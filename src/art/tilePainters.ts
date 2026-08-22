@@ -164,6 +164,52 @@ function contour(v: Vary, edgeY: number, amp: number, samples = 5): Pt[] {
   return pts
 }
 
+/**
+ * A scalloped contour: round bumps along a pinned baseline.
+ *
+ * Cloud, fungus and foam are all made of lobes, and a smooth wobble draws none
+ * of them — it draws a hill. Alternating between the baseline and a raised
+ * value at even spacing, then running it through `smooth()`, gives the row of
+ * bulges the eye actually reads as billow, while both ends stay pinned so
+ * neighbouring cells still join.
+ */
+function scallop(v: Vary, edgeY: number, amp: number, bumps: number): Pt[] {
+  const n = bumps * 2
+  const pts: Pt[] = [[0, edgeY]]
+  for (let i = 1; i < n; i++) {
+    const lift = i % 2 === 1 ? amp * v.range(0.55, 1.35) : 0
+    pts.push([(TILE / n) * i, edgeY - lift + v.range(-0.3, 0.3)])
+  }
+  pts.push([TILE, edgeY])
+  return pts
+}
+
+/**
+ * An irregular closed ring of points around a centre.
+ *
+ * A boulder, a clod and a cobble are all this shape: `blob()` through a ring
+ * whose radii wander. Drawing them as ellipses instead is what made the old
+ * ground read as a field of identical grey lozenges — an ellipse has two axes
+ * of symmetry and the eye finds both of them immediately.
+ */
+function ringPts(
+  v: Vary,
+  cx: number,
+  cy: number,
+  r: number,
+  lobes: number,
+  squash = 0.7,
+): Pt[] {
+  const pts: Pt[] = []
+  const phase = v.range(0, TAU)
+  for (let i = 0; i < lobes; i++) {
+    const a = phase + (i / lobes) * TAU
+    const rr = r * v.range(0.58, 1)
+    pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * squash])
+  }
+  return pts
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Materials
 // ─────────────────────────────────────────────────────────────────────────────
@@ -242,9 +288,13 @@ function buildTerrain(biome: Biome): Terrain {
       return {
         bedding: 'sandstone', crown: 'crust', masonry: 'adobe', joinery: 'palm',
         rigging: 'knotted', barb: 'bone', spring: 'awning', slick: 'glass',
-        cap: mix(p.ground, PAL.cream, 0.1),
-        soil: p.groundDeep,
-        rock: p.groundEdge,
+        // The value range is the whole problem in a desert: sand, sky and dune
+        // are all pale and all warm, and if the ground mass is only a step
+        // below the cap the player's silhouette has nothing to stand against.
+        // The bleached crust stays bright; everything under it goes down.
+        cap: p.ground,
+        soil: mix(p.groundDeep, p.groundEdge, 0.45),
+        rock: mix(p.groundEdge, PAL.ink, 0.22),
         moss: mix(p.groundEdge, PAL.zoroGreen, 0.2),
         grit: mix(p.groundEdge, PAL.ink, 0.42),
         timber: mix(PAL.wood, PAL.sand, 0.4),
@@ -252,17 +302,20 @@ function buildTerrain(biome: Biome): Terrain {
         accent: PAL.bloodOrange,
       }
     case 'skypiea':
-      // Cloud-turf still has to have a value range. Painting it in the palette's
-      // near-white leaves the shade tone nowhere to go, and the island reads as
-      // a hole cut in the sky.
+      // Cloud-turf still has to have a value range, and the range has to be
+      // *below* the sky. The previous recipe put cap, soil and rock all above
+      // 85% lightness against a horizon of near-white, so the island vanished:
+      // the player could not see where the ground was. A cumulus seen from the
+      // side is a bright top over a blue-grey body, so that is what this is —
+      // mint-white turf, a shaded cloud mass, pale golden stone in the cuts.
       return {
         bedding: 'cloud', crown: 'wisp', masonry: 'skystone', joinery: 'skywood',
         rigging: 'vine', barb: 'shard', spring: 'puff', slick: 'cloudice',
-        cap: p.ground,
-        soil: mix(p.groundEdge, PAL.skyLow, 0.42),
-        rock: mix(PAL.mist, PAL.skyLow, 0.3),
+        cap: mix(p.ground, PAL.white, 0.22),
+        soil: mix(PAL.mist, PAL.skyHigh, 0.3),
+        rock: mix(PAL.sand, PAL.steel, 0.42),
         moss: p.groundDeep,
-        grit: mix(PAL.mist, PAL.steel, 0.35),
+        grit: mix(PAL.steel, PAL.slate, 0.3),
         timber: mix(PAL.cream, PAL.sand, 0.35),
         metal: mix(PAL.gold, PAL.cream, 0.3),
         accent: PAL.gold,
@@ -291,7 +344,7 @@ function buildTerrain(biome: Biome): Terrain {
         rock: p.groundDeep,
         moss: mix(PAL.poison, p.groundDeep, 0.45),
         grit: mix(PAL.mist, p.ground, 0.5),
-        timber: mix(PAL.woodDeep, p.ground, 0.4),
+        timber: mix(PAL.woodDeep, p.groundDeep, 0.5),
         metal: PAL.slate,
         accent: PAL.poison,
       }
@@ -618,19 +671,13 @@ function inclusions(ctx: CanvasRenderingContext2D, v: Vary, t: Terrain, light: L
   // One stone in four tiles, not one in every other: an inclusion is only
   // interesting while it is still a surprise, and an ellipse repeated at a
   // fixed rate is the single loudest way to advertise a tile grid.
-  if (v.chance(0.24)) {
+  if (v.chance(0.16)) {
     const cx = v.range(3, TILE - 3)
     const cy = v.range(CAP_Y + 2.5, TILE - 2)
-    const r = v.range(1, 2.8)
-    const pts: Pt[] = []
-    const lobes = 5 + v.int(3)
-    for (let i = 0; i < lobes; i++) {
-      const a = (i / lobes) * TAU
-      const rr = r * v.range(0.62, 1)
-      pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * v.range(0.55, 0.8)])
-    }
-    paint(ctx, blob(pts, 0.85), grit, {
-      shadow: 0.52, radius: r, pivot: [cx, cy], rim: 0.28, line: 0.3, occlusion: 0.4, light,
+    const r = v.range(0.8, 2.2)
+    paint(ctx, blob(ringPts(v, cx, cy, r, 5 + v.int(3), v.range(0.55, 0.85)), 0.85), grit, {
+      shadow: 0.52, radius: r, pivot: [cx, cy], rim: 0.24,
+      rimColor: rgba(grit.light, 0.6), line: 0, occlusion: 0.4, light,
     })
   }
   // Grit trails: a handful of chips washed into one pocket, not a scatter.
@@ -659,6 +706,8 @@ function bedding(
   t: Terrain,
   v: Vary,
   light: Light,
+  /** True when there is open air below this cell — some masses tear there. */
+  openS: boolean,
 ): void {
   const soil = cel(t.soil)
   const rock = cel(t.rock)
@@ -691,42 +740,55 @@ function bedding(
       break
     }
     case 'cloud': {
-      // Cloud has no strata; it has billows. Stepping the value at fixed heights
-      // banded a stack of tiles into stripes — the reset at each border was the
-      // loudest thing on screen — so the mass stays one tone and the billow is
-      // carried by its lip alone, placed the same way a bedding plane is: pinned
-      // so neighbours can join, probable rather than certain so a column of
-      // tiles never repeats.
-      for (const ys of [[2.4, 6.6], [8.4, 12.6]]) {
-        if (!v.chance(0.7)) continue
-        const line = contour(v, ys[v.int(ys.length)], 2, 4 + v.int(3))
-        const lip = new Path2D()
-        smooth(lip, line, true)
+      // Cloud has no strata; it has billows. Anything drawn as a horizontal
+      // band — a stepped value, a pinned lip, a scalloped ruffle — puts a
+      // rhythm at the tile pitch across the whole island and the mass comes out
+      // as corrugated card. So the body is built from lobes instead: round,
+      // overlapping, each one lit on top and shaded underneath, and every one
+      // kept whole inside its cell so no cell border ever cuts a fill.
+      const puff = 2 + v.int(3)
+      for (let i = 0; i < puff; i++) {
+        const r = v.range(3.2, 6.4)
+        const cx = v.range(r * 0.5, TILE - r * 0.5)
+        const cy = v.range(r * 0.4, TILE - r * 0.3)
+        const lobe = blob(ringPts(v, cx, cy, r, 6 + v.int(3), v.range(0.72, 1)), 0.95)
+        // The shaded underside first, offset down, then the lit crown over it.
         ctx.save()
-        ctx.globalAlpha = 0.5
-        ctx.strokeStyle = soil.shade
-        ctx.lineWidth = 1.1
-        ctx.translate(0, 1)
-        ctx.stroke(lip)
+        ctx.globalAlpha = v.range(0.12, 0.24)
+        ctx.fillStyle = soil.deep
+        ctx.translate(0, r * 0.3)
+        ctx.fill(lobe)
         ctx.restore()
         ctx.save()
-        ctx.globalAlpha = 0.85
-        ctx.strokeStyle = rock.light
-        ctx.lineWidth = 0.7
-        ctx.stroke(lip)
+        ctx.globalAlpha = v.range(0.16, 0.3)
+        ctx.fillStyle = i % 3 === 0 ? rock.light : soil.light
+        ctx.fill(lobe)
+        // The rim of light along the top of a billow. Clipped to the lobe, so
+        // it is a crescent rather than an outline.
+        ctx.clip(lobe)
+        ctx.globalAlpha = 0.26
+        ctx.strokeStyle = PAL.white
+        ctx.lineWidth = 0.8
+        ctx.translate(light.x * 0.8, light.y * 0.8)
+        ctx.stroke(lobe)
         ctx.restore()
       }
       // Cloud-turf should look like it would not take your weight: the mass
-      // thins out toward the bottom of the cell into torn wisps rather than
-      // ending on a cut edge.
-      ctx.save()
-      ctx.globalCompositeOperation = 'destination-out'
-      ctx.fillStyle = '#000'
-      for (let i = 0; i < 2 + v.int(3); i++) {
-        const x = v.range(-1, TILE + 1)
-        ctx.fill(ellipsePath(x, TILE + v.range(0.4, 2.2), v.range(1.6, 4), v.range(1.2, 2.6), 0))
+      // thins out into torn wisps rather than ending on a cut edge. Only where
+      // there is actually air below, though — punching these through every
+      // cell put a row of holes across the middle of a solid mass, which read
+      // as a grid of grey rectangles and was most of why Skypiea's ground was
+      // invisible.
+      if (openS) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'destination-out'
+        ctx.fillStyle = '#000'
+        for (let i = 0; i < 2 + v.int(3); i++) {
+          const x = v.range(-1, TILE + 1)
+          ctx.fill(ellipsePath(x, TILE + v.range(0.4, 2.2), v.range(1.6, 4), v.range(1.2, 2.6), 0))
+        }
+        ctx.restore()
       }
-      ctx.restore()
       break
     }
     case 'quay': {
@@ -743,7 +805,16 @@ function bedding(
           const bx = Math.max(0, x)
           const bw = Math.min(x + 8, TILE) - bx
           if (bw < 1) continue
-          const tone = mix(rock.core, v.chance(0.5) ? rock.light : rock.shade, v.range(0, 0.22))
+          // One stone in seven is not like the others: a replacement in fresh
+          // pale granite, or one that has dropped out and left a dark socket.
+          // A wall where every unit is within a few percent of its neighbour is
+          // a texture, not masonry.
+          const odd = v.next()
+          const tone = odd < 0.07
+            ? mix(rock.core, PAL.mist, 0.4)
+            : odd < 0.14
+              ? mix(rock.deep, PAL.ink, 0.45)
+              : mix(rock.core, v.chance(0.5) ? rock.light : rock.shade, v.range(0, 0.26))
           block(ctx, bx + 0.35, y + 0.35, bw - 0.7, h - 0.7, cel(tone), light, 0.45)
           // Wear: a chip or a stain on roughly one stone in four.
           if (v.chance(0.26)) {
@@ -768,8 +839,11 @@ function bedding(
         ctx.fill(roundRectPath(v.range(1, 5), py, v.range(5, 8), 3, 0.5))
         ctx.restore()
       }
-      // The tide leaves the lower courses darker, green and shelled.
-      const tide = TILE - h * v.range(0.5, 0.95)
+      // The tide leaves the lower courses darker, green and shelled. Its height
+      // is pinned: a tide line that moved from cell to cell drew a dashed green
+      // streak along the quay at exactly the tile pitch, and a tide line is the
+      // one thing on a harbour wall that is genuinely level for a mile.
+      const tide = TILE - h * 0.72
       ctx.save()
       ctx.globalAlpha = 0.26
       ctx.fillStyle = t.moss
@@ -785,10 +859,14 @@ function bedding(
       const boardC = cel(t.timber)
       ctx.fillStyle = cel(t.rock).deep
       ctx.fillRect(0, 0, TILE, TILE)
-      let y = -v.range(0, 2)
-      while (y < TILE) {
-        const bh = v.range(3, 5)
-        plank(ctx, v, -1, y, TILE + 2, Math.min(bh, TILE - y + 1), boardC, light, 2)
+      // The board pitch is fixed and divides the cell, so a deck runs unbroken
+      // across a whole island. Letting each tile choose its own course heights
+      // made every border a place where the planking jumped, which reads as a
+      // stack of unrelated crates rather than as a laid deck; the variety has
+      // to come from the grain, the knots, the rot and the ironwork instead.
+      const bh = 4
+      for (let y = -1; y < TILE; y += bh) {
+        plank(ctx, v, -1, y, TILE + 2, bh - 0.35, boardC, light, 2)
         // A board that has rotted through, showing the hold beneath.
         if (v.chance(0.3)) {
           ctx.save()
@@ -797,7 +875,6 @@ function bedding(
           ctx.fill(ellipsePath(v.range(2, TILE - 2), y + bh * 0.5, v.range(1.4, 3.4), v.range(0.6, 1.4), 0))
           ctx.restore()
         }
-        y += bh + 0.35
       }
       // Wrought-iron strap across the boards.
       if (v.chance(0.35)) {
@@ -827,43 +904,60 @@ function bedding(
     case 'volcanic': {
       // Basalt columns. The joint pitch divides the tile so a cliff reads as one
       // colonnade rather than a stack of separate tiles.
+      //
+      // The columns get a dark joint and a broad value difference, and nothing
+      // else: the old version drew a bright arris down the lit side of every
+      // one, which is the signature of a *bevelled plank*, and a Wano cliff
+      // came out looking like a fence.
       const w = TILE / 2
       for (let c = 0; c < 2; c++) {
         const x = c * w
-        ctx.fillStyle = mix(rock.core, v.chance(0.5) ? rock.light : rock.deep, v.range(0.04, 0.18))
+        ctx.fillStyle = mix(rock.core, v.chance(0.5) ? rock.light : rock.deep, v.range(0.06, 0.26))
         ctx.fillRect(x, 0, w, TILE)
       }
       ctx.save()
-      ctx.globalAlpha = 0.5
-      ctx.lineWidth = 0.45
+      ctx.globalAlpha = 0.55
+      ctx.strokeStyle = rock.deep
+      ctx.lineWidth = 0.5
       for (let c = 0; c < 2; c++) {
         const x = c * w
-        ctx.strokeStyle = rock.deep
         ctx.beginPath()
         ctx.moveTo(x, 0)
         ctx.lineTo(x, TILE)
         ctx.stroke()
-        // The lit side of each column edge; without it a colonnade is stripes.
-        ctx.globalAlpha = 0.3
-        ctx.strokeStyle = rock.light
+      }
+      ctx.restore()
+      // Cooling fractures across the columns. Basalt cracks horizontally as it
+      // contracts, and those breaks are the whole reason a colonnade does not
+      // read as timber; they stop dead at a joint, so each one is drawn inside
+      // a single column.
+      ctx.save()
+      ctx.globalAlpha = 0.4
+      ctx.lineWidth = 0.35
+      for (let i = 0; i < 2 + v.int(3); i++) {
+        const c = v.int(2)
+        const x = c * w
+        const y = v.range(1, TILE - 1)
+        ctx.strokeStyle = v.chance(0.35) ? rock.light : rock.deep
         ctx.beginPath()
-        ctx.moveTo(x + (light.x < 0 ? 0.6 : -0.6), 0)
-        ctx.lineTo(x + (light.x < 0 ? 0.6 : -0.6), TILE)
+        ctx.moveTo(x + 0.3, y)
+        ctx.lineTo(x + w - 0.3, y + v.range(-0.8, 0.8))
         ctx.stroke()
-        ctx.globalAlpha = 0.5
       }
       ctx.restore()
       // Dressed stone: somebody has cut steps and revetments into this rock, and
       // the join between the worked course and the raw basalt is where Wano's
-      // ground stops being a cliff and starts being a castle wall.
-      if (v.chance(0.4)) {
+      // ground stops being a cliff and starts being a castle wall. The course
+      // sits at one of a shared set of heights, so neighbours line up into a
+      // real revetment instead of scattering grey rectangles through the rock.
+      if (v.chance(0.34)) {
         const c = cel(mix(t.rock, PAL.mist, 0.28))
-        const y = v.range(CAP_Y + 0.5, TILE - 5)
+        const y = v.pick([CAP_Y + 1.2, 8.4, 12.2])
         for (let x = v.chance(0.5) ? 0 : -3.5; x < TILE; x += 7) {
           const bx = Math.max(0, x)
           const bw = Math.min(x + 7, TILE) - bx
           if (bw < 1.5) continue
-          block(ctx, bx + 0.3, y, bw - 0.6, 3.6, c, light, 0.5)
+          block(ctx, bx + 0.3, y, bw - 0.6, 3.4, c, light, 0.5)
         }
       }
       // A conchoidal chip out of one column face: basalt breaks in shells.
@@ -873,26 +967,26 @@ function bedding(
         ctx.save()
         ctx.globalAlpha = 0.3
         ctx.fillStyle = v.chance(0.5) ? rock.light : rock.deep
-        ctx.fill(ellipsePath(cx, cy, v.range(1.5, 3.4), v.range(1.2, 2.6), v.range(0, 1)))
+        ctx.fill(blob(ringPts(v, cx, cy, v.range(1.6, 3.2), 6, v.range(0.6, 1)), 0.75))
         ctx.restore()
       }
       // One tile in six keeps any heat, and only near the bottom. Additive so
       // it glows rather than being a drawn orange line — but rare, because a
       // wall of glowing cracks stops reading as rock at all.
-      if (v.chance(0.16)) {
+      if (v.chance(0.1)) {
         const x = v.range(1.5, TILE - 1.5)
         const p = curve([
           [x, TILE],
-          [x + v.range(-1.5, 1.5), TILE * 0.7],
-          [x + v.range(-2, 2), TILE * 0.45],
+          [x + v.range(-1.2, 1.2), TILE * 0.8],
+          [x + v.range(-1.6, 1.6), TILE * 0.62],
         ] as Pt[])
         ctx.save()
         ctx.globalCompositeOperation = 'lighter'
-        ctx.strokeStyle = rgba(PAL.ember, 0.14)
+        ctx.strokeStyle = rgba(PAL.ember, 0.09)
         ctx.lineWidth = 1.2
         ctx.stroke(p)
-        ctx.strokeStyle = rgba(PAL.ember, 0.24)
-        ctx.lineWidth = 0.3
+        ctx.strokeStyle = rgba(PAL.ember, 0.15)
+        ctx.lineWidth = 0.28
         ctx.stroke(p)
         ctx.restore()
       }
@@ -901,26 +995,71 @@ function bedding(
     default: {
       // Loam. Dark, wet, full of roots and stones — the point of East Blue's
       // ground is that the grass is bright *because* what it sits on is not.
+      //
+      // The old version painted four faint lenses on a flat fill and called it
+      // soil; at gameplay scale that is a brown wall. Loam reads as loam
+      // because it has *big* forms — turned clods, a boulder half out of the
+      // bank — with small stuff only in their shadow.
       lenses(
         ctx, v,
-        [soil.shade, rock.core, mix(soil.core, rock.core, 0.55), mix(soil.core, soil.light, 0.45)],
-        4, 0.06, CAP_Y + 1, TILE - 0.5, 6, 0.34,
+        [soil.shade, soil.deep, mix(soil.core, rock.core, 0.6), mix(soil.core, soil.light, 0.55)],
+        4, 0.06, CAP_Y + 1, TILE - 0.5, 7.5, 0.5,
       )
-      seam(ctx, v, rock.shade, [8.6, 12.4], 0.32)
+      // Clod pockets, kept strictly inside the cell. A wide soft patch that
+      // runs off the edge is a *value plateau* clipped by the canvas: a whole
+      // cell comes out a different brown from its neighbour and the ground
+      // turns into a checkerboard. Interest in a mass has to come from forms
+      // whose edges are visible, not from tinting the cell.
+      ctx.save()
+      for (let i = 0; i < 2 + v.int(2); i++) {
+        const r = v.range(1.8, 3.4)
+        const cx = v.range(r + 0.6, TILE - r - 0.6)
+        const cy = v.range(CAP_Y + r, TILE - r * 0.6)
+        ctx.globalAlpha = v.range(0.2, 0.36)
+        ctx.fillStyle = v.chance(0.55) ? soil.deep : soil.light
+        ctx.fill(blob(ringPts(v, cx, cy, r, 6, 0.66), 0.9))
+      }
+      ctx.restore()
+      seam(ctx, v, rock.shade, [8.6, 12.4], 0.26)
+      // Rootlets threading down through the body. They are the one line in loam
+      // that is not horizontal, which is exactly why the mass needs them — but
+      // they are old wood, not leaf, so they are barely tinted off the soil.
+      ctx.save()
+      ctx.globalAlpha = 0.34
+      ctx.strokeStyle = mix(cel(t.moss).deep, soil.deep, 0.6)
+      ctx.lineCap = 'round'
+      for (let i = 0; i < v.int(3); i++) {
+        const x = v.range(1, TILE - 1)
+        const y0 = v.range(CAP_Y, TILE * 0.6)
+        ctx.lineWidth = v.range(0.16, 0.3)
+        ctx.stroke(curve([
+          [x, y0],
+          [x + v.range(-2, 2), y0 + v.range(3, 6)],
+          [x + v.range(-3, 3), y0 + v.range(6, 10)],
+        ] as Pt[]))
+      }
+      ctx.restore()
       // A stone big enough to be a landmark, once in a while: loam is not a
       // uniform paste, and one large form does more for the read than twenty
-      // small ones, which only ever add up to noise.
-      if (v.chance(0.2)) {
-        const cx = v.range(3, TILE - 3)
-        const cy = v.range(TILE * 0.45, TILE - 1)
+      // small ones, which only ever add up to noise. No ink line and no rim —
+      // a stone half-buried in wet earth has a soft top and a dark underside,
+      // and outlining it is what turned the old ones into stickers.
+      if (v.chance(0.18)) {
+        const r = v.range(2.4, 5)
+        const cx = v.range(r * 0.6, TILE - r * 0.6)
+        const cy = v.range(TILE * 0.5, TILE)
+        const stone = cel(mix(t.rock, t.soil, 0.4))
+        const shape = blob(ringPts(v, cx, cy, r, 7, v.range(0.5, 0.85)), 0.9)
         ctx.save()
         ctx.globalAlpha = 0.5
-        ctx.fillStyle = rock.shade
-        ctx.fill(ellipsePath(cx, cy, v.range(3, 5.5), v.range(1.6, 3), v.range(-0.2, 0.2)))
-        ctx.globalAlpha = 0.35
-        ctx.fillStyle = rock.light
-        ctx.fill(ellipsePath(cx - 0.4, cy - 0.8, v.range(2, 4), v.range(0.5, 1), v.range(-0.2, 0.2)))
+        ctx.fillStyle = soil.deep
+        ctx.translate(0.5, 0.7)
+        ctx.fill(shape)
         ctx.restore()
+        paint(ctx, shape, stone, {
+          shadow: 0.5, radius: r, pivot: [cx, cy], rim: 0.3,
+          rimColor: rgba(stone.light, 0.55), line: 0, occlusion: 0.35, light,
+        })
       }
       break
     }
@@ -944,7 +1083,12 @@ function capBand(
   // Amplitude and wavelength both move, so no two variants share a rhythm; the
   // ends stay pinned to CAP_Y because that is the only value a neighbour can
   // agree with without knowing which neighbour it is.
-  const line = contour(v, CAP_Y, v.range(1.2, soft ? 3 : 2.4), 4 + v.int(3))
+  // Cloud-turf frays into lobes where it meets the mass; everything else
+  // wanders. Both are pinned to CAP_Y at the borders, which is the only value
+  // a neighbour can agree with without knowing which neighbour it is.
+  const line = soft
+    ? scallop(v, CAP_Y, v.range(1.6, 3), 2 + v.int(2))
+    : contour(v, CAP_Y, v.range(1.2, 2.4), 4 + v.int(3))
   const path = new Path2D()
   path.moveTo(0, -0.5)
   path.lineTo(TILE, -0.5)
@@ -952,9 +1096,63 @@ function capBand(
   smooth(path, line.slice().reverse(), false)
   path.closePath()
 
-  paint(ctx, path, cap, {
-    shadow: 0.46, radius: 3.4, pivot: [TILE / 2, 2.2], rim: 0.6, line: 0, light,
-  })
+  // The cap is lit as a *band seen edge-on*, not as a lump: brightest along the
+  // sky-facing lip, one hard terminator below it, shade to the fringe. Running
+  // `paint()` here instead was the loudest tiling tell in the game — its rim
+  // strokes the whole path, so every cell got a bright vertical bar down its
+  // left and right borders, and its diagonal terminator restarted at every
+  // tile. Both edges of every band below are pinned to the cell borders, so
+  // neighbours join and a mirrored tile still matches.
+  ctx.save()
+  ctx.clip(path)
+  ctx.fillStyle = cap.core
+  ctx.fillRect(-1, -1, TILE + 2, CAP_Y + 2)
+
+  // The shadow side of the cap is pulled a third of the way toward the body it
+  // sits on. `cel()` raises saturation as it darkens, which is right for a
+  // mid-value local colour and badly wrong for a pale one: a near-white mint
+  // turf came back as a vivid green stripe. Bouncing the shade off the mass
+  // below is both what actually happens and what fixes it.
+  const shadeTone = mix(cap.shade, cel(t.soil).core, 0.3)
+  const shadeAt = v.range(CAP_Y * 0.44, CAP_Y * 0.66)
+  const term = new Path2D()
+  smooth(term, contour(v, shadeAt, 0.55, 4 + v.int(3)), true)
+  term.lineTo(TILE, CAP_Y + 2)
+  term.lineTo(0, CAP_Y + 2)
+  term.closePath()
+  ctx.fillStyle = shadeTone
+  ctx.fill(term)
+
+  const lipAt = v.range(0.85, 1.5)
+  const lip = new Path2D()
+  lip.moveTo(0, -1)
+  lip.lineTo(TILE, -1)
+  smooth(lip, contour(v, lipAt, 0.35, 4 + v.int(2)).slice().reverse(), false)
+  lip.closePath()
+  ctx.fillStyle = cap.light
+  ctx.fill(lip)
+
+  // Fibre. A turf cap seen edge-on is not a flat green stripe — it is a mat of
+  // blades, and that texture is what the eye uses to tell turf from paint.
+  // Strokes, not shapes: a stroke cut by the cell border leaves nothing to see,
+  // whereas a filled patch cut by it leaves a straight edge on the tile grid.
+  if (t.crown === 'blades' || t.crown === 'wisp' || t.crown === 'fungus') {
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 16; i++) {
+      const x = v.range(-1, TILE + 1)
+      const top = v.range(lipAt * 0.5, CAP_Y * 0.75)
+      const h = v.range(1.2, CAP_Y * 0.9)
+      ctx.globalAlpha = v.range(0.18, 0.46)
+      ctx.strokeStyle = v.chance(0.5) ? cap.light : cap.deep
+      ctx.lineWidth = v.range(0.22, 0.5)
+      ctx.beginPath()
+      ctx.moveTo(x, top + h)
+      ctx.lineTo(x + v.range(-0.9, 0.9), top)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+  }
+  ctx.restore()
 
   // A transition zone under the skin, in a tone between cap and body, whose
   // depth is *not* pinned. It is the boundary the eye actually follows, and
@@ -1011,20 +1209,23 @@ function capBand(
   }
 
   // Where the skin meets the body it frays: roots, crust flakes, splinters.
-  const fringe = v.int(6)
+  const fringe = v.int(5)
   if (fringe > 0) {
     ctx.save()
-    ctx.fillStyle = cap.shade
+    ctx.fillStyle = mix(shadeTone, cel(t.soil).core, 0.35)
     for (let i = 0; i < fringe; i++) {
       const x = v.range(1, TILE - 1)
       const d = v.range(1.2, 4.6)
       const w = v.range(0.5, 1.3)
-      ctx.globalAlpha = v.range(0.55, 0.95)
+      // Widths and depths both roll, and the alpha rolls with them, so the
+      // frayed edge is a mat with thick and thin places rather than a row of
+      // identical teeth.
+      ctx.globalAlpha = v.range(0.35, 0.8)
       ctx.fill(
         blob([
           [x - w, CAP_Y - 0.6],
-          [x + w, CAP_Y - 0.6],
-          [x + v.range(-1.2, 1.2), CAP_Y + d],
+          [x + w * v.range(0.5, 1.4), CAP_Y - 0.6],
+          [x + v.range(-1.6, 1.6), CAP_Y + d],
         ] as Pt[], 0.6),
       )
     }
@@ -1347,7 +1548,7 @@ export function paintSolid({ ctx, mask, variant, biome }: TileDrawArgs): void {
   ctx.fillStyle = cel(t.soil).core
   ctx.fillRect(0, 0, TILE, TILE)
 
-  bedding(ctx, t, v, light)
+  bedding(ctx, t, v, light, openS)
   inclusions(ctx, v, t, light)
 
   if (openN) capBand(ctx, t, v, light, openW, openE)
@@ -1395,7 +1596,12 @@ export function paintCrown({ ctx, mask, variant, biome }: TileDrawArgs): void {
   // patches and thin patches instead of an even comb.
   const density = v.next()
   const lush = density > 0.55
-  const bare = density < 0.18
+  const bare = density < 0.2
+  // Some ground grows nothing at all. A fringe that is merely *thinner* on its
+  // sparse tiles is still a continuous fringe, and a continuous fringe on a
+  // grid is a comb however much its teeth vary; the only thing that genuinely
+  // breaks the rhythm is a gap.
+  if (density < 0.075) return
 
   // Clump centres. Growth gathers where the ground holds water; spreading tufts
   // uniformly across the cell is what produced the old picket fence.
@@ -1627,16 +1833,16 @@ export function paintCrown({ ctx, mask, variant, biome }: TileDrawArgs): void {
       // The back rank is only a shade deeper than the front. Dropping it all the
       // way to the moss tone turned the fringe into a row of dark spikes.
       const back = cel(mix(t.cap, t.moss, 0.55))
-      const n = bare ? 1 + v.int(2) : lush ? 7 + v.int(5) : 3 + v.int(4)
+      const n = bare ? 1 + v.int(2) : lush ? 8 + v.int(6) : 3 + v.int(5)
       for (let i = 0; i < n; i++) {
         const front = i >= n / 2
         const x = at()
         // Squaring the roll gives a few tall blades and many short ones, which
         // is what a real fringe looks like; a flat range gives a comb.
         const roll = v.next()
-        const h = (1.3 + roll * roll * (lush ? 6.6 : 3.4)) * (front ? 1 : 0.72)
-        const w = v.range(0.5, 1.4)
-        let lean = v.range(-2.4, 2.4)
+        const h = (1.2 + roll * roll * (lush ? 7.4 : 3.6)) * (front ? 1 : 0.72)
+        const w = v.range(0.4, 1.6)
+        let lean = v.range(-3, 3)
         // Blades at an exposed edge fall away from the cliff.
         if (openW && x < 4) lean -= v.range(0.5, 2)
         if (openE && x > TILE - 4) lean += v.range(0.5, 2)
@@ -1710,53 +1916,85 @@ function paintSlope(dir: 1 | -1): TilePainter {
     ctx.clip(wedge)
     ctx.fillStyle = cel(t.soil).core
     ctx.fillRect(0, 0, TILE, TILE)
-    bedding(ctx, t, v, light)
+    bedding(ctx, t, v, light, true)
     inclusions(ctx, v, t, light)
     ctx.restore()
 
     // The cap runs along the diagonal, thick enough to read at speed.
+    //
+    // `inset` has to point *into* the wedge. It used to be `dir * -4.6`, which
+    // is the outward normal on both slopes, so the entire band fell outside the
+    // clip and every ramp in the game rendered as a bare wedge of soil with no
+    // grass on it at all — the one place a player's eye follows the ground most
+    // closely. The wedge for a rising slope lies below the diagonal, so the
+    // inward normal is (+dir, +1).
     const cap = cel(t.cap)
     const a: Pt = dir === 1 ? [-1, TILE + 1] : [TILE + 1, TILE + 1]
     const b: Pt = dir === 1 ? [TILE + 1, -1] : [-1, -1]
+    // 3.2 across and 3.2 down is 4.5 units measured square to the diagonal —
+    // the same thickness the flat cap has, so a ramp and the ground it joins
+    // look like the same skin over the same soil.
+    const inset = dir * 3.2
     ctx.save()
     ctx.clip(wedge)
     const band = new Path2D()
     band.moveTo(a[0], a[1])
     band.lineTo(b[0], b[1])
-    band.lineTo(b[0] + dir * -4.6, b[1] + 4.6)
-    band.lineTo(a[0] + dir * -4.6, a[1] + 4.6)
+    band.lineTo(b[0] + inset, b[1] + 3.2)
+    band.lineTo(a[0] + inset, a[1] + 3.2)
     band.closePath()
-    paint(ctx, band, cap, {
-      shadow: 0.26, radius: 4, pivot: [TILE / 2, TILE / 2], rim: 0.6, line: 0, light,
-    })
-    ctx.strokeStyle = cap.light
-    ctx.globalAlpha = 0.85
-    ctx.lineWidth = 0.6
-    ctx.beginPath()
-    ctx.moveTo(a[0], a[1] - 0.4)
-    ctx.lineTo(b[0], b[1] - 0.4)
-    ctx.stroke()
+    ctx.fillStyle = cap.core
+    ctx.fill(band)
+    // The same edge-on lighting the flat cap gets: a lit lip on the sky side,
+    // one hard terminator, shade to the fringe — measured along the diagonal so
+    // a ramp and the ground it joins are lit by the same sun.
+    const lip = new Path2D()
+    lip.moveTo(a[0], a[1])
+    lip.lineTo(b[0], b[1])
+    lip.lineTo(b[0] + inset * 0.3, b[1] + 0.95)
+    lip.lineTo(a[0] + inset * 0.3, a[1] + 0.95)
+    lip.closePath()
+    const shade = new Path2D()
+    shade.moveTo(a[0] + inset * 0.55, a[1] + 1.75)
+    shade.lineTo(b[0] + inset * 0.55, b[1] + 1.75)
+    shade.lineTo(b[0] + inset, b[1] + 3.2)
+    shade.lineTo(a[0] + inset, a[1] + 3.2)
+    shade.closePath()
+    ctx.fillStyle = mix(cap.shade, cel(t.soil).core, 0.3)
+    ctx.fill(shade)
+    ctx.fillStyle = cap.light
+    ctx.fill(lip)
     ctx.restore()
 
-    // Whatever grows on the flat grows on the slope too, lying along it.
-    ctx.save()
-    ctx.clip(wedge)
-    ctx.globalAlpha = 0.9
-    const n = 2 + v.int(4)
+    // Whatever grows on the flat grows on the slope too — and it grows *out* of
+    // it. Clipping this pass to the wedge cut every blade off at the diagonal,
+    // which is the one edge on a ramp that most needs to be broken: an unbroken
+    // 45-degree line is the most artificial shape a natural tileset can show.
+    const n = 3 + v.int(5)
     for (let i = 0; i < n; i++) {
-      const s = v.range(0.05, 0.95)
+      const s = v.range(0.04, 0.96)
       const px = a[0] + (b[0] - a[0]) * s
       const py = a[1] + (b[1] - a[1]) * s
-      const h = v.range(1.2, 3.6)
-      const lean = dir * v.range(0.4, 2)
-      ctx.fillStyle = i % 3 === 0 ? cel(t.moss).core : cap.shade
-      ctx.fill(blob([
-        [px - 0.9, py + 0.6],
-        [px + 0.9, py + 0.6],
-        [px + lean, py - h],
-      ] as Pt[], 0.7))
+      const roll = v.next()
+      const h = 1.2 + roll * roll * 5.4
+      const w = v.range(0.4, 1.2)
+      const lean = dir * v.range(0.2, 2.4)
+      const front = i >= n / 2
+      paint(
+        ctx,
+        blob([
+          [px - w, py + 1.2],
+          [px + w, py + 1.2],
+          [px + lean * 0.55 + w * 0.3, py - h * 0.6],
+          [px + lean, py - h],
+        ] as Pt[], 0.75),
+        front ? cap : cel(mix(t.cap, t.moss, 0.55)),
+        {
+          shadow: front ? 0.34 : 0.6, radius: Math.max(1.2, h * 0.5),
+          pivot: [px, py - h * 0.5], rim: front && h > 3 ? 0.35 : 0, line: 0, light,
+        },
+      )
     }
-    ctx.restore()
   }
 }
 

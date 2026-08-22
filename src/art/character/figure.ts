@@ -1,5 +1,6 @@
-import { createSurface, overlayTint, silhouetteOf, type Pt, type Surface } from '../ink'
-import { drawHairBack, drawHairFront, drawHead } from './head'
+import { mix } from '../color'
+import { createSurface, silhouetteOf, type Pt, type Surface } from '../ink'
+import { drawHairBack, drawHairFront, drawHead, drawNeck } from './head'
 import type { Look } from './looks'
 import type { Pose, Skeleton } from './rig'
 import {
@@ -40,21 +41,27 @@ export function drawFigure(
   // Cloth hanging behind the body is only a hand's width back, not an arm's.
   const mid = recedePalette(pal, 0.14)
 
+  const [hx, hy] = s.head
+  const r = s.headR
+
   look.props?.(ctx, s, 'behind')
   look.backCloth?.(ctx, s, mid)
 
-  drawLeg(ctx, s.legBack, s.footBack, look.legs(far))
-  drawArm(ctx, s.armBack, far.skin, look.arms(far))
+  // The hair mass falls *behind* the body, not over it. Drawn with the head it
+  // is drawn after the costume, and anyone with hair past their shoulders — the
+  // navigator, the archaeologist — ends up wearing it as a cape with the whole
+  // torso hidden underneath.
+  drawHairBack(ctx, hx, hy, r, pal.hair, look.hairBack(hx, hy, r, s))
 
+  drawLeg(ctx, s.legBack, s.footBack, { ...look.legs(far), dim: true })
+  drawArm(ctx, s.armBack, far.skin, { ...look.arms(far), dim: true })
+
+  drawNeck(ctx, s, pal.skin, look.face.jaw ?? 1)
   look.torso(ctx, s, pal)
 
   drawLeg(ctx, s.legFront, s.footFront, look.legs(pal))
   look.overLegs?.(ctx, s, pal)
 
-  // Hair mass sits over the shoulders but behind the face.
-  const [hx, hy] = s.head
-  const r = s.headR
-  drawHairBack(ctx, hx, hy, r, pal.hair, look.hairBack(hx, hy, r, s))
   drawHead(ctx, s, {
     skin: pal.skin,
     hair: pal.hair,
@@ -81,6 +88,40 @@ export function drawFigure(
 }
 
 /**
+ * The unbroken contour around a whole figure.
+ *
+ * `atlas` will do this for a sheet, but it stamps the frame's alpha outward
+ * twelve times; eight is indistinguishable at this line width and a third
+ * cheaper, and across five hundred frames that is real time. The ring is
+ * composited underneath, so the line sits outside the silhouette rather than
+ * eating into it.
+ */
+export function contourPass(surface: Surface, color: string, width: number): void {
+  const { canvas, scale } = surface
+  const w = canvas.width
+  const h = canvas.height
+  const ring = document.createElement('canvas')
+  ring.width = w
+  ring.height = h
+  const rctx = ring.getContext('2d')!
+  const r = width * scale
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    rctx.drawImage(canvas, Math.cos(a) * r, Math.sin(a) * r)
+  }
+  rctx.globalCompositeOperation = 'source-in'
+  rctx.fillStyle = color
+  rctx.fillRect(0, 0, w, h)
+
+  const ctx = surface.ctx
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalCompositeOperation = 'destination-over'
+  ctx.drawImage(ring, 0, 0)
+  ctx.restore()
+}
+
+/**
  * Multiple-image smear.
  *
  * On the frame a punch lands the eye wants a shape that spans where the body
@@ -100,15 +141,18 @@ export interface Ghost {
 
 export function drawGhosts(s: Surface, look: Look, ghosts: Ghost[], scale: number): void {
   const ctx = s.ctx
+  const trail = mix(look.banner, '#FFFFFF', 0.5)
   for (const g of ghosts) {
     const scratch = createSurface(s.w, s.h, s.scale)
     drawFigure(scratch.ctx, look, g.pose, scale)
-    overlayTint(scratch, look.banner, 0.62)
-    overlayTint(scratch, '#FFFFFF', 0.24)
+    // A flat silhouette, not a second rendering of the character. A dimmed copy
+    // of the full drawing reads as a dirty double exposure — the grey smudge
+    // the first pass had on every fast frame — where one flat shape in the
+    // character's own colour reads as the body having been there a moment ago.
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = g.alpha
-    ctx.drawImage(scratch.canvas, (g.dx ?? 0) * s.scale, (g.dy ?? 0) * s.scale)
+    ctx.drawImage(silhouetteOf(scratch, trail), (g.dx ?? 0) * s.scale, (g.dy ?? 0) * s.scale)
     ctx.restore()
   }
 }
@@ -117,13 +161,15 @@ export function drawGhosts(s: Surface, look: Look, ghosts: Ghost[], scale: numbe
  * A directional smear: the figure's own silhouette, stretched along one axis
  * and faded out behind it.
  *
- * This is what a skid or a dash wants instead of a second drawing. Because it
- * is built from the alpha of the pose actually on screen it can never drift out
- * of register with the body, and because it is scaled rather than repeated it
- * has no visible steps — the trail thins the way a real smear frame does.
+ * This is what a skid or a dash wants instead of a second drawing. It is built
+ * from the alpha of the figure already on the surface — so it can never drift
+ * out of register with the body, and it costs one silhouette instead of a whole
+ * second rendering of the character — then composited underneath with
+ * `destination-over` so the body stays crisp in front of its own trail.
  */
 export interface Smear {
-  pose: Pose
+  /** Colour of the trail — the character's own signature, washed toward white. */
+  color: string
   /** Direction and length of the trail in world units — where the body came from. */
   dx: number
   dy?: number
@@ -133,16 +179,16 @@ export interface Smear {
   steps?: number
 }
 
-export function drawSmear(surface: Surface, look: Look, sm: Smear, scale: number): void {
-  const scratch = createSurface(surface.w, surface.h, surface.scale)
-  drawFigure(scratch.ctx, look, sm.pose, scale)
-  const sil = silhouetteOf(scratch, look.banner)
+export function drawSmear(surface: Surface, sm: Smear): void {
+  const sil = silhouetteOf(surface, sm.color)
   const steps = sm.steps ?? 3
   const a0 = sm.alpha ?? 0.34
   const ctx = surface.ctx
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  for (let i = steps; i >= 1; i--) {
+  // Behind whatever is already on the surface: the trail is where the body was.
+  ctx.globalCompositeOperation = 'destination-over'
+  for (let i = 1; i <= steps; i++) {
     const t = i / steps
     ctx.globalAlpha = a0 * (1 - t) * (1 - t * 0.4)
     ctx.drawImage(sil, sm.dx * t * surface.scale, (sm.dy ?? 0) * t * surface.scale)

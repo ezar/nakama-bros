@@ -40,7 +40,8 @@ export { Overlay, hash2, terrainOf }
  * saving on `variants` is the whole reason this table exists: the crown — the
  * fringe of grass, crust and fungus that breaks the ground's top edge — is the
  * single most repeated thing on screen, and six variants of it is a picket
- * fence. Sixteen, mirrored by the renderer, is thirty-two.
+ * fence. Twenty, mirrored by the renderer, is forty — more than a viewport
+ * holds, so no run of ground on screen has to repeat a fringe at all.
  *
  * Ids whose look must *not* change from one placement to the next get one
  * variant. A question block is a piece of interface: the player has to
@@ -58,10 +59,10 @@ const S = 4
 const W = 8
 
 const ATLAS_SPECS: Record<number, Spec> = {
-  [Tile.Solid]: { maskBits: N | E | S | W, variants: 8 },
+  [Tile.Solid]: { maskBits: N | E | S | W, variants: 10 },
   [Tile.Decor]: { maskBits: N | E | S | W, variants: 4 },
   [Tile.Ice]: { maskBits: N | E | S | W, variants: 4 },
-  [Overlay.Crown]: { maskBits: E | W, variants: 16 },
+  [Overlay.Crown]: { maskBits: E | W, variants: 20 },
   [Tile.Crumble]: { maskBits: S, variants: 6 },
   [Tile.SlopeUp45]: { maskBits: 0, variants: 4 },
   [Tile.SlopeDown45]: { maskBits: 0, variants: 4 },
@@ -84,7 +85,7 @@ export const ATLAS_IDS: number[] = Object.keys(ATLAS_SPECS).map(Number)
  * It is a hint for callers that want to spread tiles across the whole range;
  * `src` wraps per id, so passing a value beyond an id's own count is safe.
  */
-export const VARIANTS = 16
+export const VARIANTS = 20
 
 /** Cells across the sheet. */
 const COLS = 16

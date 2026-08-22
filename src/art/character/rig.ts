@@ -1,5 +1,6 @@
 import { cel, mix, type Cel } from '../color'
-import { blob, curve, paint, type Pt } from '../ink'
+import { blob, curve, type Pt } from '../ink'
+import { celPaint } from './paint'
 
 /**
  * The shared character rig.
@@ -31,11 +32,11 @@ export const GROUND_Y = FH - 1.5
 
 /** Segment lengths, in world units. */
 export const SEG = {
-  thigh: 7.9,
-  shin: 7.3,
+  thigh: 8.6,
+  shin: 8.0,
   foot: 2.8,
-  torso: 10.2,
-  neck: 1.15,
+  torso: 9.5,
+  neck: 0.55,
   upperArm: 6.1,
   foreArm: 5.6,
   hand: 1.6,
@@ -416,10 +417,17 @@ function paintLimb(
   c: Cel,
   scale: number,
   bow = 0,
+  dim = false,
 ): Path2D {
   const prof = scaleProfile(profile, scale)
   const path = limbForm(a, b, prof, bow * scale)
-  paint(ctx, path, c, { ...LIMB_OPTS, radius: maxRadius(prof), pivot: midpoint(a, b) })
+  celPaint(ctx, path, c, {
+    ...LIMB_OPTS,
+    rim: dim ? 0 : LIMB_OPTS.rim,
+    occlusion: dim ? 0 : LIMB_OPTS.occlusion,
+    radius: maxRadius(prof),
+    pivot: midpoint(a, b),
+  })
   return path
 }
 
@@ -436,11 +444,14 @@ export interface HandStyle {
 }
 
 /**
- * A hand with a visible thumb.
+ * A hand.
  *
- * At this size fingers are noise, but a thumb is a silhouette: it is what stops
- * a hand reading as a knob on the end of an arm, and it tells the eye which way
- * the palm faces.
+ * At sprite size a hand is three marks and no more: the mass of the palm, the
+ * thumb breaking its outline, and one crease where the fingers fold. What it
+ * must not be is a circle on the end of a tube — a relaxed fist without
+ * knuckles reads as a blob at the hip, which is exactly how the first pass
+ * looked. So the leading edge of a fist is scalloped into three lobes, and the
+ * thumb is always drawn first so the palm's ink line closes over its root.
  */
 export function drawHand(
   ctx: CanvasRenderingContext2D,
@@ -462,34 +473,40 @@ export function drawHand(
     wrist[1] + (uy * x + ny * y) * scale,
   ]
 
-  // Thumb first, so the palm's ink line closes over its root.
-  paint(
+  // Thumb: a short tapered form laid across the near side of the palm.
+  celPaint(
     ctx,
-    limbForm(P(-0.45, -0.85), P(0.95 + grip * 0.2, -1.75 - grip * 0.15), [[0, 0.68], [0.55, 0.62], [1, 0.48]], 0.12),
+    limbForm(P(0.1, -0.9), P(1.35 + grip * 0.3, -1.5 - grip * 0.25), [[0, 0.62], [0.5, 0.58], [1, 0.42]], 0.14),
     c,
-    { shadow: 0.42, radius: 0.72, pivot: P(0.3, -1.3), rim: 0.36, line: 0.4 },
+    { shadow: 0.44, radius: 0.7, pivot: P(0.7, -1.2), rim: 0.34, line: 0.42 },
   )
 
-  const reach = 1.5 + (1 - grip) * 0.85
+  const reach = 2.3 + (1 - grip) * 1.2
+  // The knuckle line: three shallow lobes across the leading edge when the hand
+  // is closed, flattening out as it opens.
+  const lobe = (k: number): Pt => P(reach - Math.abs(k) * 0.36 * grip, k * 1.12)
   const palm = blob([
-    P(-1.2, -0.98),
-    P(0.35, -1.32),
-    P(reach, -0.6),
-    P(reach + 0.12, 0.62),
-    P(0.55, 1.42),
-    P(-0.8, 1.24),
-    P(-1.42, 0.16),
-  ], 0.86)
-  paint(ctx, palm, c, { shadow: 0.42, radius: 1.6, pivot: wrist, rim: 0.5, line: 0.46 })
+    P(-0.5, -1.44),
+    P(0.9, -1.62),
+    lobe(-0.94),
+    lobe(0),
+    lobe(0.94),
+    P(0.55, 1.62),
+    P(-0.7, 1.36),
+    P(-1.18, 0),
+  ], 0.84)
+  celPaint(ctx, palm, c, {
+    shadow: 0.44, radius: 1.5, pivot: wrist, rim: 0.46, line: 0.46, occlusion: 0.2,
+  })
 
-  // Two knuckle creases. Any more and the hand starts to fight the face.
+  // One crease where the fingers fold, and a second only on an open hand.
   ctx.save()
   ctx.clip(palm)
-  ctx.globalAlpha = 0.5
+  ctx.globalAlpha = 0.7
   ctx.strokeStyle = c.line
-  ctx.lineWidth = 0.34 * scale
-  ctx.stroke(curve([P(reach - 0.35, -0.5), P(reach - 0.55, 0.55)] as Pt[]))
-  ctx.stroke(curve([P(0.25, -0.9), P(0.05, 0.35)] as Pt[]))
+  ctx.lineWidth = 0.38 * scale
+  ctx.stroke(curve([P(reach - 0.9, -1.05), P(reach - 0.76, 1.0)] as Pt[]))
+  if (grip < 0.6) ctx.stroke(curve([P(reach - 0.2, -0.6), P(reach - 0.15, 0.7)] as Pt[]))
   ctx.restore()
 }
 
@@ -512,6 +529,13 @@ export interface ArmStyle {
   foreMass?: number
   handScale?: number
   /**
+   * The far side of the body. Everything back there is already washed toward
+   * the sky and half a value from its neighbours, so the rim, the cuff and the
+   * hardware are invisible — and at ten characters times fifty frames, drawing
+   * them anyway is the most expensive invisible thing in the build.
+   */
+  dim?: boolean
+  /**
    * Anything worn on the arm itself and shaped by its pose: plating and bolts,
    * a fin, a bandage. Drawn after the limb and before the hand, so it can cut
    * across the sleeve hem the way real hardware does.
@@ -533,10 +557,14 @@ export function drawArm(
   const upperForm = scaleProfile(FORM.upperArm, style.upperMass ?? 1)
   const foreForm = scaleProfile(FORM.foreArm, style.foreMass ?? 1)
 
-  paintLimb(ctx, root, elbow, upperForm, skin, scale)
-  paintLimb(ctx, elbow, wrist, foreForm, skin, scale, 0.22)
-
+  const dim = style.dim ?? false
   const sl = style.sleeve ?? 0
+  // Skin the garment completely covers is skin nobody will ever see.
+  if (sl < 0.97 || !style.cloth) {
+    paintLimb(ctx, root, elbow, upperForm, skin, scale, 0, dim)
+    paintLimb(ctx, elbow, wrist, foreForm, skin, scale, 0.22, dim)
+  }
+
   if (sl > 0.03 && style.cloth) {
     const total = upperLen + foreLen
     const d = sl * total
@@ -547,30 +575,30 @@ export function drawArm(
       hemAt = lerpPt(root, elbow, t)
       const prof = scaleProfile(sliceProfile(upperForm, t, 1.24), scale)
       hemR = prof[prof.length - 1][1]
-      paint(ctx, limbForm(root, hemAt, prof), style.cloth, {
+      celPaint(ctx, limbForm(root, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(root, hemAt), rim: 0.5, line: 0.46, occlusion: 0.2,
       })
     } else {
       const t = Math.min(0.98, (d - upperLen) / foreLen)
       hemAt = lerpPt(elbow, wrist, t)
       const upper = scaleProfile(scaleProfile(upperForm, 1.22), scale)
-      paint(ctx, limbForm(root, elbow, upper), style.cloth, {
+      celPaint(ctx, limbForm(root, elbow, upper), style.cloth, {
         shadow: 0.44, radius: maxRadius(upper), pivot: midpoint(root, elbow), rim: 0.5, line: 0.46, occlusion: 0.2,
       })
       const prof = scaleProfile(sliceProfile(foreForm, t, 1.2), scale)
       hemR = prof[prof.length - 1][1]
-      paint(ctx, limbForm(elbow, hemAt, prof), style.cloth, {
+      celPaint(ctx, limbForm(elbow, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(elbow, hemAt), rim: 0.5, line: 0.46,
       })
     }
-    if (style.cuff) {
+    if (style.cuff && !dim) {
       const dir = d <= upperLen ? angleOf(root, elbow) : foreDir
       band(ctx, hemAt, dir, hemR * 1.06, 0.85 * scale, style.cuff)
     }
   }
 
-  if (style.band) band(ctx, wrist, foreDir, 1.15 * scale, 0.6 * scale, style.band)
-  style.deco?.(ctx, joints, scale)
+  if (style.band && !dim) band(ctx, wrist, foreDir, 1.15 * scale, 0.6 * scale, style.band)
+  if (!dim) style.deco?.(ctx, joints, scale)
   drawHand(ctx, wrist, foreDir, skin, scale * (style.handScale ?? 1), {
     glove: style.glove, grip: style.grip,
   })
@@ -590,7 +618,7 @@ export function band(
   const nx = -uy
   const ny = ux
   const P = (x: number, y: number): Pt => [at[0] + ux * x + nx * y, at[1] + uy * x + ny * y]
-  paint(
+  celPaint(
     ctx,
     blob([
       P(-thickness, -halfWidth),
@@ -620,6 +648,8 @@ export interface LegStyle {
   shinMass?: number
   /** Foot size, for a sandal against a cyborg's boot. */
   footScale?: number
+  /** The far side of the body: rim, cuffs and hardware are dropped. See ArmStyle. */
+  dim?: boolean
   /** Hardware on the leg — plating, a fin, a greave. */
   deco?(ctx: CanvasRenderingContext2D, joints: [Pt, Pt, Pt], scale: number): void
 }
@@ -638,10 +668,13 @@ export function drawLeg(
   const thighForm = scaleProfile(FORM.thigh, style.thighMass ?? 1)
   const shinForm = scaleProfile(FORM.shin, style.shinMass ?? 1)
 
-  paintLimb(ctx, root, knee, thighForm, base, scale)
-  paintLimb(ctx, knee, ankle, shinForm, base, scale, -0.2)
-
+  const dim = style.dim ?? false
   const tr = style.trouser ?? 1
+  if (tr < 0.97 || !style.cloth) {
+    paintLimb(ctx, root, knee, thighForm, base, scale, 0, dim)
+    paintLimb(ctx, knee, ankle, shinForm, base, scale, -0.2, dim)
+  }
+
   if (tr > 0.03 && style.cloth) {
     const total = thighLen + shinLen
     const d = tr * total
@@ -652,33 +685,35 @@ export function drawLeg(
       hemAt = lerpPt(root, knee, t)
       const prof = scaleProfile(sliceProfile(thighForm, t, 1.2), scale)
       hemR = prof[prof.length - 1][1]
-      paint(ctx, limbForm(root, hemAt, prof), style.cloth, {
+      celPaint(ctx, limbForm(root, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(root, hemAt), rim: 0.5, line: 0.48, occlusion: 0.22,
       })
     } else {
       const t = Math.min(0.99, (d - thighLen) / shinLen)
       hemAt = lerpPt(knee, ankle, t)
       const thigh = scaleProfile(scaleProfile(thighForm, 1.16), scale)
-      paint(ctx, limbForm(root, knee, thigh), style.cloth, {
+      celPaint(ctx, limbForm(root, knee, thigh), style.cloth, {
         shadow: 0.44, radius: maxRadius(thigh), pivot: midpoint(root, knee), rim: 0.5, line: 0.48, occlusion: 0.22,
       })
       const prof = scaleProfile(sliceProfile(shinForm, t, 1.16), scale)
       hemR = prof[prof.length - 1][1]
-      paint(ctx, limbForm(knee, hemAt, prof), style.cloth, {
-        shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(knee, hemAt), rim: 0.5, line: 0.48,
+      celPaint(ctx, limbForm(knee, hemAt, prof), style.cloth, {
+        shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(knee, hemAt), rim: dim ? 0 : 0.5, line: 0.48,
       })
       // A knee fold: cloth always breaks where the joint does.
-      ctx.save()
-      ctx.globalAlpha = 0.4
-      ctx.strokeStyle = style.cloth.deep
-      ctx.lineWidth = 0.5 * scale
-      ctx.stroke(curve([
-        lerpPt(root, knee, 0.86),
-        lerpPt(knee, ankle, 0.1),
-      ] as Pt[]))
-      ctx.restore()
+      if (!dim) {
+        ctx.save()
+        ctx.globalAlpha = 0.4
+        ctx.strokeStyle = style.cloth.deep
+        ctx.lineWidth = 0.5 * scale
+        ctx.stroke(curve([
+          lerpPt(root, knee, 0.86),
+          lerpPt(knee, ankle, 0.1),
+        ] as Pt[]))
+        ctx.restore()
+      }
     }
-    if (style.cuff) {
+    if (style.cuff && !dim) {
       const dir = d <= thighLen ? angleOf(root, knee) : angleOf(knee, ankle)
       band(ctx, hemAt, dir, hemR * 1.05, 0.7 * scale, style.cuff)
     }
@@ -692,14 +727,15 @@ export function drawLeg(
       [0.7, 1.22 * (style.shinMass ?? 1)],
       [1, 1.16 * (style.shinMass ?? 1)],
     ], scale)
-    paint(ctx, limbForm(top, ankle, prof), style.boot, {
+    celPaint(ctx, limbForm(top, ankle, prof), style.boot, {
       shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(top, ankle), rim: 0.5, line: 0.48,
     })
-    if (style.cuff) band(ctx, top, angleOf(knee, ankle), 1.35 * scale, 0.62 * scale, style.cuff)
+    if (style.cuff && !dim) band(ctx, top, angleOf(knee, ankle), 1.35 * scale, 0.62 * scale, style.cuff)
   }
 
-  style.deco?.(ctx, joints, scale)
-  drawShoe(ctx, footJoints[0], footJoints[1], style.boot, style.sole ?? null, scale * (style.footScale ?? 1))
+  if (!dim) style.deco?.(ctx, joints, scale)
+  drawShoe(ctx, footJoints[0], footJoints[1], style.boot, dim ? null : style.sole ?? null,
+    scale * (style.footScale ?? 1))
 }
 
 /** A shoe with a heel, an instep and a sole — never a flat oval. */
@@ -729,9 +765,9 @@ export function drawShoe(
     P(1.2, 1.05),
     P(-1.9, 1.0),
   ] as Pt[], 0.72)
-  paint(ctx, upper, c, { shadow: 0.42, radius: 2.2, pivot: P(0.4, 0), rim: 0.5, line: 0.48, occlusion: 0.22 })
+  celPaint(ctx, upper, c, { shadow: 0.42, radius: 2.2, pivot: P(0.4, 0), rim: 0.5, line: 0.48, occlusion: 0.22 })
   if (sole) {
-    paint(
+    celPaint(
       ctx,
       blob([
         P(-1.95, 0.35),
@@ -836,7 +872,7 @@ export function drawBody(
   grow = 0,
 ): Path2D {
   const path = torsoPath(s, b, grow)
-  paint(ctx, path, c, {
+  celPaint(ctx, path, c, {
     shadow: 0.44,
     radius: b.shoulder + grow,
     pivot: bodyPoint(s, 0.5, 0),
@@ -921,7 +957,7 @@ export function drawRibbon(
   radius = 3,
 ): Path2D {
   const path = blob(pts, 0.88)
-  paint(ctx, path, c, { shadow: 0.5, radius, pivot, rim: 0.42, line: 0.46, occlusion: 0.2 })
+  celPaint(ctx, path, c, { shadow: 0.5, radius, pivot, rim: 0.42, line: 0.46, occlusion: 0.2 })
   return path
 }
 

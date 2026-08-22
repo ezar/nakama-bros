@@ -155,11 +155,21 @@ export class Renderer {
     camY: number,
     time: number,
   ): void {
+    // Layer art is rasterised at ART_SCALE, which equals RENDER_SCALE, so a
+    // layer drawn at a whole device pixel maps one source texel to one device
+    // pixel and stays crisp. Parallax offsets are continuous, so without this
+    // every layer is resampled every frame — and at a repeat boundary the two
+    // copies each get a half-covered edge column, which is a visible seam. Snap
+    // both edges of every blit to the device grid and take the width from the
+    // difference, so consecutive copies share an exact device-pixel border.
+    const snap = (v: number) => Math.round(v * RENDER_SCALE) / RENDER_SCALE
     for (const l of layers) {
       const drift = (l.autoScroll ?? 0) * time
       const ox = -(camX * l.factor + drift)
       const oy = -(camY * (l.factorY ?? l.factor * 0.35)) + l.yOffset
       const bob = l.bob ? Math.sin(time * (l.bobSpeed ?? 0.6)) * l.bob : 0
+      const dy = snap(oy + bob)
+      const dh = snap(oy + bob + l.height) - dy
       ctx.save()
       if (l.alpha !== undefined) ctx.globalAlpha = l.alpha
       if (l.blend) ctx.globalCompositeOperation = l.blend
@@ -167,10 +177,12 @@ export class Renderer {
         let start = ox % l.width
         if (start > 0) start -= l.width
         for (let x = start; x < GAME_W; x += l.width) {
-          ctx.drawImage(l.image, x, oy + bob, l.width, l.height)
+          const dx = snap(x)
+          ctx.drawImage(l.image, dx, dy, snap(x + l.width) - dx, dh)
         }
       } else {
-        ctx.drawImage(l.image, ox, oy + bob, l.width, l.height)
+        const dx = snap(ox)
+        ctx.drawImage(l.image, dx, dy, snap(ox + l.width) - dx, dh)
       }
       ctx.restore()
     }
@@ -289,13 +301,42 @@ export class Renderer {
   }
 
   /**
+   * As `grad`, but radial and with a mid stop.
+   *
+   * Inner corners need a pool that is dense at the crease and gone by the time
+   * it is a tile away; a two-stop linear ramp fades far too evenly and reads as
+   * a smudge rather than as contact.
+   */
+  private rgrad(
+    ctx: CanvasRenderingContext2D,
+    key: number,
+    cx: number, cy: number, r: number,
+    color: string, a0: number, a1: number,
+  ): CanvasGradient {
+    let g = this.gcache.get(key)
+    if (!g) {
+      g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+      g.addColorStop(0, rgba(color, a0))
+      g.addColorStop(0.45, rgba(color, a1))
+      g.addColorStop(1, rgba(color, 0))
+      this.gcache.set(key, g)
+    }
+    return g
+  }
+
+  /**
    * The pass that turns a grid of tiles into terrain.
    *
-   * Four things happen here, all of them impossible to bake into the atlas
-   * because they depend on what is next to a tile rather than on the tile:
-   * depth below the surface, bounce light on upward faces, the shadow a wall
-   * casts along its own foot, and occlusion thrown into the open air — which,
-   * where two edges meet, is what draws an inner corner.
+   * Everything here depends on what is *next to* a tile rather than on the tile,
+   * so none of it can be baked into the atlas. The passes run in the order a
+   * painter would work: depth first, then the light on the vertical faces, then
+   * the bounce off everything facing the sky, then the shadows and the creases.
+   *
+   * The rule the whole pass obeys is that shading is applied to the real
+   * terrain edge — the boundary between a solid cell and an open one — and
+   * never to a rectangle that merely contains it. That is what makes a
+   * one-tile pillar, a step and an inner corner all read correctly from the
+   * same code.
    */
   private drawTerrainAmbient(
     ctx: CanvasRenderingContext2D,
@@ -315,6 +356,7 @@ export class Renderer {
     }
     // Which way the key light comes from: -1 when it rakes in from the left.
     const ls = p.lightDirX < 0 ? -1 : 1
+    const bounce = mix(p.sunTint, p.ambient, 0.35)
     this.gcache.clear()
     ctx.save()
 
@@ -328,7 +370,11 @@ export class Renderer {
         if (id !== Tile.Solid && id !== Tile.Ice && id !== Tile.Decor) continue
         let d = 0
         while (d < 5 && map.get(tx, ty - 1 - d) === id) d++
-        if (d === 0) continue
+        // The surface row is shaded too, from nothing at its top to whatever
+        // the row below starts at. Skipping it as an optimisation left a step
+        // of the first ramp's whole depth exactly one tile under every skyline
+        // — a hard horizontal line across the frame, which is the artefact the
+        // continuous ramp exists to remove.
         const top = DEPTH_SHADE[Math.min(d, 5)]
         const bot = DEPTH_SHADE[Math.min(d + 1, 5)]
         ctx.fillStyle = this.grad(
@@ -339,24 +385,72 @@ export class Renderer {
       }
     }
 
-    // 2. Bounce. Ground facing the sky picks up warm light off everything
+    // 2. The vertical faces, lit and shadowed on the terrain itself.
+    //
+    //    A cliff has a side turned into the light and a side turned away from
+    //    it, and until that is drawn a mass of ground is a flat brown wall with
+    //    a green lid. This runs on the *solid* cell next to open air, so a
+    //    single-tile pillar gets both of its faces and a face two tiles tall
+    //    joins into one continuous band, with no seam at the row border.
+    for (let ty = y0; ty <= y1; ty++) {
+      const y = ty * TILE
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!solid(tx, ty)) continue
+        const x = tx * TILE
+        for (const s of [-1, 1] as const) {
+          if (solid(tx + s, ty)) continue
+          const edge = s < 0 ? x : x + TILE
+          const lit = s === ls
+          const w = lit ? 5 : 6.5
+          const rx = s < 0 ? x : x + TILE - w
+          if (lit) {
+            // The lit face: a wash of warm light, brightest at the arris.
+            ctx.globalCompositeOperation = 'lighter'
+            ctx.fillStyle = this.grad(
+              ctx, 7e7 + (tx + 4096) * 2 + (s < 0 ? 0 : 1),
+              edge, 0, edge - s * w, 0,
+              rgba(bounce, 0.2), rgba(bounce, 0),
+            )
+            ctx.fillRect(rx, y, w, TILE)
+            ctx.globalCompositeOperation = 'source-over'
+          } else {
+            ctx.fillStyle = this.grad(
+              ctx, 8e7 + (tx + 4096) * 2 + (s < 0 ? 0 : 1),
+              edge, 0, edge - s * w, 0,
+              rgba(PAL.ink, 0.3), rgba(PAL.ink, 0),
+            )
+            ctx.fillRect(rx, y, w, TILE)
+          }
+        }
+      }
+    }
+
+    // 3. Bounce. Ground facing the sky picks up warm light off everything
     //    around it; without this the top of a cliff is the same value as its
-    //    side and the whole mass reads as a cut-out.
+    //    side and the whole mass reads as a cut-out. Two bands: a wide soft
+    //    one for the bounce itself and a tight bright one at the lip, which is
+    //    the line that separates ground from sky at a glance.
     ctx.globalCompositeOperation = 'lighter'
     for (let ty = y0; ty <= y1; ty++) {
       const y = ty * TILE
       for (let tx = x0; tx <= x1; tx++) {
         if (!solid(tx, ty) || solid(tx, ty - 1)) continue
+        const x = tx * TILE
         ctx.fillStyle = this.grad(
-          ctx, 2e7 + ty, 0, y, 0, y + 7,
-          rgba(p.sunTint, 0.15), rgba(p.sunTint, 0),
+          ctx, 2e7 + ty, 0, y, 0, y + 9,
+          rgba(bounce, 0.17), rgba(bounce, 0),
         )
-        ctx.fillRect(tx * TILE, y, TILE, 7)
+        ctx.fillRect(x, y, TILE, 9)
+        ctx.fillStyle = this.grad(
+          ctx, 2.5e7 + ty, 0, y, 0, y + 1.8,
+          rgba(p.sunTint, 0.1), rgba(p.sunTint, 0),
+        )
+        ctx.fillRect(x, y, TILE, 1.8)
       }
     }
     ctx.globalCompositeOperation = 'source-over'
 
-    // 3. The shadow a wall casts along its own foot. Cheap, and it is the cue
+    // 4. The shadow a wall casts along its own foot. Cheap, and it is the cue
     //    that tells the eye which of two adjacent surfaces is higher.
     for (let ty = y0; ty <= y1; ty++) {
       const y = ty * TILE
@@ -367,16 +461,15 @@ export class Renderer {
         const from = ls < 0 ? x : x + TILE
         ctx.fillStyle = this.grad(
           ctx, 3e7 + (tx + 4096) * 4 + (ls < 0 ? 0 : 1),
-          from, 0, from + ls * -9, 0,
-          rgba(PAL.ink, 0.34), rgba(PAL.ink, 0),
+          from, 0, from + ls * -11, 0,
+          rgba(PAL.ink, 0.4), rgba(PAL.ink, 0),
         )
-        ctx.fillRect(ls < 0 ? x : x + TILE - 9, y, 9, 6)
+        ctx.fillRect(ls < 0 ? x : x + TILE - 11, y, 11, 7)
       }
     }
 
-    // 4. Occlusion thrown into the open. Every open cell is darkened by the
-    //    solids around it; where two of those overlap the corner deepens on its
-    //    own, which is how an inner corner draws itself.
+    // 5. Occlusion thrown into the open. Every open cell is darkened by the
+    //    solids around it.
     for (let ty = y0; ty <= y1; ty++) {
       const y = ty * TILE
       for (let tx = x0; tx <= x1; tx++) {
@@ -413,6 +506,30 @@ export class Renderer {
             rgba(PAL.ink, away ? 0.3 : 0.18), rgba(PAL.ink, 0),
           )
           ctx.fillRect(s < 0 ? x : x + TILE - w, y, w, TILE)
+        }
+
+        // 6. Inner corners. Where two of those faces meet, the crease pools.
+        //    Summing two linear bands only ever gives a soft cross; a radial
+        //    pool anchored on the corner point is what actually reads as one
+        //    surface running into another, and it is the difference between a
+        //    step in the ground and two rectangles that happen to touch.
+        for (const sy of [-1, 1] as const) {
+          if (!solid(tx, ty + sy)) continue
+          for (const sx of [-1, 1] as const) {
+            if (!solid(tx + sx, ty)) continue
+            const cx = sx < 0 ? x : x + TILE
+            const cy = sy < 0 ? y : y + TILE
+            // A radial gradient is anchored to a point, so its key has to
+            // carry the full tile coordinate: folding the row into eight
+            // buckets made two corners eight rows apart share one gradient,
+            // and the second of them got a pool centred on the first.
+            ctx.fillStyle = this.rgrad(
+              ctx,
+              2e8 + ((tx + 4096) * 64 + (ty + 4096)) * 4 + (sx < 0 ? 0 : 1) * 2 + (sy < 0 ? 0 : 1),
+              cx, cy, 13, PAL.ink, 0.34, 0.16,
+            )
+            ctx.fillRect(sx < 0 ? x : x + TILE - 13, sy < 0 ? y : y + TILE - 13, 13, 13)
+          }
         }
       }
     }
@@ -496,10 +613,17 @@ export class Renderer {
     // 1. Refraction. Slices are clamped to the viewport so the source rect is
     //    always inside the buffer we are reading from.
     const S = RENDER_SCALE
-    const slice = 6
+    const slice = 4
+    const span = Math.max(1, wb - wt)
     for (let wy = Math.floor(wt); wy < wb; wy += slice) {
       const h = Math.min(slice, wb - wy)
-      const off = Math.sin(a.time * 1.5 + wy * 0.36) * 0.9
+      // The shear is strongest just under the surface and dies away with
+      // depth: it is the wave that bends the light, so the bend belongs where
+      // the wave is. A constant offset sheared the whole body by the same
+      // amount, which reads as the picture sliding rather than as refraction.
+      const near = 1 - (wy - wt) / span
+      const amp = 0.55 + near * near * 1.9
+      const off = Math.sin(a.time * 1.5 + wy * 0.36) * amp
       ctx.drawImage(
         this.buffer,
         (wl - camX) * S, (wy - camY) * S, (wr - wl) * S, h * S,
@@ -507,16 +631,28 @@ export class Renderer {
       )
     }
 
-    // 2. Body, darkening with depth. The ramp is pre-mixed, so this is a plain
-    //    fill per tile rather than a colour computation per tile per frame.
+    // 2. Body, darkening with depth. The ramp is pre-mixed, so this costs a
+    //    gradient per (row, depth) rather than a colour computation per tile per
+    //    frame — and it has to be a gradient: a flat fill per tile stepped the
+    //    value at every row border and a deep pool came out as a stack of
+    //    stripes. Consecutive tiles hand off at the same ramp entry, so a
+    //    column of water darkens as one continuous body.
     for (let i = 0; i < cells.length; i += 3) {
+      const ty = cells[i + 1]
+      const y = ty * TILE
       const d = Math.min(7, cells[i + 2])
-      ctx.fillStyle = ramp[d]
-      ctx.fillRect(cells[i] * TILE, cells[i + 1] * TILE, TILE, TILE)
+      ctx.fillStyle = this.grad(
+        ctx, 1.2e8 + ty * 16 + d, 0, y, 0, y + TILE,
+        ramp[d], ramp[Math.min(7, d + 1)],
+      )
+      ctx.fillRect(cells[i] * TILE, y, TILE, TILE)
     }
 
-    // 3. Caustics: two sets of shafts travelling at different speeds and in
-    //    opposite directions, so the shimmer never locks to the surface wave.
+    // 3. Caustics. Two families, and neither is tied to the surface wave: the
+    //    shafts hanging from the surface, and a net crawling over the bed. They
+    //    travel at different speeds and in opposite directions, which is what
+    //    keeps the shimmer from locking to the swell and reading as a texture
+    //    scrolling past.
     ctx.globalCompositeOperation = 'lighter'
     for (const [period, speed, slant, width, alpha] of [
       [17, 6.5, -9, 3.2, 0.028],
@@ -536,23 +672,52 @@ export class Renderer {
       }
       ctx.stroke()
     }
+    // The net on the bed: bright wavering lines lying on whatever the water is
+    // standing on, sliding the other way and at a third of the speed. This is
+    // the read that says the pool has a floor rather than a bottom edge.
+    ctx.lineWidth = 0.55
+    for (let i = 0; i < cells.length; i += 3) {
+      const tx = cells[i]
+      const ty = cells[i + 1]
+      if (!map.flags(tx, ty + 1).solid) continue
+      const x = tx * TILE
+      const y = ty * TILE + TILE
+      ctx.strokeStyle = rgba(PAL.foam, 0.075)
+      ctx.beginPath()
+      for (let k = 0; k < 3; k++) {
+        const px = x + ((k * 5.4 + a.time * 2.2 + tx * 6.3) % TILE)
+        const w = 2.4 + Math.sin(a.time * 1.7 + tx + k) * 1.4
+        ctx.moveTo(px - w, y - 1.4 - Math.sin(a.time * 2.4 + px * 0.3) * 0.9)
+        ctx.lineTo(px + w, y - 1.4 + Math.sin(a.time * 2.1 + px * 0.28) * 0.9)
+      }
+      ctx.stroke()
+    }
     ctx.globalCompositeOperation = 'source-over'
 
-    // 4. Foam where the water is held by something solid.
+    // 4. Foam where the water is held by something solid. Water piles against a
+    //    wall and slides down it, so the contact is an uneven band with lumps
+    //    riding it, never the ruled strip it used to be.
     for (let i = 0; i < cells.length; i += 3) {
       const tx = cells[i]
       const ty = cells[i + 1]
       const x = tx * TILE
       const y = ty * TILE
       if (map.flags(tx, ty + 1).solid) {
-        ctx.fillStyle = rgba(PAL.foam, 0.09)
-        ctx.fillRect(x, y + TILE - 1.8, TILE, 1.8)
+        ctx.fillStyle = this.grad(
+          ctx, 1.3e8 + ty, 0, y + TILE, 0, y + TILE - 3.4,
+          rgba(PAL.foam, 0.16), rgba(PAL.foam, 0),
+        )
+        ctx.fillRect(x, y + TILE - 3.4, TILE, 3.4)
       }
       for (const s of [-1, 1] as const) {
         if (!map.flags(tx + s, ty).solid) continue
         const bx = s < 0 ? x : x + TILE
-        ctx.fillStyle = rgba(PAL.foam, 0.16)
-        ctx.fillRect(s < 0 ? x : x + TILE - 2.4, y, 2.4, TILE)
+        ctx.fillStyle = this.grad(
+          ctx, 1.4e8 + (tx + 4096) * 2 + (s < 0 ? 0 : 1),
+          bx, 0, bx - s * 3.6, 0,
+          rgba(PAL.foam, 0.24), rgba(PAL.foam, 0),
+        )
+        ctx.fillRect(s < 0 ? x : x + TILE - 3.6, y, 3.6, TILE)
         // Lumps of foam riding up and down the wall, so the contact line is not
         // a ruled strip.
         ctx.beginPath()
@@ -609,6 +774,21 @@ export class Renderer {
     ctx.lineWidth = 1.8
     ctx.stroke(path)
     ctx.restore()
+
+    // The refracted line: a second, brighter crest travelling at its own speed
+    // and lagging the wave, so the two cross. A surface seen edge-on shows the
+    // bright sky bent along the near face of every swell, and that bent
+    // highlight is what makes a waterline read as water rather than as a
+    // drawn stroke — one stroke on its own is a border.
+    const bent = new Path2D()
+    for (let x = xa * TILE; x <= (xb + 1) * TILE; x += 2) {
+      const py = y + wave(x) * 0.55 + Math.sin(a.time * 1.7 - x * 0.11) * 0.7 + 0.9
+      if (x === xa * TILE) bent.moveTo(x, py)
+      else bent.lineTo(x, py)
+    }
+    ctx.strokeStyle = rgba(PAL.seaLight, 0.5)
+    ctx.lineWidth = 1.3
+    ctx.stroke(bent)
 
     ctx.strokeStyle = rgba(PAL.foam, 0.85)
     ctx.lineWidth = 0.9
