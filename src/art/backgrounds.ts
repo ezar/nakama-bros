@@ -2952,13 +2952,21 @@ function fgLayer(biome: string, tag: string, p: BiomePalette, o: FgOpts): Parall
 export function buildForeground(biome: Biome): ParallaxLayer[] {
   const p = biomePalette(biome)
   return [
+    // Anchored to the very bottom of the frame: a near-plane layer that rises
+    // into the play space hides where the player's feet are. Only the tips of
+    // these silhouettes should ever clear the bottom edge.
+    //
+    // They are also drawn nearly opaque. A translucent near-plane shape does
+    // not read as "in front of the world" — it reads as something buried
+    // inside whatever it overlaps, which over soil looked like netting in the
+    // dirt rather than grass at the camera.
     fgLayer(biome, 'a', p, {
-      w: 660, h: 78, y: 176, factor: 1.16, factorY: 0.35,
-      count: 7, scale: 1, tone: 0.56, bank: 14, alpha: 0.62,
+      w: 660, h: 78, y: 196, factor: 1.16, factorY: 0.28,
+      count: 7, scale: 0.85, tone: 0.68, bank: 14, alpha: 0.94,
     }),
     fgLayer(biome, 'b', p, {
-      w: 470, h: 100, y: 184, factor: 1.52, factorY: 0.5,
-      count: 4, scale: 1.7, tone: 0.74, bank: 16, alpha: 0.8,
+      w: 470, h: 100, y: 202, factor: 1.52, factorY: 0.4,
+      count: 4, scale: 1.35, tone: 0.82, bank: 16, alpha: 1,
     }),
   ]
 }
