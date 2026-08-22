@@ -229,7 +229,17 @@ export interface Hit {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Playable crew members. Each has a distinct traversal verb. */
-export type CrewId = 'luffy' | 'zoro' | 'nami' | 'sanji' | 'usopp' | 'chopper'
+export type CrewId =
+  | 'luffy'
+  | 'zoro'
+  | 'nami'
+  | 'sanji'
+  | 'usopp'
+  | 'chopper'
+  | 'robin'
+  | 'franky'
+  | 'brook'
+  | 'jinbe'
 
 /**
  * Power tiers, escalating like Mario's small → super → fire.
