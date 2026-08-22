@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "capture": "npm run build && node scripts/shoot.mjs"
   },
   "dependencies": {
     "framer-motion": "^11.3.0",
