@@ -89,14 +89,8 @@ export abstract class Entity {
     if (this.facing === -1) ctx.scale(-1, 1)
     ctx.drawImage(
       this.sheet.image,
-      frame.sx,
-      frame.sy,
-      frame.sw,
-      frame.sh,
-      Math.round(frame.ox),
-      Math.round(frame.oy),
-      frame.sw,
-      frame.sh,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      frame.ox, frame.oy, frame.w, frame.h,
     )
     ctx.restore()
   }

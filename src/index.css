@@ -25,8 +25,9 @@
   }
 
   canvas {
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+    /* The art is cel-shaded vector work rendered above display resolution, so
+       it must be filtered on the way down, not nearest-neighboured. */
+    image-rendering: auto;
     display: block;
   }
 }

@@ -26,6 +26,10 @@ abstract class Pickup extends Entity {
     this.body.gravityScale = 0
     this.baseY = y
     this.tags.add('item')
+    // Offset the animation clock by position so a row of pickups shimmers
+    // instead of pulsing in lockstep, which reads as a rendering bug.
+    this.animTime = ((x * 0.017 + y * 0.011) % 1) * 0.6
+    this.age = this.animTime
   }
 
   protected abstract collect(world: World, player: Player): void

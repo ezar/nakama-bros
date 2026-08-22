@@ -38,7 +38,7 @@ export class Player extends Entity {
   private wasInWater = false
 
   constructor(x: number, y: number, crew: CrewId = 'luffy') {
-    super(x, y, 11, 22)
+    super(x, y, 13, 30)
     this.crew = crew
     this.depth = 100
     this.cullable = false
@@ -75,8 +75,8 @@ export class Player extends Entity {
   setTierSilent(tier: PowerTier): void {
     this.tier = tier
     this.armor = TIER_MODS[tier].armor
-    this.body.w = 11 * TIER_MODS[tier].scale
-    this.body.h = 22 * TIER_MODS[tier].scale
+    this.body.w = 13 * TIER_MODS[tier].scale
+    this.body.h = 30 * TIER_MODS[tier].scale
   }
 
   setTier(tier: PowerTier, world: World): void {
@@ -86,8 +86,8 @@ export class Player extends Entity {
     this.armor = TIER_MODS[tier].armor
     const mods = TIER_MODS[tier]
     // Grow from the feet so a size change never pushes the player into a floor.
-    this.body.w = 11 * mods.scale
-    this.body.h = 22 * mods.scale
+    this.body.w = 13 * mods.scale
+    this.body.h = 30 * mods.scale
     world.events.emit('player:power', { tier, x: this.x, y: this.y })
     world.audio.playSfx(rising ? (tier === 'base' ? 'powerdown' : 'gear-shift') : 'powerdown')
     world.hitstop(rising ? 8 : 4)
@@ -465,7 +465,7 @@ export class Player extends Entity {
       ctx.globalAlpha = 0.3 * (1 - Math.min(1, shadowDrop / 60))
       ctx.fillStyle = '#0B1020'
       ctx.beginPath()
-      ctx.ellipse(sx, sy + shadowDrop, 7 * scale, 2.4 * scale, 0, 0, Math.PI * 2)
+      ctx.ellipse(sx, sy + shadowDrop, 8.5 * scale, 2.6 * scale, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
     }
@@ -479,13 +479,13 @@ export class Player extends Entity {
     ctx.drawImage(
       this.sheet.image,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      Math.round(frame.ox), Math.round(frame.oy), frame.sw, frame.sh,
+      frame.ox, frame.oy, frame.w, frame.h,
     )
     if (this.flash > 0.01) {
       ctx.globalCompositeOperation = 'source-atop'
       ctx.globalAlpha = this.flash
       ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(frame.ox, frame.oy, frame.sw, frame.sh)
+      ctx.fillRect(frame.ox, frame.oy, frame.w, frame.h)
     }
     ctx.restore()
   }
