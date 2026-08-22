@@ -42,6 +42,58 @@ export const SEG = {
   headR: 4.25,
 } as const
 
+/**
+ * Per-character proportions, as multipliers on SEG.
+ *
+ * Ten crew members cannot all be the same skeleton scaled up and down: a
+ * cyborg is forearms and shoulders on short legs, a living skeleton is all
+ * length, a fishman is a barrel. Scaling the whole figure only changes how far
+ * away it looks — changing the *ratios* is what changes who it is.
+ */
+export interface Proportion {
+  thigh: number
+  shin: number
+  foot: number
+  torso: number
+  neck: number
+  upperArm: number
+  foreArm: number
+  headR: number
+  /** How far out from the spine the arms and legs are rooted. */
+  armRoot: number
+  legRoot: number
+}
+
+export const SIZE: Proportion = {
+  thigh: 1, shin: 1, foot: 1, torso: 1, neck: 1,
+  upperArm: 1, foreArm: 1, headR: 1, armRoot: 1, legRoot: 1,
+}
+
+export const proportion = (o: Partial<Proportion> = {}): Proportion => ({ ...SIZE, ...o })
+
+/** Segment lengths in world units after a character's proportions are applied. */
+export interface Segments {
+  thigh: number
+  shin: number
+  foot: number
+  torso: number
+  neck: number
+  upperArm: number
+  foreArm: number
+  headR: number
+}
+
+export const segmentsOf = (z: Proportion): Segments => ({
+  thigh: SEG.thigh * z.thigh,
+  shin: SEG.shin * z.shin,
+  foot: SEG.foot * z.foot,
+  torso: SEG.torso * z.torso,
+  neck: SEG.neck * z.neck,
+  upperArm: SEG.upperArm * z.upperArm,
+  foreArm: SEG.foreArm * z.foreArm,
+  headR: SEG.headR * z.headR,
+})
+
 export interface Pose {
   /** Hip offset from the neutral standing position. */
   hipX: number
@@ -163,6 +215,10 @@ export interface Skeleton {
   /** Unit vector across the chest, left → right. */
   across: Pt
   torsoLen: number
+  /** Head radius for this character, in world units. */
+  headR: number
+  /** Resolved segment lengths, so painters can hang props off real bones. */
+  seg: Segments
   /** Secondary-motion terms, carried through so props can read them. */
   drag: number
   lift: number
@@ -175,34 +231,38 @@ const step = (from: Pt, angle: number, len: number): Pt => [
 ]
 
 /** Solve the skeleton for a pose. Angles are absolute, measured from down. */
-export function solve(p: Pose): Skeleton {
-  const torsoLen = SEG.torso + p.spine
+export function solve(p: Pose, size: Proportion = SIZE): Skeleton {
+  const seg = segmentsOf(size)
+  const torsoLen = seg.torso + p.spine
   const up: Pt = [Math.sin(p.lean), -Math.cos(p.lean)]
   const across: Pt = [Math.cos(p.lean), Math.sin(p.lean)]
 
-  const hip: Pt = [CX + p.hipX, GROUND_Y - SEG.thigh - SEG.shin + p.hipY]
+  const hip: Pt = [CX + p.hipX, GROUND_Y - seg.thigh - seg.shin + p.hipY]
   const shoulder: Pt = [hip[0] + up[0] * torsoLen, hip[1] + up[1] * torsoLen]
-  const neck: Pt = [shoulder[0] + up[0] * SEG.neck, shoulder[1] + up[1] * SEG.neck]
+  const neck: Pt = [shoulder[0] + up[0] * seg.neck, shoulder[1] + up[1] * seg.neck]
   const head: Pt = [
-    neck[0] + Math.sin(p.lean + p.headTilt) * SEG.headR,
-    neck[1] - Math.cos(p.lean + p.headTilt) * SEG.headR,
+    neck[0] + Math.sin(p.lean + p.headTilt) * seg.headR,
+    neck[1] - Math.cos(p.lean + p.headTilt) * seg.headR,
   ]
 
   // Arms hang from the outside of the shoulder line rather than the spine —
   // narrow-set arms are what made the old figure read as a stick.
   const arm = (a: [number, number], side: number): [Pt, Pt, Pt] => {
     const root: Pt = [
-      shoulder[0] + across[0] * side * 3.05 - up[0] * 0.7,
-      shoulder[1] + across[1] * side * 3.05 - up[1] * 0.7 + p.roll * side,
+      shoulder[0] + across[0] * side * 3.05 * size.armRoot - up[0] * 0.7,
+      shoulder[1] + across[1] * side * 3.05 * size.armRoot - up[1] * 0.7 + p.roll * side,
     ]
-    const elbow = step(root, a[0], SEG.upperArm)
-    const hand = step(elbow, a[0] + a[1], SEG.foreArm)
+    const elbow = step(root, a[0], seg.upperArm)
+    const hand = step(elbow, a[0] + a[1], seg.foreArm)
     return [root, elbow, hand]
   }
   const leg = (a: [number, number], side: number): [Pt, Pt, Pt] => {
-    const root: Pt = [hip[0] + across[0] * side * 1.9, hip[1] + across[1] * side * 1.9]
-    const knee = step(root, a[0], SEG.thigh)
-    const ankle = step(knee, a[0] + a[1], SEG.shin)
+    const root: Pt = [
+      hip[0] + across[0] * side * 1.9 * size.legRoot,
+      hip[1] + across[1] * side * 1.9 * size.legRoot,
+    ]
+    const knee = step(root, a[0], seg.thigh)
+    const ankle = step(knee, a[0] + a[1], seg.shin)
     return [root, knee, ankle]
   }
 
@@ -211,7 +271,7 @@ export function solve(p: Pose): Skeleton {
 
   const foot = (l: [Pt, Pt, Pt], angle: number): [Pt, Pt] => {
     const ankle = l[2]
-    return [ankle, [ankle[0] + Math.cos(angle) * SEG.foot, ankle[1] + Math.sin(angle) * SEG.foot]]
+    return [ankle, [ankle[0] + Math.cos(angle) * seg.foot, ankle[1] + Math.sin(angle) * seg.foot]]
   }
 
   return {
@@ -230,6 +290,8 @@ export function solve(p: Pose): Skeleton {
     up,
     across,
     torsoLen,
+    headR: seg.headR,
+    seg,
     drag: p.drag,
     lift: p.lift,
     flutter: p.flutter,
@@ -438,6 +500,16 @@ export interface ArmStyle {
   /** A bracelet or wrap at the wrist. */
   band?: Cel | null
   grip?: number
+  /** Multipliers on the limb's radius profile — a cyborg's forearm is not a swordsman's. */
+  upperMass?: number
+  foreMass?: number
+  handScale?: number
+  /**
+   * Anything worn on the arm itself and shaped by its pose: plating and bolts,
+   * a fin, a bandage. Drawn after the limb and before the hand, so it can cut
+   * across the sleeve hem the way real hardware does.
+   */
+  deco?(ctx: CanvasRenderingContext2D, joints: [Pt, Pt, Pt], scale: number): void
 }
 
 export function drawArm(
@@ -451,9 +523,11 @@ export function drawArm(
   const foreDir = angleOf(elbow, wrist)
   const upperLen = dist(root, elbow)
   const foreLen = dist(elbow, wrist)
+  const upperForm = scaleProfile(FORM.upperArm, style.upperMass ?? 1)
+  const foreForm = scaleProfile(FORM.foreArm, style.foreMass ?? 1)
 
-  paintLimb(ctx, root, elbow, FORM.upperArm, skin, scale)
-  paintLimb(ctx, elbow, wrist, FORM.foreArm, skin, scale, 0.22)
+  paintLimb(ctx, root, elbow, upperForm, skin, scale)
+  paintLimb(ctx, elbow, wrist, foreForm, skin, scale, 0.22)
 
   const sl = style.sleeve ?? 0
   if (sl > 0.03 && style.cloth) {
@@ -464,7 +538,7 @@ export function drawArm(
     if (d <= upperLen) {
       const t = Math.max(0.12, d / upperLen)
       hemAt = lerpPt(root, elbow, t)
-      const prof = scaleProfile(sliceProfile(FORM.upperArm, t, 1.24), scale)
+      const prof = scaleProfile(sliceProfile(upperForm, t, 1.24), scale)
       hemR = prof[prof.length - 1][1]
       paint(ctx, limbForm(root, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(root, hemAt), rim: 0.5, line: 0.46, occlusion: 0.2,
@@ -472,11 +546,11 @@ export function drawArm(
     } else {
       const t = Math.min(0.98, (d - upperLen) / foreLen)
       hemAt = lerpPt(elbow, wrist, t)
-      const upper = scaleProfile(scaleProfile(FORM.upperArm, 1.22), scale)
+      const upper = scaleProfile(scaleProfile(upperForm, 1.22), scale)
       paint(ctx, limbForm(root, elbow, upper), style.cloth, {
         shadow: 0.44, radius: maxRadius(upper), pivot: midpoint(root, elbow), rim: 0.5, line: 0.46, occlusion: 0.2,
       })
-      const prof = scaleProfile(sliceProfile(FORM.foreArm, t, 1.2), scale)
+      const prof = scaleProfile(sliceProfile(foreForm, t, 1.2), scale)
       hemR = prof[prof.length - 1][1]
       paint(ctx, limbForm(elbow, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(elbow, hemAt), rim: 0.5, line: 0.46,
@@ -489,7 +563,10 @@ export function drawArm(
   }
 
   if (style.band) band(ctx, wrist, foreDir, 1.15 * scale, 0.6 * scale, style.band)
-  drawHand(ctx, wrist, foreDir, skin, scale, { glove: style.glove, grip: style.grip })
+  style.deco?.(ctx, joints, scale)
+  drawHand(ctx, wrist, foreDir, skin, scale * (style.handScale ?? 1), {
+    glove: style.glove, grip: style.grip,
+  })
 }
 
 /** A short band wrapped across a limb — cuffs, bracelets, boot tops, belts. */
@@ -531,6 +608,13 @@ export interface LegStyle {
   cuff?: Cel | null
   /** Sole colour; defaults to a darkened boot. */
   sole?: Cel | null
+  /** Multipliers on the leg's radius profile. */
+  thighMass?: number
+  shinMass?: number
+  /** Foot size, for a sandal against a cyborg's boot. */
+  footScale?: number
+  /** Hardware on the leg — plating, a fin, a greave. */
+  deco?(ctx: CanvasRenderingContext2D, joints: [Pt, Pt, Pt], scale: number): void
 }
 
 export function drawLeg(
@@ -544,9 +628,11 @@ export function drawLeg(
   const base = style.bare ?? style.cloth ?? style.boot
   const thighLen = dist(root, knee)
   const shinLen = dist(knee, ankle)
+  const thighForm = scaleProfile(FORM.thigh, style.thighMass ?? 1)
+  const shinForm = scaleProfile(FORM.shin, style.shinMass ?? 1)
 
-  paintLimb(ctx, root, knee, FORM.thigh, base, scale)
-  paintLimb(ctx, knee, ankle, FORM.shin, base, scale, -0.2)
+  paintLimb(ctx, root, knee, thighForm, base, scale)
+  paintLimb(ctx, knee, ankle, shinForm, base, scale, -0.2)
 
   const tr = style.trouser ?? 1
   if (tr > 0.03 && style.cloth) {
@@ -557,7 +643,7 @@ export function drawLeg(
     if (d <= thighLen) {
       const t = Math.max(0.15, d / thighLen)
       hemAt = lerpPt(root, knee, t)
-      const prof = scaleProfile(sliceProfile(FORM.thigh, t, 1.2), scale)
+      const prof = scaleProfile(sliceProfile(thighForm, t, 1.2), scale)
       hemR = prof[prof.length - 1][1]
       paint(ctx, limbForm(root, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(root, hemAt), rim: 0.5, line: 0.48, occlusion: 0.22,
@@ -565,11 +651,11 @@ export function drawLeg(
     } else {
       const t = Math.min(0.99, (d - thighLen) / shinLen)
       hemAt = lerpPt(knee, ankle, t)
-      const thigh = scaleProfile(scaleProfile(FORM.thigh, 1.16), scale)
+      const thigh = scaleProfile(scaleProfile(thighForm, 1.16), scale)
       paint(ctx, limbForm(root, knee, thigh), style.cloth, {
         shadow: 0.44, radius: maxRadius(thigh), pivot: midpoint(root, knee), rim: 0.5, line: 0.48, occlusion: 0.22,
       })
-      const prof = scaleProfile(sliceProfile(FORM.shin, t, 1.16), scale)
+      const prof = scaleProfile(sliceProfile(shinForm, t, 1.16), scale)
       hemR = prof[prof.length - 1][1]
       paint(ctx, limbForm(knee, hemAt, prof), style.cloth, {
         shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(knee, hemAt), rim: 0.5, line: 0.48,
@@ -594,14 +680,19 @@ export function drawLeg(
   const shaft = style.shaft ?? 0
   if (shaft > 0.03) {
     const top = lerpPt(ankle, knee, shaft)
-    const prof = scaleProfile([[0, profileAt(FORM.shin, 1 - shaft) * 1.14], [0.7, 1.22], [1, 1.16]], scale)
+    const prof = scaleProfile([
+      [0, profileAt(shinForm, 1 - shaft) * 1.14],
+      [0.7, 1.22 * (style.shinMass ?? 1)],
+      [1, 1.16 * (style.shinMass ?? 1)],
+    ], scale)
     paint(ctx, limbForm(top, ankle, prof), style.boot, {
       shadow: 0.44, radius: maxRadius(prof), pivot: midpoint(top, ankle), rim: 0.5, line: 0.48,
     })
     if (style.cuff) band(ctx, top, angleOf(knee, ankle), 1.35 * scale, 0.62 * scale, style.cuff)
   }
 
-  drawShoe(ctx, footJoints[0], footJoints[1], style.boot, style.sole ?? null, scale)
+  style.deco?.(ctx, joints, scale)
+  drawShoe(ctx, footJoints[0], footJoints[1], style.boot, style.sole ?? null, scale * (style.footScale ?? 1))
 }
 
 /** A shoe with a heel, an instep and a sole — never a flat oval. */
