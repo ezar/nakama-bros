@@ -139,6 +139,19 @@ export class AudioEngine implements AudioApi {
         this.failed = true
         return
       }
+      // iOS mutes every WebAudio context when the hardware silent switch is on,
+      // whatever the volume is set to. Declaring the session as playback is the
+      // only way to be heard through it, and it has to happen before the
+      // context exists. Safari 16.4+; harmless where it is missing.
+      const nav = navigator as unknown as { audioSession?: { type: string } }
+      if (nav.audioSession) {
+        try {
+          nav.audioSession.type = 'playback'
+        } catch {
+          // A browser that exposes the object but rejects the value.
+        }
+      }
+
       const ctx = new Ctor()
       const graph = createAudioGraph(ctx, ctx.destination)
       graph.master.gain.value = this.masterVolume
@@ -150,6 +163,21 @@ export class AudioEngine implements AudioApi {
       this.music = new MusicPlayer(ctx, graph.musicIn, graph.reverbIn)
       this.music.setIntensity(this.intensity)
       this.started = true
+
+      // The gesture that got us here is spent the moment we await, so resume
+      // is fired synchronously and a one-frame silent buffer is played
+      // alongside it: on iOS the buffer is what actually moves the context out
+      // of 'suspended', where resume() alone often reports success and leaves
+      // it stuck.
+      void ctx.resume().catch(() => {})
+      try {
+        const blip = ctx.createBufferSource()
+        blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+        blip.connect(ctx.destination)
+        blip.start(0)
+      } catch {
+        // Not fatal: the context may already be running.
+      }
       await ctx.resume().catch(() => {})
 
       if (this.pending) {
@@ -258,6 +286,10 @@ export class AudioEngine implements AudioApi {
     node.gain.setTargetAtTime(Math.max(0, v), this.ctx.currentTime, 0.02)
   }
 
+  isRunning(): boolean {
+    return this.ctx?.state === 'running'
+  }
+
   suspend(): void {
     void this.ctx?.suspend().catch(() => {})
   }
@@ -270,6 +302,7 @@ export class AudioEngine implements AudioApi {
 /** A no-op implementation, used before the user has interacted with the page. */
 export const silentAudio: AudioApi = {
   ready: async () => {},
+  isRunning: () => false,
   playSfx: () => {},
   playMusic: () => {},
   stopMusic: () => {},
