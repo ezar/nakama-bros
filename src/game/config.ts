@@ -101,9 +101,28 @@ export const CREW: Record<CrewId, CrewStats> = {
     id: 'chopper', name: 'Chopper', runSpeed: 158, jumpTiles: 3.9, airJumps: 0,
     attackTime: 0.24, accent: PAL.chopperPink,
   },
+  robin: {
+    id: 'robin', name: 'Robin', runSpeed: 150, jumpTiles: 3.3, airJumps: 0,
+    attackTime: 0.3, accent: '#7E5CA8',
+  },
+  franky: {
+    id: 'franky', name: 'Franky', runSpeed: 140, jumpTiles: 3.1, airJumps: 0,
+    attackTime: 0.36, accent: '#3AC8E0',
+  },
+  brook: {
+    id: 'brook', name: 'Brook', runSpeed: 182, jumpTiles: 3.6, airJumps: 1,
+    attackTime: 0.18, accent: '#E8E4F2',
+  },
+  jinbe: {
+    id: 'jinbe', name: 'Jinbe', runSpeed: 144, jumpTiles: 3.2, airJumps: 0,
+    attackTime: 0.32, accent: '#2E86C1',
+  },
 }
 
-export const CREW_IDS: CrewId[] = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper']
+export const CREW_IDS: CrewId[] = [
+  'luffy', 'zoro', 'nami', 'sanji', 'usopp',
+  'chopper', 'robin', 'franky', 'brook', 'jinbe',
+]
 
 /**
  * Initial jump velocity for a desired peak height, derived from the hold-phase
