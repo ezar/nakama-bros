@@ -17,6 +17,10 @@ const BLURB: Record<CrewId, string> = {
   sanji: 'Doble salto y patada aérea inmediata.',
   usopp: 'Dispara a distancia con el tirachinas.',
   chopper: 'Salto altísimo y embestida rodante.',
+  robin: 'Brazos que florecen a distancia y agarran plataformas.',
+  franky: 'Puñetazo de acero que rompe bloques y muros.',
+  brook: 'El más rápido y ligero: doble salto y estocada helada.',
+  jinbe: 'Nada como nadie y golpea con presión de agua.',
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
