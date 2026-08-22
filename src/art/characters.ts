@@ -1,10 +1,16 @@
 import type { CrewId, SpriteSheet } from '../types'
+import { mix } from './color'
 import { SheetBuilder, type AnimSpec, type FrameSpec } from './atlas'
-import type { Surface } from './ink'
+import type { Pt, Surface } from './ink'
 import { LOOKS, CREW_SCALE, type Look } from './character/looks'
-import { drawFigure, drawGhosts, type Ghost } from './character/figure'
+import {
+  contourPass, drawFigure, drawGhosts, drawSmear, drawStreaks, type Ghost, type Smear,
+} from './character/figure'
 import { buildPortrait } from './character/portrait'
-import { CX, FH, FW, GROUND_Y, lerpPose, pose, type Expression, type Pose } from './character/rig'
+import {
+  CX, FH, FW, GROUND_Y, lerpPose, pose, solve,
+  type Expression, type Pose, type Skeleton,
+} from './character/rig'
 
 /**
  * The crew's animation sets.
@@ -17,18 +23,42 @@ import { CX, FH, FW, GROUND_Y, lerpPose, pose, type Expression, type Pose } from
  * reads as speed where one missing drawing reads as a dropped frame.
  */
 
-const frameFor = (look: Look, scale: number) =>
-  (
-    p: Pose,
-    dur: number,
-    opts: { attack?: number; ghosts?: Ghost[] } = {},
-  ): FrameSpec => ({
+interface FrameOpts {
+  attack?: number
+  /** After-images of an earlier pose, for the frame a strike lands. */
+  ghosts?: Ghost[]
+  /** A stretched copy of this pose, trailing back the way the body came. */
+  smear?: Omit<Smear, 'color'>
+  /** Speed lines: [origin, angle, colour, [offset, length, alpha][]]. */
+  streaks?: (s: Skeleton) => {
+    from: Pt
+    angle: number
+    color: string
+    lines: Array<[number, number, number]>
+  }
+}
+
+const frameFor = (look: Look, scale: number) => {
+  const trail = mix(look.banner, '#FFFFFF', 0.55)
+  return (p: Pose, dur: number, opts: FrameOpts = {}): FrameSpec => ({
     dur,
     draw: (s: Surface, ctx: CanvasRenderingContext2D) => {
       if (opts.ghosts) drawGhosts(s, look, opts.ghosts, scale)
+      if (opts.streaks) {
+        const k = opts.streaks(solve(p, look.size))
+        drawStreaks(ctx, k.from, k.angle, k.color, k.lines)
+      }
       drawFigure(ctx, look, p, scale, { attack: opts.attack })
+      contourPass(s, CONTOUR, 0.75)
+      // After the contour: the trail is made from the finished figure's alpha,
+      // outline included, so it reads as one shape rather than a hollow one.
+      if (opts.smear) drawSmear(s, { color: trail, ...opts.smear })
     },
   })
+}
+
+/** The single unbroken line around every character. */
+const CONTOUR = '#1A1428'
 
 /** Animations whose extremes leave the standing frame need a wider canvas. */
 const wide = (fw: number): AnimSpec => ({ loop: false, fw, ox: -CX })
@@ -143,6 +173,30 @@ function attackPoses(style: AttackStyle): Array<{ p: Pose; dur: number; attack: 
         { p: pose({ ...common, lean: 0.16, hipY: 0.5, armFront: [1.05, 0.3], armBack: [-1.0, 1.0], legFront: [0.6, -0.34], legBack: [-0.54, 0.22], expression: 'determined', drag: 0.9 }), dur: 0.06, attack: 0.4 },
         { p: pose({ ...common, lean: 0.04, hipY: 0.2, armFront: [0.6, 0.6], armBack: [-0.5, 0.6], legFront: [0.34, -0.2], legBack: [-0.3, 0.18], expression: 'neutral', drag: 0.3 }), dur: 0.085, attack: 0.1 },
       ]
+    case 'bloom':
+      // The archaeologist does not lunge. She sets her feet, folds her arms and
+      // lets the attack happen somewhere else entirely — the stillness of the
+      // body is what makes the hands blooming out of thin air unsettling.
+      return [
+        // The near forearm has to finish level and pointing forward: the bloom
+        // is anchored to it, and an arm folded across the chest sends the whole
+        // effect into the floor.
+        { p: pose({ ...common, lean: 0.04, hipY: 0.3, armFront: [-0.5, 1.1], armBack: [1.35, 1.5], legFront: [0.3, -0.2], legBack: [-0.34, 0.22], expression: 'focused', drag: -0.3 }), dur: 0.06, attack: 0.08 },
+        { p: pose({ ...common, lean: -0.06, hipY: 0.7, armFront: [-0.72, 1.5], armBack: [1.6, 1.7], legFront: [0.36, -0.26], legBack: [-0.4, 0.2], expression: 'focused', drag: -0.7, squashY: 1.03 }), dur: 0.07, attack: 0.3 },
+        { p: pose({ ...common, lean: 0.1, hipY: 0.1, armFront: [-0.56, 2.13], armBack: [1.5, 1.66], legFront: [0.42, -0.3], legBack: [-0.46, 0.22], expression: 'smug', headTurn: 0.88, drag: 0.5, squashY: 1.02 }), dur: 0.08, attack: 1 },
+        { p: pose({ ...common, lean: 0.08, hipY: 0.3, armFront: [-0.52, 2.05], armBack: [1.44, 1.62], legFront: [0.36, -0.26], legBack: [-0.4, 0.2], expression: 'smug', drag: 0.3 }), dur: 0.07, attack: 0.6 },
+        { p: pose({ ...common, lean: 0.05, hipY: 0.2, armFront: [-0.36, 1.5], armBack: [1.2, 1.5], legFront: [0.24, -0.16], legBack: [-0.28, 0.16], expression: 'smug', drag: 0.15 }), dur: 0.09, attack: 0.2 },
+      ]
+    case 'palm':
+      // A fishman's karate: the stance drops, the hips turn, and the strike
+      // travels through a planted foot rather than off a swinging shoulder.
+      return [
+        { p: pose({ ...common, lean: -0.1, hipY: 1.6, spine: 0.5, armFront: [-1.05, 1.5], armBack: [0.9, 0.7], legFront: [0.72, -0.66], legBack: [-0.72, 0.44], expression: 'focused', drag: -0.6, squashY: 1.02 }), dur: 0.055, attack: 0 },
+        { p: pose({ ...common, lean: -0.24, hipY: 2.4, spine: 0.8, armFront: [-1.45, 1.7], armBack: [1.15, 0.8], legFront: [0.9, -0.86], legBack: [-0.88, 0.4], expression: 'strain', drag: -1.4, squashX: 0.94, squashY: 1.05 }), dur: 0.06, attack: 0.28 },
+        { p: pose({ ...common, lean: 0.2, hipY: 1.9, spine: 0.4, armFront: [1.42, 0.14], armBack: [0.5, 0.9], legFront: [0.96, -0.7], legBack: [-0.94, 0.36], expression: 'shout', headTurn: 0.94, drag: 2.4, squashX: 1.12, squashY: 0.94 }), dur: 0.075, attack: 1, smear: true },
+        { p: pose({ ...common, lean: 0.14, hipY: 2.1, spine: 0.5, armFront: [1.28, 0.24], armBack: [0.4, 0.85], legFront: [0.88, -0.66], legBack: [-0.86, 0.34], expression: 'determined', drag: 1.1, squashX: 1.05 }), dur: 0.065, attack: 0.5 },
+        { p: pose({ ...common, lean: 0.06, hipY: 1.2, spine: 0.3, armFront: [0.6, 0.7], armBack: [-0.3, 0.6], legFront: [0.5, -0.36], legBack: [-0.5, 0.26], expression: 'determined', drag: 0.3 }), dur: 0.09, attack: 0.12 },
+      ]
     default:
       return [
         { p: pose({ ...common, lean: -0.22, hipY: 0.8, armFront: [-1.2, 1.45], armBack: [0.7, 0.55], legFront: [0.52, -0.32], legBack: [-0.48, 0.3], expression: 'focused', drag: -0.8, squashY: 1.04 }), dur: 0.05, attack: 0 },
@@ -165,25 +219,48 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
     fh: FH,
     ox: -CX,
     oy: -GROUND_Y,
-    contour: '#1A1428',
-    contourWidth: 0.75,
+    contour: null,
   })
 
   // ── Idle: a slow breath, the head level, the far arm a beat behind ─────────
-  const breathe = (t: number, hip: number, af: [number, number], ab: [number, number], tilt: number) =>
-    pose({
-      hipY: hip, spine: hip * 0.4, lean: 0.05 + hip * 0.01,
-      armFront: af, armBack: ab, headTilt: tilt, headTurn: 0.72,
-      legFront: [0.05, -0.03], legBack: [-0.07, 0.05],
-      squashY: 1 - hip * 0.004, flutter: t, drag: 0.12 * Math.sin(t * Math.PI * 2),
-      lift: -hip * 0.5,
+  //
+  // Three near-identical drawings is not a breath, it is a still with jitter.
+  // This is a real cycle: the chest rises over three frames and falls over
+  // three, the hips carrying about two units of it and the spine passing most
+  // of that up through the body. Two things are deliberately *late* — the far
+  // arm runs a frame behind the near one, and the hat brim and hair are driven
+  // by `lift`, which is the body's vertical velocity rather than its position,
+  // so they are still coming up when the shoulders have already stopped.
+  const TAU = Math.PI * 2
+  const IDLE = 6
+  const breathe = (i: number) => {
+    const t = i / IDLE
+    const rise = Math.cos(t * TAU)
+    const late = Math.cos((t - 1 / IDLE) * TAU)
+    // Vertical velocity, positive going up: what every loose thing lags by.
+    const vel = -Math.sin(t * TAU)
+    return pose({
+      hipY: -0.95 * rise,
+      spine: 0.62 * rise,
+      lean: 0.05 - 0.012 * rise,
+      roll: 0.16 * late,
+      armFront: [0.2 + 0.075 * rise, 0.3 - 0.05 * rise],
+      armBack: [-0.24 - 0.08 * late, 0.26 - 0.05 * late],
+      legFront: [0.05, -0.03],
+      legBack: [-0.07, 0.05],
+      headTilt: -0.016 * late,
+      headTurn: 0.72,
+      squashY: 1 + 0.011 * rise,
+      squashX: 1 - 0.007 * rise,
+      flutter: t,
+      drag: 0.16 * vel,
+      lift: 1.35 * vel,
     })
-  b.add('idle', [
-    frame(breathe(0, 0.15, [0.2, 0.28], [-0.22, 0.24], 0.012), 0.44),
-    frame(breathe(0.25, -0.35, [0.15, 0.24], [-0.16, 0.2], -0.006), 0.38),
-    frame(breathe(0.5, -0.6, [0.12, 0.22], [-0.13, 0.18], -0.02), 0.4),
-    frame(breathe(0.75, -0.2, [0.19, 0.28], [-0.2, 0.24], -0.004), 0.38),
-  ])
+  }
+  // Held longer at the top and bottom of the breath than through the middle:
+  // an evenly timed cycle reads as a machine.
+  const IDLE_DUR = [0.3, 0.2, 0.24, 0.3, 0.2, 0.24]
+  b.add('idle', IDLE_DUR.map((d, i) => frame(breathe(i), d)))
 
   // ── Run: contact / down / pass / up, twice ────────────────────────────────
   b.add('run', RUN.concat(RUN.map(mirror)).map((k, i) =>
@@ -250,18 +327,29 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
   ], { loop: false })
 
   // ── Skid: heels dug in, everything loose thrown forward ───────────────────
+  //
+  // The old grey after-image is gone. What a brake wants is not a second body
+  // but a *direction*: a stretched copy of this exact silhouette trailing back
+  // the way the feet are still sliding, plus a rake of dust lines off the heel.
+  // Both are tied to the pose, so they can never drift out of register with it.
   const skidA = pose({
     lean: -0.36, hipY: 2.0, spine: 0.7, legFront: [0.98, -0.6], legBack: [-0.88, 0.34],
     armFront: [1.45, 0.4], armBack: [-1.55, 0.5], squashX: 1.07, squashY: 0.95,
     expression: 'strain', headTurn: 0.58, drag: -2.2, lift: -0.5, footFront: 0.38,
   })
+  const skidDust = (dust: string) => (sk: Skeleton) => ({
+    from: sk.footFront[1] as Pt,
+    angle: -0.16,
+    color: dust,
+    lines: [[-1.2, 12, 0.4], [0.4, 17, 0.5], [2.0, 9, 0.3], [3.4, 13, 0.22]] as Array<[number, number, number]>,
+  })
   b.add('skid', [
-    frame(skidA, 0.07, { ghosts: [{ pose: skidA, alpha: 0.3, dx: 3.4 }, { pose: skidA, alpha: 0.16, dx: 6.4 }] }),
+    frame(skidA, 0.07, { smear: { dx: 7.5, alpha: 0.4 }, streaks: skidDust(look.pal.boots.light) }),
     frame(pose({
       lean: -0.28, hipY: 1.5, spine: 0.5, legFront: [0.86, -0.5], legBack: [-0.78, 0.3],
       armFront: [1.28, 0.46], armBack: [-1.4, 0.54], squashX: 1.04, squashY: 0.97,
       expression: 'strain', headTurn: 0.6, drag: -1.7, flutter: 0.5, footFront: 0.34,
-    }), 0.09),
+    }), 0.09, { smear: { dx: 4.5, alpha: 0.24 }, streaks: skidDust(look.pal.boots.light) }),
   ], { ...wide(70), loop: true })
 
   b.add('crouch', [
@@ -278,23 +366,28 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
   ])
 
   // ── Hurt: the impact frame smears, the second frame recoils ───────────────
+  //
+  // The smear runs back toward where the blow came from, so the drawing itself
+  // says which way the body has been thrown.
   const hurtA = pose({
     lean: -0.55, hipY: -0.8, legFront: [-0.9, 0.5], legBack: [0.86, 0.4],
     armFront: [-2.4, 0.2], armBack: [2.3, 0.3], headTilt: -0.46,
     expression: 'hurt', drag: -2.6, lift: 1.2, headTurn: 0.45, squashX: 0.94, squashY: 1.06,
   })
   b.add('hurt', [
-    frame(hurtA, 0.09, {
-      ghosts: [{ pose: hurtA, alpha: 0.3, dx: 3.6, dy: -1.2 }, { pose: hurtA, alpha: 0.15, dx: 6.8, dy: -2.2 }],
-    }),
+    frame(hurtA, 0.09, { smear: { dx: 7, dy: -2.4, alpha: 0.42, steps: 4 } }),
     frame(pose({
       lean: -0.4, hipY: 0.4, legFront: [-0.7, 0.44], legBack: [0.66, 0.4],
       armFront: [-2.1, 0.3], armBack: [2.0, 0.35], headTilt: -0.34,
       expression: 'hurt', drag: -1.4, lift: -0.6, headTurn: 0.5, flutter: 0.5,
-    }), 0.16),
+    }), 0.16, { smear: { dx: 3.2, dy: -1, alpha: 0.2 } }),
   ], { ...wide(70) })
 
   // ── Victory: dip, leap, hold, settle ──────────────────────────────────────
+  // The raised arm has to clear the face. Arms are rooted forward of the chest,
+  // so an arm thrown straight up from there passes in front of the head and
+  // hides the one expression in the game that is pure delight; swinging the
+  // elbow back behind the shoulder first is what keeps the face on screen.
   b.add('victory', [
     frame(pose({
       lean: 0.08, hipY: 2.2, spine: 0.8, armFront: [0.8, 0.9], armBack: [-0.85, 0.85],
@@ -302,17 +395,17 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
       expression: 'joy', headTurn: 0.4, headTilt: 0.06, drag: -0.4,
     }), 0.16),
     frame(pose({
-      lean: 0.0, hipY: -2.4, armFront: [-2.95, 0.15], armBack: [-2.55, 0.35],
+      lean: 0.0, hipY: -2.4, armFront: [-2.18, -0.86], armBack: [-1.1, 0.6],
       legFront: [0.16, -0.1], legBack: [-0.2, 0.1], squashX: 0.94, squashY: 1.1,
       expression: 'joy', headTurn: 0.4, headTilt: -0.12, drag: 0.5, lift: 2.4,
     }), 0.2),
     frame(pose({
-      lean: 0.02, hipY: -1.3, armFront: [-3.1, 0.25], armBack: [-2.4, 0.2],
+      lean: 0.02, hipY: -1.3, armFront: [-2.24, -0.8], armBack: [-0.95, 0.55],
       legFront: [0.12, -0.06], legBack: [-0.14, 0.08], squashY: 1.03,
       expression: 'joy', headTurn: 0.4, headTilt: -0.06, drag: 0.2, lift: 0.6, flutter: 0.35,
     }), 0.26),
     frame(pose({
-      lean: 0.02, hipY: 0.2, armFront: [-2.85, 0.3], armBack: [-2.6, 0.25],
+      lean: 0.02, hipY: 0.2, armFront: [-2.12, -0.88], armBack: [-0.82, 0.5],
       legFront: [0.12, -0.06], legBack: [-0.14, 0.08],
       expression: 'joy', headTurn: 0.4, headTilt: 0.05, lift: -0.5, flutter: 0.7,
     }), 0.26),
@@ -331,24 +424,25 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
         : undefined,
     })), { ...wide(88) })
 
-  // ── Dash: a held extreme plus its own ghost ───────────────────────────────
+  // ── Dash: a held extreme, a trail and a rake of speed lines ───────────────
   const dashA = pose({
     lean: 0.66, hipY: 1.4, spine: 0.6, legFront: [-1.15, 0.5], legBack: [1.2, 0.3],
     armFront: [1.85, 0.2], armBack: [-1.9, 0.3], squashX: 1.16, squashY: 0.89,
     expression: 'shout', headTurn: 0.95, drag: 2.6, lift: 0.3,
   })
+  const dashLines = (sk: Skeleton) => ({
+    from: [sk.hip[0] - 4, sk.hip[1] - 2] as Pt,
+    angle: Math.PI - 0.06,
+    color: look.pal.accent.light,
+    lines: [[-9, 15, 0.42], [-3.5, 21, 0.5], [2.5, 17, 0.36], [7.5, 12, 0.26]] as Array<[number, number, number]>,
+  })
   b.add('dash', [
-    frame(dashA, 0.07, {
-      ghosts: [
-        { pose: dashA, alpha: 0.3, dx: -4.5 },
-        { pose: dashA, alpha: 0.16, dx: -8.5 },
-      ],
-    }),
+    frame(dashA, 0.07, { smear: { dx: -9.5, alpha: 0.45, steps: 4 }, streaks: dashLines }),
     frame(pose({
       lean: 0.62, hipY: 1.1, spine: 0.5, legFront: [-1.0, 0.56], legBack: [1.1, 0.34],
       armFront: [1.75, 0.26], armBack: [-1.8, 0.34], squashX: 1.13, squashY: 0.91,
       expression: 'strain', headTurn: 0.95, drag: 2.2, flutter: 0.5,
-    }), 0.09),
+    }), 0.09, { smear: { dx: -6, alpha: 0.3 }, streaks: dashLines }),
   ], { ...wide(74), loop: true })
 
   // ── Water & rigging ───────────────────────────────────────────────────────
@@ -386,12 +480,29 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
   return b.build()
 }
 
+/** Every playable crew member, in roster order. */
+export const CREW_IDS: CrewId[] = [
+  'luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper', 'robin', 'franky', 'brook', 'jinbe',
+]
+
 export function buildCrewSheets(): Record<CrewId, SpriteSheet> {
-  const ids: CrewId[] = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper']
-  return ids.reduce((acc, id) => {
+  const t0 = performance.now()
+  const sheets = CREW_IDS.reduce((acc, id) => {
     acc[id] = buildCrewSheet(id)
     return acc
   }, {} as Record<CrewId, SpriteSheet>)
+  // Ten characters at forty-odd frames each is the single most expensive thing
+  // the loading screen does, so the cost is left where a capture script can
+  // read it rather than being guessed at.
+  if (typeof window !== 'undefined') window.__CREW_MS__ = performance.now() - t0
+  return sheets
+}
+
+declare global {
+  interface Window {
+    /** Milliseconds the last `buildCrewSheets()` took. Debug probe. */
+    __CREW_MS__?: number
+  }
 }
 
 /**
@@ -400,11 +511,11 @@ export function buildCrewSheets(): Record<CrewId, SpriteSheet> {
  * `<img>` via `toDataURL`.
  */
 export function buildCrewPortraits(): Record<CrewId, HTMLCanvasElement> {
-  const ids: CrewId[] = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper']
-  return ids.reduce((acc, id) => {
+  return CREW_IDS.reduce((acc, id) => {
     acc[id] = buildPortrait(id)
     return acc
   }, {} as Record<CrewId, HTMLCanvasElement>)
 }
 
 export { LOOKS }
+

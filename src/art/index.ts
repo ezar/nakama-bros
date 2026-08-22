@@ -49,12 +49,20 @@ export async function loadArt(onProgress?: (t: number, label: string) => void): 
   onProgress?.(1, '¡Zarpando!')
   await nextFrame()
   cached = { crew, enemies, items, effects }
+  window.__ART__ = cached
   return cached
 }
 
 export function art(): ArtLibrary {
   if (!cached) throw new Error('loadArt() must complete before art() is used')
   return cached
+}
+
+declare global {
+  interface Window {
+    /** Debug handle: lets the capture scripts render sheets at any zoom. */
+    __ART__?: ArtLibrary
+  }
 }
 
 /** Terrain atlas for a biome, built on first use. */

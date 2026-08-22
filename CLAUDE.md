@@ -78,3 +78,24 @@ Render interno de 480×270, escalado entero al viewport. `TILE = 16`.
 ## Despliegue
 
 GitHub Pages con `base: '/nakama-bros/'`. CI corre type-check, tests y build.
+
+## Ver el arte que escribes
+
+Una captura del juego es demasiado pequeña para revisar sprites. Para verlos de
+verdad:
+
+```bash
+npm run build
+node scripts/sheets.mjs --sheet crew:luffy --zoom 5
+# también: enemies:grunt, items:berry, effects:flash
+# contact sheet en screenshots/sheets/, cada animación en una fila,
+# sobre damero para que se vean huecos y píxeles sueltos
+```
+
+Con varios agentes a la vez, dale a cada uno su propio destino para que no
+choquen los builds:
+
+```bash
+npx vite build --outDir dist-mio
+node scripts/sheets.mjs --dist dist-mio --port 4331 --sheet crew:zoro --zoom 5
+```

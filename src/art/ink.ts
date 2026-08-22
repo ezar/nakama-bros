@@ -251,8 +251,11 @@ export function paint(
     ctx.clip(path)
     ctx.strokeStyle = opts.rimColor ?? c.light
     ctx.lineWidth = opts.rim * 2
-    // Offsetting the stroke toward the light leaves a band only on the lit edge.
-    ctx.translate(light.x * opts.rim * 0.9, light.y * opts.rim * 0.9)
+    // The stroke is clipped to the shape, so the half that survives is the half
+    // that falls INSIDE the path. Offsetting away from the light is therefore
+    // what leaves a band on the lit edge — offsetting toward it lights the edge
+    // in shadow, which reads as every form being lit from below.
+    ctx.translate(-light.x * opts.rim * 0.95, -light.y * opts.rim * 0.95)
     ctx.stroke(path)
     ctx.restore()
   }

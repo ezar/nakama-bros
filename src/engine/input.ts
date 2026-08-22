@@ -104,7 +104,7 @@ export class Input {
     this.detached.push(() => {
       target.removeEventListener('keydown', onKeyDown as EventListener)
       target.removeEventListener('keyup', onKeyUp as EventListener)
-      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('blur-sm', onBlur)
     })
   }
 

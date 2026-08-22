@@ -1,15 +1,18 @@
 import type { CrewId } from '../../types'
 import { cel, mix } from '../color'
-import { blob, crescentPath, curve, ellipsePath, glint, paint, roundRectPath, type Pt } from '../ink'
+import { blob, crescentPath, curve, ellipsePath, glint, roundRectPath, type Pt } from '../ink'
+import { celPaint } from './paint'
 import { PAL } from '../palette'
 import { browShadow } from './head'
 import { CREW_TWO } from './crew2'
 import type { Look } from './parts'
 import {
-  P, collar, limbFormLite, paintPanel, skinCel, spikeHair, tails, waistWrap,
+  P, bigFist, collar, limbFormLite, paintPanel, skinCel, spikeHair, stretchLimb, tails, waistWrap,
 } from './parts'
 import type { Skeleton } from './rig'
-import { SEG, band, bodyFolds, bodyPoint, drawBody, drawRibbon, hemShape, lag, ribbon } from './rig'
+import {
+  SEG, band, bodyFolds, bodyPoint, drawBody, drawRibbon, hemShape, lag, proportion, ribbon,
+} from './rig'
 
 /**
  * Per-character identity: palette, build, costume, hair, headgear and props.
@@ -30,6 +33,19 @@ import { SEG, band, bodyFolds, bodyPoint, drawBody, drawRibbon, hemShape, lag, r
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Where the top of the head is, for a head that is tilted.
+ *
+ * Hats were hung a fixed distance straight up from the skull's centre, which is
+ * right only while the head is level. Throw the head back — the hurt frames, the
+ * apex of a jump — and the hat stays where it was and the character appears to
+ * have knocked it off. Following the head's own up-vector keeps it on.
+ */
+const crownOf = (s: Skeleton, cx: number, cy: number, d: number): Pt => {
+  const a = s.lean + s.headTilt
+  return [cx + Math.sin(a) * d - s.drag * 0.28, cy - Math.cos(a) * d + s.lift * 0.26]
+}
+
+/**
  * The straw hat: an uneven brim, a crown and a red band. It is the single most
  * important silhouette in the game, so the brim is drawn as a blob with a
  * varying radius rather than an ellipse — a perfect oval reads as clip art, and
@@ -38,8 +54,9 @@ import { SEG, band, bodyFolds, bodyPoint, drawBody, drawRibbon, hemShape, lag, r
 function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
   const straw = cel(PAL.strawGold)
   const tilt = -s.drag * 0.05 + s.lean * 0.4
-  const hx = cx - s.drag * 0.5
-  const y = cy - r * 1.04 + s.lift * 0.28
+  // High enough that the brim's lower edge clears the brow: the hat is the
+  // silhouette, but the face is the character, and the brim was eating it.
+  const [hx, y] = crownOf(s, cx, cy, r * 1.36)
   const brimPts: Pt[] = []
   const wobble = [1, 0.96, 1.03, 0.98, 1.02, 0.95, 1.04, 0.97]
   for (let i = 0; i < 8; i++) {
@@ -50,7 +67,7 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
     ])
   }
   const brim = blob(brimPts, 0.95)
-  paint(ctx, brim, straw, { shadow: 0.36, radius: r * 1.5, pivot: [hx, y], rim: 0.6, line: 0.52, occlusion: 0.2 })
+  celPaint(ctx, brim, straw, { shadow: 0.36, radius: r * 1.5, pivot: [hx, y], rim: 0.6, line: 0.52, occlusion: 0.2 })
 
   const crown = blob([
     [hx - r * 0.9, y + r * 0.2],
@@ -59,9 +76,9 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
     [hx + r * 0.82, y - r * 0.5],
     [hx + r * 0.94, y + r * 0.22],
   ] as Pt[], 0.85)
-  paint(ctx, crown, straw, { shadow: 0.42, radius: r, pivot: [hx, y - r * 0.3], rim: 0.55, line: 0.55 })
+  celPaint(ctx, crown, straw, { shadow: 0.42, radius: r, pivot: [hx, y - r * 0.3], rim: 0.55, line: 0.55 })
 
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [hx - r * 0.95, y + r * 0.24],
     [hx - r * 0.84, y - r * 0.14],
     [hx + r * 0.88, y - r * 0.08],
@@ -82,47 +99,46 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
     ] as Pt[]))
   }
   ctx.restore()
-  browShadow(ctx, cx, cy, r, 0.46, 0.2)
+  browShadow(ctx, cx, cy, r, 0.6, 0.12)
 }
 
 function bandanaHead(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
   const c = cel(PAL.zoroGreen)
-  paint(ctx, blob([
-    [cx - r * 1.02, cy - r * 0.66],
-    [cx - r * 0.8, cy - r * 1.04],
-    [cx + r * 0.86, cy - r * 0.92],
-    [cx + r * 0.98, cy - r * 0.52],
-    [cx, cy - r * 0.74],
-  ] as Pt[], 0.75), c, { shadow: 0.4, radius: r, pivot: [cx, cy - r * 0.6], rim: 0.5, line: 0.5 })
+  celPaint(ctx, blob([
+    [cx - r * 0.94, cy - r * 0.8],
+    [cx - r * 0.74, cy - r * 1.12],
+    [cx + r * 0.78, cy - r * 1.02],
+    [cx + r * 0.9, cy - r * 0.68],
+    [cx, cy - r * 0.86],
+  ] as Pt[], 0.75), c, { shadow: 0.4, radius: r, pivot: [cx, cy - r * 0.8], rim: 0.5, line: 0.5 })
   // The knot, then two tails that lag the head by a frame and whip on a turn.
-  const knot: Pt = [cx - r * 0.94, cy - r * 0.72]
-  paint(ctx, ellipsePath(knot[0], knot[1], r * 0.28, r * 0.24, -0.4), c, {
+  const knot: Pt = [cx - r * 0.88, cy - r * 0.86]
+  celPaint(ctx, ellipsePath(knot[0], knot[1], r * 0.28, r * 0.24, -0.4), c, {
     shadow: 0.44, radius: r * 0.3, pivot: knot, line: 0.44,
   })
   for (let i = 0; i < 2; i++) {
     const spread = i === 0 ? -0.42 : 0.16
     drawRibbon(
       ctx,
-      ribbon(knot, Math.PI + spread - s.lift * 0.06, r * (2.5 + s.drag * 0.5), r * 0.24, r * 0.1,
-        0.9 + s.drag * 0.3 + i * 0.35, 0.12, s.flutter + i * 0.4),
+      ribbon(knot, Math.PI + spread - s.lift * 0.06, r * (1.75 + s.drag * 0.35), r * 0.3, r * 0.08,
+        1.15 + s.drag * 0.3 + i * 0.4, 0.16, s.flutter + i * 0.4),
       c,
       knot,
       r * 1.4,
     )
   }
-  browShadow(ctx, cx, cy, r, 0.44, 0.16)
+  browShadow(ctx, cx, cy, r, 0.58, 0.1)
 }
 
 function topHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
   const pink = cel(PAL.chopperPink)
-  const y = cy - r * 1.02 + s.lift * 0.25
-  const hx = cx - s.drag * 0.35
+  const [hx, y] = crownOf(s, cx, cy, r * 1.02)
   // Antlers first: they are behind the hat, and they are the read that says
   // "reindeer" before anything else in the frame does.
   const antler = (dir: number) => {
     const c = cel(PAL.woodLight)
     const base: Pt = [cx + dir * r * 0.74, y + r * 0.1]
-    paint(ctx, blob([
+    celPaint(ctx, blob([
       [base[0], base[1]],
       [base[0] + dir * r * 0.3, base[1] - r * 1.24],
       [base[0] + dir * r * 1.24, base[1] - r * 1.66],
@@ -137,16 +153,16 @@ function topHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number
   antler(-1)
   antler(1)
 
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [hx - r * 1.36, y + r * 0.12],
     [hx, y - r * 0.06],
     [hx + r * 1.36, y + r * 0.12],
     [hx, y + r * 0.34],
   ] as Pt[], 0.9), pink, { shadow: 0.36, radius: r, pivot: [hx, y], rim: 0.5, line: 0.5 })
-  paint(ctx, roundRectPath(hx - r * 0.8, y - r * 1.3, r * 1.6, r * 1.42, r * 0.22), pink, {
+  celPaint(ctx, roundRectPath(hx - r * 0.8, y - r * 1.3, r * 1.6, r * 1.42, r * 0.22), pink, {
     shadow: 0.42, radius: r, pivot: [hx, y - r * 0.5], rim: 0.5, line: 0.5, occlusion: 0.2,
   })
-  paint(ctx, roundRectPath(hx - r * 0.82, y - r * 0.5, r * 1.64, r * 0.44, 0.2), cel(PAL.denim), {
+  celPaint(ctx, roundRectPath(hx - r * 0.82, y - r * 0.5, r * 1.64, r * 0.44, 0.2), cel(PAL.denim), {
     shadow: 0.35, radius: r, pivot: [hx, y - r * 0.28], line: 0.4,
   })
   // The cross patch on the crown.
@@ -156,12 +172,12 @@ function topHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number
   ctx.fill(roundRectPath(hx - r * 0.12, y - r * 1.12, r * 0.24, r * 0.56, 0.06))
   ctx.fill(roundRectPath(hx - r * 0.28, y - r * 0.96, r * 0.56, r * 0.24, 0.06))
   ctx.restore()
-  browShadow(ctx, cx, cy, r, 0.5, 0.16)
+  browShadow(ctx, cx, cy, r, 0.5, 0.09)
 }
 
 function goggles(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const strap = cel(PAL.usoppBrown)
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [cx - r * 1.06, cy - r * 0.98],
     [cx + r * 1.02, cy - r * 0.92],
     [cx + r * 1.04, cy - r * 0.5],
@@ -169,7 +185,7 @@ function goggles(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   ] as Pt[], 0.5), strap, { shadow: 0.42, radius: r, pivot: [cx, cy - r * 0.74], rim: 0.4, line: 0.45 })
   for (const dx of [-0.52, 0.56]) {
     const lens = ellipsePath(cx + dx * r, cy - r * 0.76, r * 0.42, r * 0.36)
-    paint(ctx, lens, cel(PAL.magic), {
+    celPaint(ctx, lens, cel(PAL.magic), {
       shadow: 0.3, radius: r * 0.42, pivot: [cx + dx * r, cy - r * 0.76], line: 0.46,
     })
     glint(ctx, cx + dx * r - r * 0.13, cy - r * 0.87, r * 0.17, r * 0.1, -0.6)
@@ -197,7 +213,7 @@ const katana = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: numbe
     ctx.fill(crescentPath(hand[0], hand[1], len * 0.96, 1.3, angle - 1.2, angle + 0.2))
     ctx.restore()
   }
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [hand[0] - sn * 1.0, hand[1] + c * 1.0],
     [tip[0] - sn * 0.42, tip[1] + c * 0.42],
     [tip[0] + c * 1.8, tip[1] + sn * 1.8],
@@ -214,10 +230,10 @@ const katana = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: numbe
     [tip[0] - c * 1.2, tip[1] - sn * 1.2],
   ] as Pt[]))
   ctx.restore()
-  paint(ctx, ellipsePath(hand[0], hand[1], 1.7, 0.66, angle), cel(PAL.gold), {
+  celPaint(ctx, ellipsePath(hand[0], hand[1], 1.7, 0.66, angle), cel(PAL.gold), {
     shadow: 0.4, radius: 1.5, pivot: hand, rim: 0.4, line: 0.4,
   })
-  paint(ctx, limbFormLite(
+  celPaint(ctx, limbFormLite(
     [hand[0] - c * 0.6, hand[1] - sn * 0.6],
     [hand[0] - c * 3.6, hand[1] - sn * 3.6],
     0.85,
@@ -236,7 +252,7 @@ const climaTact = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
     const seg = 6 + i * 0.6
     const nx = x + c * seg
     const ny = y + sn * seg
-    paint(ctx, limbFormLite([x, y], [nx, ny], 1.05 - i * 0.14), wood, {
+    celPaint(ctx, limbFormLite([x, y], [nx, ny], 1.05 - i * 0.14), wood, {
       shadow: 0.4, radius: 1.2, pivot: [x, y], rim: 0.5, line: 0.44,
     })
     band(ctx, [nx, ny], angle, 1.2 - i * 0.14, 0.4, cel(PAL.denim))
@@ -258,7 +274,7 @@ const sling = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: number
   const c = Math.cos(angle)
   const sn = Math.sin(angle)
   const P = (x: number, y: number): Pt => [hand[0] + c * x - sn * y, hand[1] + sn * x + c * y]
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     P(-3.4, 0.9), P(-0.4, 0.9), P(0.6, 2.6), P(3.4, 4.6), P(4.4, 3.6), P(1.9, 1.6),
     P(1.4, 0), P(1.9, -1.6), P(4.4, -3.6), P(3.4, -4.6), P(0.6, -2.6), P(-0.4, -0.9), P(-3.4, -0.9),
   ] as Pt[], 0.62), wood, { shadow: 0.42, radius: 3.4, pivot: hand, rim: 0.5, line: 0.46 })
@@ -269,56 +285,66 @@ const sling = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: number
   ctx.stroke(curve([P(3.9, 4.1), P(-1.2 - t * 3, 0), P(3.9, -4.1)] as Pt[]))
   ctx.restore()
   if (t > 0.5) {
-    paint(ctx, ellipsePath(P(-1.2 - t * 3, 0)[0], P(-1.2 - t * 3, 0)[1], 1.1, 1.1), cel(PAL.ember), {
+    celPaint(ctx, ellipsePath(P(-1.2 - t * 3, 0)[0], P(-1.2 - t * 3, 0)[1], 1.1, 1.1), cel(PAL.ember), {
       shadow: 0.35, radius: 1.1, pivot: hand, rim: 0.4, line: 0.4,
     })
   }
 }
 
 const fist = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: number) => {
-  // The stretch: a tapered tube from the wrist out to an oversized fist, with a
-  // speed line down its length so the arm reads as travelling, not as long.
+  /**
+   * The stretch.
+   *
+   * Everything the rest of the character gets, the stretched arm gets too: a
+   * tapering silhouette, a hard terminator running down its length, a rim on
+   * the lit edge and a coloured ink line. It also gets the two things that were
+   * missing and that actually sell it — a wrist, so the fist is attached to
+   * something, and a set of tension rings down the tube, so the arm reads as
+   * rubber under load rather than as a pale pipe.
+   */
   const skin = skinCel(PAL.skin)
-  const reach = 5 + t * 14
   const c = Math.cos(angle)
   const sn = Math.sin(angle)
+  const reach = 5 + t * 16
+  const root: Pt = [hand[0] - c * 2.2, hand[1] - sn * 2.2]
   const tip: Pt = [hand[0] + c * reach, hand[1] + sn * reach]
-  paint(ctx, blob([
-    [hand[0] - sn * 1.6, hand[1] + c * 1.6],
-    [tip[0] - sn * 2.5, tip[1] + c * 2.5],
-    [tip[0] + sn * 2.5, tip[1] - c * 2.5],
-    [hand[0] + sn * 1.6, hand[1] - c * 1.6],
-  ] as Pt[], 0.4), skin, { shadow: 0.44, radius: 2.5, pivot: hand, rim: 0.55, line: 0.46 })
-  paint(ctx, blob([
-    [tip[0] - c * 1.6 - sn * 3.1, tip[1] - sn * 1.6 + c * 3.1],
-    [tip[0] + c * 2.4 - sn * 2.4, tip[1] + sn * 2.4 + c * 2.4],
-    [tip[0] + c * 3.2, tip[1] + sn * 3.2],
-    [tip[0] + c * 2.4 + sn * 2.4, tip[1] + sn * 2.4 - c * 2.4],
-    [tip[0] - c * 1.6 + sn * 3.1, tip[1] - sn * 1.6 - c * 3.1],
-  ] as Pt[], 0.8), skin, { shadow: 0.42, radius: 3.2, pivot: tip, rim: 0.62, line: 0.5, occlusion: 0.2 })
-  ctx.save()
-  ctx.strokeStyle = skin.line
-  ctx.lineWidth = 0.42
-  ctx.lineCap = 'round'
-  ctx.stroke(curve([
-    [tip[0] + c * 1.2 - sn * 2.2, tip[1] + sn * 1.2 + c * 2.2],
-    [tip[0] + c * 1.9, tip[1] + sn * 1.9],
-    [tip[0] + c * 1.2 + sn * 2.2, tip[1] + sn * 1.2 - c * 2.2],
-  ] as Pt[]))
-  ctx.restore()
+
+  // Speed lines first, behind the arm, raked back along the punch.
   if (t > 0) {
     ctx.save()
-    ctx.globalAlpha = 0.3 * t
+    ctx.globalAlpha = 0.34 * t
     ctx.strokeStyle = PAL.cream
-    ctx.lineWidth = 0.55
-    for (const off of [-2.1, 0.2, 2.1]) {
-      ctx.stroke(curve([
-        [hand[0] - sn * off - c * 4, hand[1] + c * off - sn * 4],
-        [tip[0] - sn * off - c * 4.5, tip[1] + c * off - sn * 4.5],
-      ] as Pt[]))
+    ctx.lineCap = 'round'
+    for (const [off, len] of [[-3.4, 9], [-1.2, 14], [1.6, 11], [3.6, 7]] as Array<[number, number]>) {
+      ctx.lineWidth = 0.5 + (1 - Math.abs(off) / 4) * 0.5
+      ctx.beginPath()
+      ctx.moveTo(hand[0] - sn * off - c * 3, hand[1] + c * off - sn * 3)
+      ctx.lineTo(hand[0] - sn * off - c * (3 + len), hand[1] + c * off - sn * (3 + len))
+      ctx.stroke()
     }
     ctx.restore()
   }
+
+  const tube = stretchLimb(ctx, root, [tip[0] - c * 2.6, tip[1] - sn * 2.6], 2.45, 1.55, skin)
+  // Tension rings: three arcs across the tube, closer together near the fist
+  // where the rubber is stretched hardest.
+  ctx.save()
+  ctx.clip(tube)
+  ctx.globalAlpha = 0.4
+  ctx.strokeStyle = skin.deep
+  ctx.lineWidth = 0.42
+  for (const d of [0.34, 0.6, 0.8]) {
+    const x = root[0] + (tip[0] - root[0]) * d
+    const y = root[1] + (tip[1] - root[1]) * d
+    ctx.stroke(curve([
+      [x - sn * 2.6 - c * 0.5, y + c * 2.6 - sn * 0.5],
+      [x, y],
+      [x + sn * 2.6 - c * 0.5, y - c * 2.6 - sn * 0.5],
+    ] as Pt[]))
+  }
+  ctx.restore()
+
+  bigFist(ctx, tip, angle, 3.5, skin)
 }
 
 const legKick = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: number) => {
@@ -337,7 +363,7 @@ const hoof = (ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: number)
   const c = cel('#C9895A')
   const reach = 2.5 + t * 5
   const tip: Pt = [hand[0] + Math.cos(angle) * reach, hand[1] + Math.sin(angle) * reach]
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [tip[0] - 3, tip[1] - 2.6], [tip[0] + 2.4, tip[1] - 3], [tip[0] + 3.4, tip[1] + 0.4],
     [tip[0] + 1.6, tip[1] + 3.2], [tip[0] - 2.6, tip[1] + 2.8],
   ] as Pt[], 0.85), c, { shadow: 0.42, radius: 3.2, pivot: tip, rim: 0.55, line: 0.5 })
@@ -364,7 +390,7 @@ const LOOKS_BASE = {
   luffy: {
     name: 'Luffy',
     build: { shoulder: 4.6, chest: 4.15, waist: 2.85, hip: 3.75 },
-    face: { scar: true, eye: 1.04, brow: 1.15, iris: '#3A2438' },
+    face: { scar: true, eye: 1.04, brow: 1.15, iris: '#8A4426' },
     portrait: { expression: 'joy', turn: 0.34, tilt: -0.08 },
     banner: PAL.luffyRed,
     pal: P({
@@ -409,7 +435,7 @@ const LOOKS_BASE = {
       waistWrap(ctx, s, pal.sash, -0.04, 0.22, 0.8)
       tails(ctx, s, pal.shirt, 0.16, 4.4, 6.0, 1.5, 0.62)
     },
-    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.35, cy - r * 0.16, r * 1.14, 9, 1.5, 0.16, 1.7),
+    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.35, cy - r * 0.2, r * 1.02, 9, 1.6, 0.11, 1.7),
     hairFront: (cx, cy, r, s) => [
       [
         [cx - r * 1.0, cy - r * 0.52],
@@ -435,7 +461,7 @@ const LOOKS_BASE = {
   zoro: {
     name: 'Zoro',
     build: { shoulder: 5.15, chest: 4.6, waist: 3.3, hip: 4.05 },
-    face: { eyeAspect: 0.82, eye: 0.96, brow: 1.35, blush: 0.4, iris: '#26483A' },
+    face: { eyeAspect: 0.82, eye: 0.96, brow: 1.35, blush: 0.4, iris: '#2E8A5E' },
     portrait: { expression: 'smug', turn: 0.3, tilt: 0.05 },
     banner: PAL.zoroGreen,
     pal: P({
@@ -449,7 +475,7 @@ const LOOKS_BASE = {
       // widest silhouette of the six.
       const left = bodyPoint(s, 0.9, -5.6)
       const right = bodyPoint(s, 0.9, 5.2)
-      paint(ctx, blob(hemShape(left, right, 15, s, 1.35), 0.85), pal.coat, {
+      celPaint(ctx, blob(hemShape(left, right, 15, s, 1.35), 0.85), pal.coat, {
         shadow: 0.52, radius: 6, pivot: bodyPoint(s, 0.4, 0), rim: 0.4, line: 0.5, occlusion: 0.28,
       })
     },
@@ -474,7 +500,7 @@ const LOOKS_BASE = {
       // The haramaki: thick, and the one bright horizontal on a dark figure.
       waistWrap(ctx, s, pal.sash, -0.06, 0.3, 0.85)
     },
-    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.3, cy - r * 0.26, r * 1.06, 11, 1.8, 0.22, 2.3),
+    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.3, cy - r * 0.3, r * 0.98, 9, 2.1, 0.14, 2.3),
     hairFront: (cx, cy, r, s) => [
       [
         [cx - r * 0.94, cy - r * 0.5],
@@ -495,15 +521,15 @@ const LOOKS_BASE = {
         const a = 2.5 + i * 0.13
         const c = cel(['#232630', '#3E4250', '#151820'][i])
         const tip: Pt = [hip[0] + Math.cos(a) * 14.5, hip[1] + Math.sin(a) * 14.5]
-        paint(ctx, limbFormLite(hip, tip, 0.85), c, {
+        celPaint(ctx, limbFormLite(hip, tip, 0.85), c, {
           shadow: 0.5, radius: 1.2, pivot: hip, rim: 0.4, line: 0.42,
         })
         // Hilt and guard on the near end, where they break the silhouette.
         const grip: Pt = [hip[0] - Math.cos(a) * 4.4, hip[1] - Math.sin(a) * 4.4]
-        paint(ctx, limbFormLite(hip, grip, 0.72), cel(['#7A2A32', '#2E5C46', '#C0A050'][i]), {
+        celPaint(ctx, limbFormLite(hip, grip, 0.72), cel(['#7A2A32', '#2E5C46', '#C0A050'][i]), {
           shadow: 0.44, radius: 1, pivot: grip, line: 0.4,
         })
-        paint(ctx, ellipsePath(hip[0], hip[1], 1.5, 0.5, a), cel(PAL.gold), {
+        celPaint(ctx, ellipsePath(hip[0], hip[1], 1.5, 0.5, a), cel(PAL.gold), {
           shadow: 0.4, radius: 1.4, pivot: hip, line: 0.38,
         })
       }
@@ -516,7 +542,7 @@ const LOOKS_BASE = {
   nami: {
     name: 'Nami',
     build: { shoulder: 4.05, chest: 3.85, waist: 2.45, hip: 3.65 },
-    face: { eye: 1.14, lash: 1.3, brow: 0.85, blush: 1.3, iris: '#6B3A1C' },
+    face: { eye: 1.14, lash: 1.3, brow: 0.85, blush: 1.3, iris: '#B4682E' },
     portrait: { expression: 'smug', turn: 0.28, tilt: 0.06 },
     banner: PAL.namiOrange,
     pal: P({
@@ -545,7 +571,7 @@ const LOOKS_BASE = {
       ] as Pt[], 0.3)
       ctx.save()
       ctx.clip(top)
-      paint(ctx, stripe, pal.accent, { shadow: 0.4, radius: 4, pivot: bodyPoint(s, 0.76, 0), line: 0 })
+      celPaint(ctx, stripe, pal.accent, { shadow: 0.4, radius: 4, pivot: bodyPoint(s, 0.76, 0), line: 0 })
       ctx.restore()
       bodyFolds(ctx, top, s, [
         [[1.0, -3.2], [0.74, -2.2], [0.56, -2.6]],
@@ -558,7 +584,7 @@ const LOOKS_BASE = {
       const left = bodyPoint(s, 0.2, -4.0)
       const right = bodyPoint(s, 0.2, 4.0)
       const skirt = blob(hemShape(left, right, 8.4, s, 1.5), 0.82)
-      paint(ctx, skirt, pal.coat, {
+      celPaint(ctx, skirt, pal.coat, {
         shadow: 0.46, radius: 4.6, pivot: bodyPoint(s, 0.05, 0), rim: 0.5, line: 0.5, occlusion: 0.3,
       })
       ctx.save()
@@ -574,14 +600,14 @@ const LOOKS_BASE = {
       waistWrap(ctx, s, pal.trim, 0.16, 0.3, 0.7)
     },
     hairBack: (cx, cy, r, s) => [
-      [cx - r * 1.34, cy - r * 0.44],
-      lag([cx - r * 0.78, cy - r * 1.2], s, 0.4),
-      lag([cx + r * 0.56, cy - r * 1.22], s, 0.4),
-      [cx + r * 1.3, cy - r * 0.38],
-      lag([cx + r * 1.32, cy + r * 1.6], s, 1.6),
-      lag([cx + r * 0.66, cy + r * 2.5], s, 2.6),
-      lag([cx - r * 0.72, cy + r * 2.4], s, 3),
-      lag([cx - r * 1.34, cy + r * 1.2], s, 2),
+      [cx - r * 1.1, cy - r * 0.48],
+      lag([cx - r * 0.68, cy - r * 1.16], s, 0.4),
+      lag([cx + r * 0.52, cy - r * 1.18], s, 0.4),
+      [cx + r * 1.08, cy - r * 0.42],
+      lag([cx + r * 1.12, cy + r * 1.1], s, 1.2),
+      lag([cx + r * 0.6, cy + r * 1.9], s, 2.0),
+      lag([cx - r * 0.66, cy + r * 1.8], s, 2.3),
+      lag([cx - r * 1.12, cy + r * 0.9], s, 1.6),
     ] as Pt[],
     hairFront: (cx, cy, r, s) => [
       [
@@ -609,7 +635,7 @@ const LOOKS_BASE = {
   sanji: {
     name: 'Sanji',
     build: { shoulder: 4.45, chest: 3.9, waist: 2.65, hip: 3.5 },
-    face: { swirlBrow: true, eye: 0.98, eyeAspect: 0.92, blush: 0.35, iris: '#245A80' },
+    face: { swirlBrow: true, eye: 0.98, eyeAspect: 0.92, blush: 0.35, iris: '#2E86C4' },
     portrait: { expression: 'smug', turn: 0.36, tilt: -0.04 },
     banner: PAL.sanjiGold,
     pal: P({
@@ -638,20 +664,24 @@ const LOOKS_BASE = {
         bodyFolds(ctx, p, s, [[[0.98, v(4.2)], [0.6, v(3.4)], [0.14, v(3.6)]]], pal.coat.deep, 0.5)
       }
       collar(ctx, s, pal.shirt, 2.2, 0.14)
-      paint(ctx, ellipsePath(...bodyPoint(s, 0.24, 0.9), 0.42, 0.42), pal.accent, {
+      celPaint(ctx, ellipsePath(...bodyPoint(s, 0.24, 0.9), 0.42, 0.42), pal.accent, {
         shadow: 0.4, radius: 0.5, pivot: bodyPoint(s, 0.24, 0.9), line: 0.3,
       })
     },
     hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.3, cy - r * 0.22, r * 1.04, 7, 1.4, 0.12, 3.1),
     hairFront: (cx, cy, r, s) => [
-      // The fringe covers one eye entirely — Sanji's defining face shape.
+      // The fringe covers one eye entirely and falls past the jaw on the far
+      // side — the one thing that stops a man in a plain suit reading as a
+      // rectangle when the whole figure is filled in black.
       [
-        [cx - r * 1.06, cy - r * 0.18],
-        lag([cx - r * 0.9, cy - r * 1.06], s, 0.45),
-        lag([cx + r * 0.38, cy - r * 1.14], s, 0.4),
-        [cx + r * 0.9, cy - r * 0.66],
-        [cx + r * 0.22, cy - r * 0.74],
-        [cx - r * 0.26, cy + r * 0.16],
+        [cx - r * 0.98, cy + r * 0.44],
+        [cx - r * 1.12, cy - r * 0.24],
+        lag([cx - r * 0.96, cy - r * 1.06], s, 0.45),
+        lag([cx + r * 0.38, cy - r * 1.16], s, 0.4),
+        [cx + r * 0.88, cy - r * 0.68],
+        [cx + r * 0.2, cy - r * 0.76],
+        [cx - r * 0.24, cy - r * 0.1],
+        [cx - r * 0.56, cy + r * 0.24],
       ] as Pt[],
       [
         [cx + r * 0.5, cy - r * 0.98],
@@ -668,7 +698,7 @@ const LOOKS_BASE = {
   usopp: {
     name: 'Usopp',
     build: { shoulder: 4.25, chest: 3.9, waist: 2.85, hip: 3.7 },
-    face: { nose: 0, eye: 1.05, brow: 1.1, blush: 0.9, freckles: true, iris: '#3A2214' },
+    face: { nose: 0, eye: 1.05, brow: 1.1, blush: 0.9, freckles: true, iris: '#8E4E22' },
     portrait: { expression: 'surprised', turn: 0.3, tilt: 0.08 },
     banner: PAL.usoppBrown,
     pal: P({
@@ -692,7 +722,7 @@ const LOOKS_BASE = {
         paintPanel(ctx, s, [
           [1.08, v(3.4)], [1.08, v(1.9)], [0.8, v(1.9)], [0.76, v(3.0)],
         ], pal.coat, { radius: 1.4, pivot: bodyPoint(s, 0.94, v(2.6)), shadow: 0.4 })
-        paint(ctx, ellipsePath(...bodyPoint(s, 0.8, v(2.5)), 0.46, 0.46), pal.trim, {
+        celPaint(ctx, ellipsePath(...bodyPoint(s, 0.8, v(2.5)), 0.46, 0.46), pal.trim, {
           shadow: 0.36, radius: 0.5, pivot: bodyPoint(s, 0.8, v(2.5)), line: 0.32,
         })
       }
@@ -730,7 +760,7 @@ const LOOKS_BASE = {
       // The nose. It is the character, so it is drawn as a real tapering form
       // with its own terminator rather than a triangle stuck on the face.
       const skin = skinCel('#D89A6C')
-      paint(ctx, blob([
+      celPaint(ctx, blob([
         [cx + r * 0.5, cy + r * 0.06],
         [cx + r * 1.7, cy + r * 0.24],
         [cx + r * 2.5, cy + r * 0.46],
@@ -744,11 +774,11 @@ const LOOKS_BASE = {
       if (phase !== 'behind') return
       const hip = bodyPoint(s, 0.12, -4.4)
       const c = cel(PAL.usoppBrown)
-      paint(ctx, blob([
+      celPaint(ctx, blob([
         [hip[0] - 4.2, hip[1] - 1.6], [hip[0] + 0.6, hip[1] - 2.0],
         [hip[0] + 1.0, hip[1] + 3.0], [hip[0] - 4.6, hip[1] + 3.4],
       ] as Pt[], 0.55), c, { shadow: 0.5, radius: 3, pivot: hip, rim: 0.4, line: 0.46 })
-      paint(ctx, blob([
+      celPaint(ctx, blob([
         [hip[0] - 4.4, hip[1] - 1.8], [hip[0] + 0.8, hip[1] - 2.2],
         [hip[0] + 0.9, hip[1] - 0.4], [hip[0] - 4.5, hip[1] - 0.1],
       ] as Pt[], 0.4), cel(PAL.wood), { shadow: 0.44, radius: 2, pivot: hip, line: 0.42 })
@@ -761,7 +791,14 @@ const LOOKS_BASE = {
   chopper: {
     name: 'Chopper',
     build: { shoulder: 4.5, chest: 4.6, waist: 3.85, hip: 4.15 },
-    face: { eye: 1.42, muzzle: true, blush: 1.9, nose: 0, brow: 0.8, iris: '#38221E' },
+    // Scaling an adult down gives a small adult. What makes the reindeer read
+    // is the ratio: a head a third again too big, a barrel of a torso and
+    // stubby limbs — a shape nobody else in the cast has at any size.
+    size: proportion({
+      thigh: 0.72, shin: 0.7, torso: 0.8, upperArm: 0.74, foreArm: 0.72,
+      headR: 1.34, armRoot: 0.88, legRoot: 0.9,
+    }),
+    face: { eye: 1.42, muzzle: true, blush: 1.9, nose: 0, brow: 0.8, iris: '#9A5228' },
     portrait: { expression: 'joy', turn: 0.26, tilt: 0.1 },
     banner: PAL.chopperPink,
     pal: P({
@@ -843,18 +880,32 @@ export const LOOKS: Record<CrewId, Look> = {
   ...CREW_TWO,
 }
 
-/** Scale of the whole figure. Chopper is small; the rest are adults. */
+/**
+ * Overall scale, on top of each character's own bone lengths.
+ *
+ * The two work together: `size` decides the *shape* — a cyborg's short legs, a
+ * skeleton's long ones — and this decides how tall the whole thing stands. Run
+ * end to end the cast now spans about twenty-seven world units to forty, which
+ * is a head and a half of difference between the shortest and the tallest, and
+ * that is the point. A roster that all measures the same is a roster of one
+ * character in ten costumes.
+ *
+ * The ceiling is not taste, it is the frame: at 50 units tall there is room for
+ * a straw hat, an afro or a topknot above the head and no more, so the tallest
+ * three are scaled to keep their headgear inside the sheet even at the top of a
+ * jump.
+ */
 export const CREW_SCALE: Record<CrewId, number> = {
   luffy: 1,
-  zoro: 1.05,
-  nami: 0.97,
-  sanji: 1.03,
-  usopp: 0.99,
-  chopper: 0.78,
-  robin: 0.99,
+  zoro: 1.04,
+  nami: 0.95,
+  sanji: 1.02,
+  usopp: 0.97,
+  chopper: 0.82,
+  robin: 1.02,
   franky: 1.12,
-  brook: 1.08,
-  jinbe: 1.14,
+  brook: 1.0,
+  jinbe: 1.1,
 }
 
 export { SEG, mix }

@@ -97,8 +97,9 @@ await page.waitForFunction(() => !!document.querySelector('button'), { timeout: 
 await page.waitForTimeout(600)
 await shot('01-title')
 
-// Crew select.
-const crewBtn = page.getByRole('button').nth(1)
+// Crew select. Click by accessible name, not by index: the title menu grows
+// and reorders, and an index silently captures whatever screen it lands on.
+const crewBtn = page.getByRole('button', { name: /tripulaci|crew/i }).first()
 await crewBtn.click()
 await page.waitForTimeout(700)
 await shot('02-crew')
@@ -108,7 +109,7 @@ await page.keyboard.press('Escape').catch(() => {})
 await page.goto(url, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => !!document.querySelector('button'), { timeout: 30000 })
 await page.waitForTimeout(400)
-await page.getByRole('button').first().click()
+await page.getByRole('button', { name: /zarpar|set sail|jugar|play/i }).first().click()
 await page.waitForFunction(() => !!window.__NAKAMA__, { timeout: 30000 })
 await page.waitForTimeout(800)
 

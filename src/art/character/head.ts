@@ -1,5 +1,6 @@
-import { cel, mix, type Cel } from '../color'
-import { blob, curve, ellipsePath, glint, inkStroke, paint, type Pt } from '../ink'
+import { cel, hexToRgb, mix, rgbToHsl, type Cel } from '../color'
+import { blob, curve, ellipsePath, glint, inkStroke, type Pt } from '../ink'
+import { celPaint } from './paint'
 import type { Expression, Skeleton } from './rig'
 import { limbForm } from './rig'
 
@@ -115,19 +116,59 @@ const EXPRESSIONS: Record<Expression, EyeShape> = {
   smug: E({ open: 0.74, squint: 0.38, brow: -0.14, raise: 0.12, look: 0.06, mouth: 'smirk' }),
 }
 
-/** The skull shape: a rounded cranium tapering to a small chin. */
+/**
+ * The skull shape: a broad rounded cranium over a short jaw.
+ *
+ * The chin is deliberately shallow. A long jaw pushes the eyes up under the
+ * fringe and leaves a bare orange plate below the mouth, which is what makes a
+ * stylised head read as a mask rather than a face; keeping the jaw short puts
+ * the eyeline near the middle of the shape where the eye expects it and leaves
+ * room for a cheek between the eye and the chin.
+ */
 export function headPath(cx: number, cy: number, r: number, turn: number, heft = 1): Path2D {
-  const jaw = (0.64 + turn * 0.12) * heft
+  const jaw = (0.62 + turn * 0.08) * heft
+  // Taller than it is wide. A head as broad as the shoulders reads as a chibi
+  // whatever is drawn on it; keeping the cranium narrow is what lets the head
+  // be big enough to carry a face without the body looking like a doll's.
   return blob([
-    [cx - r * 0.96, cy - r * 0.28],
-    [cx - r * 0.72, cy - r * 0.94],
-    [cx + r * 0.1, cy - r * 1.08],
-    [cx + r * 0.94, cy - r * 0.6],
-    [cx + r * (0.88 + turn * 0.1) * heft, cy + r * 0.18],
-    [cx + r * 0.46 * heft, cy + r * jaw],
-    [cx - r * 0.1, cy + r * (jaw + 0.16)],
-    [cx - r * 0.74 * heft, cy + r * 0.34],
-  ] as Pt[], 0.9)
+    [cx - r * 0.86, cy - r * 0.4],
+    [cx - r * 0.7, cy - r * 1.0],
+    [cx + r * 0.04, cy - r * 1.14],
+    [cx + r * 0.76, cy - r * 0.72],
+    [cx + r * (0.84 + turn * 0.06) * heft, cy + r * 0.02],
+    [cx + r * 0.66 * heft, cy + r * (jaw * 0.66)],
+    [cx + r * 0.18, cy + r * (jaw + 0.08)],
+    [cx - r * 0.4, cy + r * (jaw - 0.06)],
+    [cx - r * 0.74 * heft, cy + r * 0.2],
+  ] as Pt[], 0.88)
+}
+
+/**
+ * The throat, drawn before the costume rather than with the head.
+ *
+ * It is narrow and short on purpose: anything wider than the jaw stops being a
+ * neck and becomes a second object under the chin, which is exactly how a
+ * stylised head comes unstuck from its body. It is kept in deep shadow, because
+ * the jaw always occludes the throat and that one dark wedge is what seats a
+ * head on a pair of shoulders. And it is laid down *first*, so every collar,
+ * lapel and kimono in the cast closes over its base — drawn with the head it
+ * painted straight over them, and every character grew an orange post.
+ */
+export function drawNeck(ctx: CanvasRenderingContext2D, s: Skeleton, skin: Cel, jaw = 1): void {
+  const [cx, cy] = s.head
+  const r = s.headR
+  const nw = 0.92 * jaw
+  const path = blob([
+    [s.neck[0] - nw * 1.2, s.neck[1] + 0.7],
+    [s.neck[0] + nw * 1.2, s.neck[1] + 0.7],
+    [cx + nw * 0.7, cy + r * 0.28],
+    [cx - nw * 0.7, cy + r * 0.28],
+  ] as Pt[], 0.3)
+  // Built from the skin's deepest value, not its mid tone. The throat is the
+  // one place on a character that is always fully occluded, and painting it a
+  // shade under the jaw is the difference between a neck and an orange post.
+  const throat = { ...skin, core: skin.deep, shade: skin.deep }
+  celPaint(ctx, path, throat, { shadow: 0.4, radius: 1.2, pivot: s.neck, line: 0.4, occlusion: 0.5 })
 }
 
 export function drawHead(
@@ -140,23 +181,26 @@ export function drawHead(
   const st0: FaceStyle = { ...FACE, ...o.style }
   const path = headPath(cx, cy, r, o.turn, st0.jaw)
 
-  // Neck first, so the head sits on it rather than floating. It is kept in deep
-  // shadow: the jaw always occludes the throat, and that one dark wedge is what
-  // seats a head on a body.
-  const nw = 1.45 * st0.jaw
-  const neckPath = blob([
-    [s.neck[0] - nw, s.neck[1] + 1.5],
-    [s.neck[0] + nw, s.neck[1] + 1.5],
-    [cx + nw * 0.83, cy + r * 0.52],
-    [cx - nw * 0.83, cy + r * 0.52],
-  ] as Pt[], 0.4)
-  paint(ctx, neckPath, o.skin, { shadow: 0.72, radius: 1.5, pivot: s.neck, line: 0.42, occlusion: 0.5 })
-
   // The terminator is pushed down to the jaw rather than run across the eyes:
   // on a face the shadow belongs under the chin and behind the hair, and the
   // features have to sit in unbroken light or they stop reading.
-  paint(ctx, path, o.skin, {
-    shadow: 0.27, radius: r * 1.2, pivot: [cx + r * 0.1, cy - r * 0.1], rim: 0.66, line: 0.5,
+  // A face takes a much narrower rim than a jacket does. A wide one wraps the
+  // jaw in cream and the head starts to read as a mask with a beard, so this is
+  // a hint of light on the temple and nothing more.
+  // A rim is a ratio, not a constant: on skin that is already near white — a
+  // skull, or a very pale complexion — a cream band at full strength has no
+  // headroom left and blows out into what reads as a headband across the brow.
+  // Fade it toward nothing as the base lightens, and warm it instead of
+  // whitening it.
+  const skinL = rgbToHsl(hexToRgb(o.skin.core)).l
+  const rimFade = 1 - Math.max(0, (skinL - 0.6) / 0.4) * 0.82
+  celPaint(ctx, path, o.skin, {
+    shadow: 0.27,
+    radius: r * 1.2,
+    pivot: [cx + r * 0.1, cy - r * 0.1],
+    rim: 0.42 * rimFade,
+    rimColor: mix(o.skin.light, skinL > 0.72 ? '#FFE6BE' : '#FFFFFF', 0.25),
+    line: 0.5,
   })
 
   drawFace(ctx, cx, cy, r, o, path)
@@ -180,10 +224,10 @@ function drawFace(
   const ink = mix(o.hair.line, '#180F22', 0.4)
   // Turn shifts the features toward the facing side and squeezes the far eye.
   const shift = r * 0.24 * o.turn
-  const eyeY = cy + r * 0.14 + e.look * r * 0.1
-  const nearX = cx + shift + r * 0.4
-  const farX = cx + shift - r * 0.52
-  const nearW = r * 0.38 * st.eye
+  const eyeY = cy + r * 0.08 + e.look * r * 0.08
+  const nearX = cx + shift + r * 0.36
+  const farX = cx + shift - r * 0.42
+  const nearW = r * 0.24 * st.eye
   const farW = nearW * (1 - o.turn * 0.4)
   const iris = st.iris ?? mix(o.hair.core, '#2E2440', 0.4)
 
@@ -203,15 +247,18 @@ function drawFace(
       [cx + shift - r * 0.42, cy + r * 0.9],
       [cx + shift - r * 0.72, cy + r * 0.54],
     ] as Pt[], 0.9)
-    paint(ctx, mz, cel(mix(o.skin.light, '#FFFFFF', 0.35), { lineDarkness: 0.36 }), {
+    celPaint(ctx, mz, cel(mix(o.skin.light, '#FFFFFF', 0.35), { lineDarkness: 0.36 }), {
       shadow: 0.34, radius: r * 0.7, pivot: [cx + shift, cy + r * 0.5], rim: 0.4, line: 0.44,
     })
   }
 
   const eye = (x: number, w: number, near: boolean) => {
     // Wider than tall. A tall eye at this size fills with iris and reads as a
-    // hole; the sclera showing either side of the iris is what makes it an eye.
-    const h = r * 0.4 * st.eye * st.eyeAspect * e.open
+    // hole — which is precisely what went wrong the first time round: the eye
+    // was taller than it was wide, the iris filled it, and two black ovals ate
+    // the face. The sclera showing either side of the iris is what makes it an
+    // eye rather than a socket.
+    const h = r * 0.22 * st.eye * st.eyeAspect * e.open
     if (h < r * 0.1) {
       // A shut eye is one confident arc, and which way it bends is the whole
       // expression: up for delight, folded down for pain.
@@ -236,27 +283,30 @@ function drawFace(
       [x + w * 0.3, eyeY + h * (0.92 - e.squint * 0.6)],
       [x - w * 0.52, eyeY + h * (0.78 - e.squint * 0.5)],
     ] as Pt[], 0.92)
-    ctx.fillStyle = '#FCFAF6'
+    ctx.fillStyle = '#FDFBF4'
     ctx.fill(socket)
     ctx.save()
     ctx.clip(socket)
-    // One iris, tall enough to touch both lids, leaving sclera only at the
-    // corners. Four marks is the budget for a face five pixels high: sclera,
-    // iris, glint, lash. A rim, a pupil and a lit floor on top of those is
-    // three more tones than the eye has room for, and they average to grey.
+    // Three marks and no more. The eye is seven device pixels across at the
+    // resolution this sheet is rasterised at, so a rim, a pupil, a lit floor
+    // and a highlight all at once do not resolve — they average to grey, which
+    // is exactly what the first pass got. Iris, pupil, glint: that is the
+    // budget, and the iris is saturated so it survives being three pixels wide.
     ctx.fillStyle = iris
-    ctx.fill(ellipsePath(x + w * 0.08, eyeY + h * 0.06, w * 0.68, h * 1.06))
+    ctx.fill(ellipsePath(x + w * 0.08, eyeY - h * 0.06, w * 0.64, h * 1.14))
+    ctx.fillStyle = mix(iris, '#100A18', 0.62)
+    ctx.fill(ellipsePath(x + w * 0.08, eyeY - h * 0.02, w * 0.34, h * 0.74))
     ctx.restore()
-    glint(ctx, x - w * 0.26, eyeY - h * 0.3, w * 0.3, h * 0.34, -0.5, '#FFFFFF', 1)
+    glint(ctx, x - w * 0.26, eyeY - h * 0.5, w * 0.26, h * 0.34, -0.5, '#FFFFFF', 1)
 
     // The upper lash: the heaviest line on the character, tapered and flicked
     // out past the outer corner.
     inkStroke(ctx, curve([
-      [x - w * 1.04, eyeY + 0.2],
-      [x - w * 0.36, eyeY - h * 1.08],
-      [x + w * 0.7, eyeY - h * 0.86],
-      [x + w * 1.22, eyeY - h * 0.4],
-    ] as Pt[]), 0.74 * st.lash * (near ? 1 : 0.78), ink, 0.5)
+      [x - w * 1.06, eyeY + 0.1],
+      [x - w * 0.36, eyeY - h * 1.2],
+      [x + w * 0.7, eyeY - h * 0.98],
+      [x + w * 1.24, eyeY - h * 0.34],
+    ] as Pt[]), 0.36 * st.lash * (near ? 1 : 0.76), ink, 0.5)
     // Lower lid: thin, and only under the near eye.
     if (near) {
       ctx.globalAlpha = 0.45
@@ -277,12 +327,12 @@ function drawFace(
   // Brows, drawn as tapered solids rather than strokes. A brow with weight is
   // the difference between an expression and a face with lines on it.
   const brow = (x: number, w: number, dir: number, near: boolean) => {
-    const y = eyeY - r * (0.5 + e.raise * -0.12)
+    const y = eyeY - r * (0.4 + e.raise * -0.1)
     const tilt = e.brow * dir
-    const a: Pt = [x - w * 1.05, y - tilt * r * 0.2]
-    const b: Pt = [x + w * 1.1, y + tilt * r * 0.26 + r * 0.04]
-    const wt = 0.4 * st.brow * (near ? 1 : 0.8)
-    paint(ctx, limbForm(a, b, [[0, wt * 0.7], [0.35, wt], [1, wt * 0.45]], -0.28), cel(ink), {
+    const a: Pt = [x - w * 0.94, y - tilt * r * 0.18]
+    const b: Pt = [x + w * 1.04, y + tilt * r * 0.24 + r * 0.03]
+    const wt = 0.24 * st.brow * (near ? 1 : 0.8)
+    celPaint(ctx, limbForm(a, b, [[0, wt * 0.7], [0.35, wt], [1, wt * 0.45]], -0.28), cel(ink), {
       shadow: 0, rim: 0, line: 0,
     })
   }
@@ -348,28 +398,51 @@ function drawFace(
     ctx.restore()
   }
 
-  // Mouth
-  const mx = cx + shift + r * (st.muzzle ? 0.28 : 0.34)
-  const my = cy + r * (st.muzzle ? 0.66 : 0.54)
-  const mw = r * 0.3
+  // Mouth.
+  //
+  // It has to be a *mark*, not a tick. A one-unit hyphen on a nine-unit head
+  // disappears the moment the sprite is on a busy background, and the face is
+  // then two eyes and nothing — which is the other half of why the old head
+  // read as a mask. Everything below is authored against `mw`, so widening the
+  // mouth widens the whole shape rather than stretching a line.
+  const mx = cx + shift + r * (st.muzzle ? 0.24 : 0.3)
+  const my = cy + r * (st.muzzle ? 0.62 : 0.46)
+  const mw = r * (st.muzzle ? 0.32 : 0.36)
+  const lip = mix(o.skin.deep, ink, 0.62)
   ctx.save()
-  ctx.strokeStyle = ink
-  ctx.lineWidth = 0.7
+  ctx.strokeStyle = lip
+  ctx.lineWidth = 0.5
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   const gum = '#7E2226'
   switch (e.mouth) {
     case 'flat':
-      ctx.stroke(curve([[mx - mw, my], [mx + mw * 0.6, my - 0.14]] as Pt[]))
+      inkStroke(ctx, curve([
+        [mx - mw * 0.82, my - mw * 0.06],
+        [mx - mw * 0.06, my + mw * 0.14],
+        [mx + mw * 0.74, my - mw * 0.08],
+      ] as Pt[]), 0.5, lip, 0.5)
       break
     case 'smile':
-      ctx.stroke(curve([[mx - mw, my - 0.24], [mx, my + 0.5], [mx + mw, my - 0.3]] as Pt[]))
+      inkStroke(ctx, curve([
+        [mx - mw, my - mw * 0.3],
+        [mx, my + mw * 0.52],
+        [mx + mw, my - mw * 0.36],
+      ] as Pt[]), 0.54, lip, 0.5)
       break
     case 'smirk':
-      ctx.stroke(curve([[mx - mw, my + 0.24], [mx + mw * 0.3, my + 0.12], [mx + mw, my - 0.5]] as Pt[]))
+      inkStroke(ctx, curve([
+        [mx - mw, my + mw * 0.3],
+        [mx + mw * 0.3, my + mw * 0.16],
+        [mx + mw, my - mw * 0.6],
+      ] as Pt[]), 0.54, lip, 0.5)
       break
     case 'frown':
-      ctx.stroke(curve([[mx - mw, my + 0.34], [mx, my - 0.3], [mx + mw, my + 0.4]] as Pt[]))
+      inkStroke(ctx, curve([
+        [mx - mw, my + mw * 0.42],
+        [mx, my - mw * 0.34],
+        [mx + mw, my + mw * 0.46],
+      ] as Pt[]), 0.54, lip, 0.5)
       break
     case 'grit': {
       const p = blob([
@@ -446,7 +519,7 @@ function drawFace(
   }
   if (st.muzzle) {
     // Reindeer nose, over the mouth.
-    paint(ctx, ellipsePath(cx + shift + r * 0.5, cy + r * 0.42, r * 0.2, r * 0.15, -0.3), cel('#3A2A34'), {
+    celPaint(ctx, ellipsePath(cx + shift + r * 0.5, cy + r * 0.42, r * 0.2, r * 0.15, -0.3), cel('#3A2A34'), {
       shadow: 0.3, radius: r * 0.2, pivot: [cx + shift + r * 0.5, cy + r * 0.42], rim: 0.24, line: 0,
     })
   }
@@ -487,7 +560,7 @@ function drawFace(
     for (const [dx, k] of [[0.62, 1], [-0.24, 0.82]] as Array<[number, number]>) {
       const bx = cx + shift + r * dx
       const by = cy + r * 0.5
-      paint(ctx, blob([
+      celPaint(ctx, blob([
         [bx - r * 0.15 * k, by + r * 0.12],
         [bx + r * 0.16 * k, by + r * 0.16],
         [bx + r * 0.1 * k, by - r * st.tusk * k],
@@ -537,26 +610,31 @@ function drawSkullFace(
     // The socket is a rounded triangle, tipped by the brow so the same hollow
     // reads furious or startled without changing size.
     const tilt = e.brow * dir * 0.5
-    const w = r * 0.44 * k
-    const h = r * 0.42 * (0.85 + e.open * 0.3)
+    // Narrow, tall and canted inward at the top, with a corner rather than a
+    // curve on the inner brow. Two round holes of equal weight on a pale head
+    // read as a panda, whatever size they are — the asymmetry and the angle
+    // are what make them bone.
+    const w = r * 0.27 * k
+    const h = r * 0.44 * (0.85 + e.open * 0.3)
+    const inner = dir > 0 ? -1 : 1
     const p = blob([
-      [x - w, cy - h * 0.5 + tilt * r * 0.3],
-      [x + w * 0.2, cy - h * (0.9 + e.raise * 0.1) - tilt * r * 0.3],
-      [x + w, cy - h * 0.25 - tilt * r * 0.2],
-      [x + w * 0.72, cy + h * 0.86],
-      [x - w * 0.5, cy + h * 0.92],
-    ] as Pt[], 0.9)
-    paint(ctx, p, hollow, { shadow: 0.2, radius: w, pivot: [x, cy], rim: 0, line: 0.42 })
+      [x + inner * w * 0.95, cy - h * (0.86 + e.raise * 0.1) - tilt * r * 0.3],
+      [x - inner * w * 0.85, cy - h * (0.52 + e.raise * 0.08) + tilt * r * 0.28],
+      [x - inner * w, cy + h * 0.34],
+      [x - inner * w * 0.42, cy + h * 0.94],
+      [x + inner * w * 0.5, cy + h * 0.72],
+    ] as Pt[], 0.55)
+    celPaint(ctx, p, hollow, { shadow: 0.2, radius: w, pivot: [x, cy], rim: 0, line: 0.42 })
     // The pinpoint. It is the whole gaze, so it moves with the expression.
     ctx.save()
     ctx.globalAlpha = 0.92
     ctx.fillStyle = '#F4FBFF'
     ctx.fill(ellipsePath(x + w * (0.18 + e.look * 0.4), cy + h * (0.05 + e.look * 0.5),
-      w * 0.24 * k, h * 0.26))
+      w * 0.17 * k, h * 0.15))
     ctx.restore()
   }
-  socket(cx + r * 0.42, 1, 1)
-  if (o.turn < 0.94) socket(cx - r * 0.5, 1 - o.turn * 0.35, -1)
+  socket(cx + r * 0.38, 1, 1)
+  if (o.turn < 0.94) socket(cx - r * 0.44, 1 - o.turn * 0.35, -1)
 
   // Brow ridge: one heavy bone line across both sockets, the only thing that
   // can scowl on a face with no muscles.
@@ -571,7 +649,7 @@ function drawSkullFace(
   ctx.restore()
 
   // Nasal cavity — a small inverted heart, off-centre with the head's turn.
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [cx + r * 0.06, cy + r * 0.28],
     [cx + r * 0.3, cy + r * 0.5],
     [cx + r * 0.04, cy + r * 0.6],
@@ -605,7 +683,7 @@ function drawSkullFace(
   }
   if (e.gape > 0.05) {
     // The dark of the open jaw, behind both ranks.
-    paint(ctx, blob([
+    celPaint(ctx, blob([
       [cx - tw, my - r * 0.12],
       [cx + tw * 0.9, my - r * 0.14],
       [cx + tw * 0.7, my + drop + r * 0.2],
@@ -625,9 +703,36 @@ export function drawHairBack(
   hair: Cel,
   shape: Pt[],
 ): void {
-  paint(ctx, blob(shape, 0.95), hair, {
+  celPaint(ctx, blob(shape, 0.95), hair, {
     shadow: 0.52, radius: r * 1.4, pivot: [cx, cy], rim: 0.5, line: 0.5, occlusion: 0.22,
   })
+
+  // A shine sized from the mass's own bounds rather than the head's, so a
+  // shape that sits well clear of the skull still catches the key light.
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+  for (const [x, y] of shape) {
+    if (x < x0) x0 = x
+    if (x > x1) x1 = x
+    if (y < y0) y0 = y
+    if (y > y1) y1 = y
+  }
+  const w = x1 - x0
+  const h = y1 - y0
+  if (w > 0.5 && h > 0.5) {
+    ctx.save()
+    ctx.clip(blob(shape, 0.95))
+    ctx.globalAlpha = 0.42
+    ctx.fillStyle = cel(hair.light).light
+    ctx.fill(blob([
+      [x0 + w * 0.14, y0 + h * 0.42],
+      [x0 + w * 0.34, y0 + h * 0.13],
+      [x0 + w * 0.72, y0 + h * 0.3],
+      [x0 + w * 0.6, y0 + h * 0.42],
+      [x0 + w * 0.36, y0 + h * 0.27],
+      [x0 + w * 0.22, y0 + h * 0.52],
+    ] as Pt[], 0.85))
+    ctx.restore()
+  }
 }
 
 /**
@@ -644,13 +749,21 @@ export function drawHairFront(
   locks: Pt[][],
 ): void {
   for (const lock of locks) {
-    paint(ctx, blob(lock, 0.9), hair, {
+    celPaint(ctx, blob(lock, 0.9), hair, {
       shadow: 0.36, radius: r * 0.8, pivot: [cx, cy - r * 0.5], rim: 0.5, line: 0.45,
     })
   }
   // A single band of specular across the crown — the anime hair highlight. It
   // is one shape, not a gradient, so it holds the cel logic.
+  //
+  // It is clipped to the locks that were actually drawn. Placed by head radius
+  // alone it lands wherever the crown *would* be, which on a character whose
+  // hair sits high — an afro, a tall crest — is bare forehead, and it reads as
+  // a headband rather than a shine.
+  const mass = new Path2D()
+  for (const lock of locks) mass.addPath(blob(lock, 0.9))
   ctx.save()
+  ctx.clip(mass)
   ctx.globalAlpha = 0.5
   ctx.fillStyle = cel(hair.light).light
   ctx.fill(blob([
@@ -671,11 +784,11 @@ export function browShadow(
   cy: number,
   r: number,
   drop: number,
-  strength = 0.26,
+  strength = 0.14,
 ): void {
   ctx.save()
   ctx.globalAlpha = strength
   ctx.fillStyle = '#2A2038'
-  ctx.fill(ellipsePath(cx + r * 0.1, cy - r * drop, r * 0.94, r * 0.34))
+  ctx.fill(ellipsePath(cx + r * 0.1, cy - r * drop, r * 0.78, r * 0.24))
   ctx.restore()
 }

@@ -39,12 +39,14 @@ export function buildPortrait(id: CrewId, size = PORTRAIT_SIZE): HTMLCanvasEleme
 
   // Frame on the head, and normalise across the cast: Chopper is drawn at three
   // quarters scale in game, but his card must not be three quarters of a card.
-  const sk = solve(p)
+  const sk = solve(p, look.size)
   const headX = CX + (sk.head[0] - CX) * cs
   const headY = GROUND_Y + (sk.head[1] - GROUND_Y) * cs
-  const k = (size * 0.153) / (SEG.headR * cs)
+  // Frame on the head at roughly two fifths of the card: a bust, with the
+  // shoulders running off the bottom edge, rather than a small full figure.
+  const k = (size * 0.215) / (SEG.headR * (look.size?.headR ?? 1) * cs)
   const tx = size * 0.5 - k * headX
-  const ty = size * 0.375 - k * headY
+  const ty = size * 0.47 - k * headY
 
   const fig = createSurface(size, size)
   fig.ctx.save()

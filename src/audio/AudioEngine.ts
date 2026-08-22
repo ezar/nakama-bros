@@ -1,200 +1,269 @@
 import type { AudioApi, SfxName } from '../types'
-import { SFX_RECIPES, type SfxRecipe } from './sfx'
 import { MusicPlayer } from './music'
+import { renderSfx, SFX_RECIPES } from './sfx'
+import { reverbImpulse } from './synth'
 
 /**
  * Procedural audio.
  *
- * Every sound is synthesised at runtime from oscillators and noise buffers —
- * no audio files, so the whole soundtrack costs a few kilobytes of code and
- * the music can react to gameplay (layers swell during boss phases) in a way
- * pre-rendered loops cannot.
+ * Nothing is loaded: every sound is synthesised at runtime from oscillators and
+ * noise, so the whole soundtrack costs a few kilobytes of code and the music
+ * can react to the game — layers swell during boss phases, and loud effects
+ * duck the score out of their way — in a way pre-rendered loops cannot.
+ *
+ * The signal path, once and for all:
+ *
+ *   music ─ musicGain ─ duck ─┐
+ *   sfx   ─ sfxGain ──────────┼─ glue comp ─ limiter ─ master ─ out
+ *   reverb return ────────────┘
+ *
+ * The glue compressor keeps a busy mix together; the limiter after it is a
+ * brick wall, so twenty simultaneous explosions cannot clip the output.
  */
+
+export interface AudioGraph {
+  /** Music player output goes here. */
+  musicIn: GainNode
+  /** Sound effects go here. */
+  sfxIn: GainNode
+  /** Anything can send a copy of itself here for room. */
+  reverbIn: GainNode
+  /** Dips while a loud effect plays. */
+  duck: GainNode
+  master: GainNode
+}
+
+/**
+ * Build the mix bus. Exported (and written against `BaseAudioContext`) so the
+ * offline renderer used to inspect the music gets exactly the same chain the
+ * player hears.
+ */
+export function createAudioGraph(ctx: BaseAudioContext, dest: AudioNode): AudioGraph {
+  const master = ctx.createGain()
+  master.gain.value = 0.9
+
+  // Brick-wall limiter: hard knee, fast attack, nothing gets past 0 dBFS.
+  const limiter = ctx.createDynamicsCompressor()
+  limiter.threshold.value = -1.5
+  limiter.knee.value = 0
+  limiter.ratio.value = 20
+  limiter.attack.value = 0.002
+  limiter.release.value = 0.12
+
+  // Glue: gentle, slow, only there to stop the mix falling apart when a boss
+  // fight has music, drums and four explosions running at once.
+  const glue = ctx.createDynamicsCompressor()
+  glue.threshold.value = -18
+  glue.knee.value = 22
+  glue.ratio.value = 2.6
+  glue.attack.value = 0.006
+  glue.release.value = 0.22
+
+  // Nothing below the lowest note anybody can hear — sub rumble only eats
+  // headroom the limiter would rather spend on the music.
+  const rumble = ctx.createBiquadFilter()
+  rumble.type = 'highpass'
+  rumble.frequency.value = 34
+  rumble.Q.value = 0.7
+
+  glue.connect(rumble)
+  rumble.connect(limiter)
+  limiter.connect(master)
+  master.connect(dest)
+
+  const duck = ctx.createGain()
+  duck.gain.value = 1
+  duck.connect(glue)
+
+  const musicIn = ctx.createGain()
+  musicIn.connect(duck)
+
+  const sfxIn = ctx.createGain()
+  sfxIn.connect(glue)
+
+  const reverbIn = ctx.createGain()
+  reverbIn.gain.value = 1
+  const convolver = ctx.createConvolver()
+  convolver.buffer = reverbImpulse(ctx)
+  const wet = ctx.createGain()
+  wet.gain.value = 0.5
+  // A little high-pass keeps the tail from muddying the bass.
+  const tilt = ctx.createBiquadFilter()
+  tilt.type = 'highpass'
+  tilt.frequency.value = 320
+  reverbIn.connect(convolver)
+  convolver.connect(tilt)
+  tilt.connect(wet)
+  wet.connect(glue)
+
+  return { musicIn, sfxIn, reverbIn, duck, master }
+}
+
+/** Below this gap two triggers of the same effect are one machine-gun burst. */
+const MIN_GAP = 0.028
+/** Concurrent effect voices allowed before quiet ones start being dropped. */
+const VOICE_BUDGET = 26
+
 export class AudioEngine implements AudioApi {
   private ctx: AudioContext | null = null
-  private master: GainNode | null = null
-  private musicGain: GainNode | null = null
-  private sfxGain: GainNode | null = null
-  private noiseBuffer: AudioBuffer | null = null
+  private graph: AudioGraph | null = null
   private music: MusicPlayer | null = null
   private started = false
+  private failed = false
 
   private masterVolume = 0.8
   private musicVolume = 0.55
   private sfxVolume = 0.85
-  /** Rate-limits identical sounds so a coin cascade does not clip. */
+
+  /** Last trigger time per effect, for the anti-machine-gun gate. */
   private lastPlayed = new Map<SfxName, number>()
+  /** Trigger counter per effect, for the round-robin pitch cycle. */
+  private counter = new Map<SfxName, number>()
+  /** End times of effect voices in flight, for the voice budget. */
+  private voices: number[] = []
+  /** Pending music track, if playMusic ran before the context existed. */
+  private pending: { track: string; fade: number; intensity: number } | null = null
+  private intensity = 0.5
 
   async ready(): Promise<void> {
+    if (this.failed) return
     if (this.started) {
-      await this.ctx?.resume()
+      await this.ctx?.resume().catch(() => {})
       return
     }
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    const ctx = new Ctor()
-    this.ctx = ctx
+    try {
+      const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
+      const Ctor = w.AudioContext ?? w.webkitAudioContext
+      if (!Ctor) {
+        // Headless capture and old browsers: stay silent, never throw.
+        this.failed = true
+        return
+      }
+      const ctx = new Ctor()
+      const graph = createAudioGraph(ctx, ctx.destination)
+      graph.master.gain.value = this.masterVolume
+      graph.musicIn.gain.value = this.musicVolume
+      graph.sfxIn.gain.value = this.sfxVolume
 
-    // A gentle bus compressor keeps the mix glued when many SFX overlap.
-    const comp = ctx.createDynamicsCompressor()
-    comp.threshold.value = -14
-    comp.knee.value = 24
-    comp.ratio.value = 3.5
-    comp.attack.value = 0.004
-    comp.release.value = 0.2
+      this.ctx = ctx
+      this.graph = graph
+      this.music = new MusicPlayer(ctx, graph.musicIn, graph.reverbIn)
+      this.music.setIntensity(this.intensity)
+      this.started = true
+      await ctx.resume().catch(() => {})
 
-    const master = ctx.createGain()
-    master.gain.value = this.masterVolume
-    const musicGain = ctx.createGain()
-    musicGain.gain.value = this.musicVolume
-    const sfxGain = ctx.createGain()
-    sfxGain.gain.value = this.sfxVolume
-
-    musicGain.connect(comp)
-    sfxGain.connect(comp)
-    comp.connect(master)
-    master.connect(ctx.destination)
-
-    this.master = master
-    this.musicGain = musicGain
-    this.sfxGain = sfxGain
-
-    // Shared white-noise buffer for percussion, splashes and explosions.
-    const len = Math.floor(ctx.sampleRate * 1.2)
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-    const data = buf.getChannelData(0)
-    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
-    this.noiseBuffer = buf
-
-    this.music = new MusicPlayer(ctx, musicGain)
-    this.started = true
-    await ctx.resume()
+      if (this.pending) {
+        const p = this.pending
+        this.pending = null
+        this.music.play(p.track, p.fade, p.intensity)
+      }
+    } catch {
+      // A blocked or missing AudioContext must never take the game down.
+      this.failed = true
+      this.ctx = null
+      this.graph = null
+      this.music = null
+    }
   }
 
   playSfx(name: SfxName, opts: { volume?: number; rate?: number; pan?: number } = {}): void {
     const ctx = this.ctx
-    const dest = this.sfxGain
-    if (!ctx || !dest || ctx.state === 'suspended') return
-    const now = ctx.currentTime
-    const last = this.lastPlayed.get(name) ?? -1
-    if (now - last < 0.022) return
-    this.lastPlayed.set(name, now)
-
+    const graph = this.graph
+    if (!ctx || !graph || ctx.state !== 'running') return
     const recipe = SFX_RECIPES[name]
     if (!recipe) return
 
-    let node: AudioNode = dest
-    if (opts.pan !== undefined && ctx.createStereoPanner) {
-      const panner = ctx.createStereoPanner()
-      panner.pan.value = Math.max(-1, Math.min(1, opts.pan))
-      panner.connect(dest)
-      node = panner
+    const now = ctx.currentTime
+    const last = this.lastPlayed.get(name) ?? -1
+    if (now - last < MIN_GAP) return
+    this.lastPlayed.set(name, now)
+
+    // Voice budget: when the screen is a fireworks show, the small sounds are
+    // the ones that can be missed without anybody noticing.
+    this.voices = this.voices.filter((t) => t > now)
+    if (this.voices.length > VOICE_BUDGET && (recipe.duck ?? 0) < 0.25) return
+
+    const n = (this.counter.get(name) ?? 0) + 1
+    this.counter.set(name, n)
+    const cycle = recipe.cycle ? recipe.cycle[n % recipe.cycle.length] : 0
+    const jitter = (Math.random() * 2 - 1) * (recipe.vary ?? 0.35)
+
+    try {
+      // A few milliseconds of lead: below anybody's perception, but it puts the
+      // start on the audio clock instead of on whenever this callback ran.
+      const end = renderSfx(ctx, recipe, graph.sfxIn, graph.reverbIn, now + 0.004, {
+        volume: opts.volume ?? 1,
+        rate: opts.rate ?? 1,
+        pan: opts.pan ?? 0,
+        semitones: cycle + jitter,
+      })
+      this.voices.push(end)
+      const duck = (recipe.duck ?? 0) * Math.min(1.2, opts.volume ?? 1)
+      if (duck > 0.05) this.duckMusic(duck, now)
+    } catch {
+      // A voice that cannot be built is a missing sound, not a crashed game.
     }
-    this.renderRecipe(recipe, now, node, opts.volume ?? 1, opts.rate ?? 1)
   }
 
-  private renderRecipe(
-    recipe: SfxRecipe,
-    at: number,
-    dest: AudioNode,
-    volume: number,
-    rate: number,
-  ): void {
-    const ctx = this.ctx!
-    for (const v of recipe.voices) {
-      const start = at + (v.delay ?? 0)
-      const dur = v.dur / rate
-      const gain = ctx.createGain()
-      gain.gain.setValueAtTime(0.0001, start)
-      const peak = Math.max(0.0001, v.gain * volume * recipe.gain)
-      gain.gain.exponentialRampToValueAtTime(peak, start + Math.max(0.001, v.attack ?? 0.005))
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur)
-
-      let src: AudioScheduledSourceNode
-      if (v.type === 'noise') {
-        const n = ctx.createBufferSource()
-        n.buffer = this.noiseBuffer
-        n.loop = true
-        src = n
-      } else {
-        const o = ctx.createOscillator()
-        o.type = v.type
-        o.frequency.setValueAtTime(v.freq * rate, start)
-        if (v.freqEnd !== undefined) {
-          const end = Math.max(20, v.freqEnd * rate)
-          if (v.sweep === 'linear') o.frequency.linearRampToValueAtTime(end, start + dur)
-          else o.frequency.exponentialRampToValueAtTime(end, start + dur)
-        }
-        if (v.vibrato) {
-          const lfo = ctx.createOscillator()
-          const lfoGain = ctx.createGain()
-          lfo.frequency.value = v.vibrato.rate
-          lfoGain.gain.value = v.vibrato.depth
-          lfo.connect(lfoGain)
-          lfoGain.connect(o.frequency)
-          lfo.start(start)
-          lfo.stop(start + dur + 0.05)
-        }
-        src = o
-      }
-
-      let chain: AudioNode = gain
-      if (v.filter) {
-        const f = ctx.createBiquadFilter()
-        f.type = v.filter.type
-        f.frequency.setValueAtTime(v.filter.freq, start)
-        if (v.filter.freqEnd !== undefined) {
-          f.frequency.exponentialRampToValueAtTime(Math.max(40, v.filter.freqEnd), start + dur)
-        }
-        f.Q.value = v.filter.q ?? 1
-        gain.connect(f)
-        chain = f
-      }
-      chain.connect(dest)
-      src.connect(gain)
-      src.start(start)
-      src.stop(start + dur + 0.02)
-    }
+  /** Dip the music under a loud effect, then let it back up. */
+  private duckMusic(amount: number, now: number): void {
+    const graph = this.graph
+    if (!graph) return
+    const depth = Math.max(0.35, 1 - amount * 0.55)
+    const g = graph.duck.gain
+    g.cancelScheduledValues(now)
+    g.setTargetAtTime(depth, now, 0.012)
+    g.setTargetAtTime(1, now + 0.06 + amount * 0.35, 0.16)
   }
 
   playMusic(track: string, opts: { fade?: number; intensity?: number } = {}): void {
-    this.music?.play(track, opts.fade ?? 0.6, opts.intensity ?? 0.5)
+    const fade = opts.fade ?? 0.6
+    const intensity = opts.intensity ?? this.intensity
+    this.intensity = intensity
+    if (!this.music) {
+      // The first level can ask for music before the user has clicked anything.
+      this.pending = { track, fade, intensity }
+      return
+    }
+    this.music.play(track, fade, intensity)
   }
 
   stopMusic(fade = 0.5): void {
+    this.pending = null
     this.music?.stop(fade)
   }
 
   setIntensity(v: number): void {
+    this.intensity = v
     this.music?.setIntensity(v)
   }
 
   setMasterVolume(v: number): void {
     this.masterVolume = v
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02)
-    }
+    this.ramp(this.graph?.master, v)
   }
 
   setMusicVolume(v: number): void {
     this.musicVolume = v
-    if (this.musicGain && this.ctx) {
-      this.musicGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02)
-    }
+    this.ramp(this.graph?.musicIn, v)
   }
 
   setSfxVolume(v: number): void {
     this.sfxVolume = v
-    if (this.sfxGain && this.ctx) {
-      this.sfxGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02)
-    }
+    this.ramp(this.graph?.sfxIn, v)
+  }
+
+  private ramp(node: GainNode | undefined, v: number): void {
+    if (!node || !this.ctx) return
+    node.gain.setTargetAtTime(Math.max(0, v), this.ctx.currentTime, 0.02)
   }
 
   suspend(): void {
-    void this.ctx?.suspend()
+    void this.ctx?.suspend().catch(() => {})
   }
 
   resume(): void {
-    void this.ctx?.resume()
+    void this.ctx?.resume().catch(() => {})
   }
 }
 

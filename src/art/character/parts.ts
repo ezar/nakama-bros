@@ -1,5 +1,6 @@
-import { cel, mix } from '../color'
-import { blob, curve, ellipsePath, glint, paint, type Pt } from '../ink'
+import { cel, mix, type Cel } from '../color'
+import { KEY_LIGHT, blob, curve, ellipsePath, glint, type Pt } from '../ink'
+import { celPaint } from './paint'
 import type { FaceStyle } from './head'
 import type {
   ArmStyle, Build, Expression, LegStyle, Palette, Proportion, Skeleton,
@@ -96,11 +97,11 @@ export const paintPanel = (
   ctx: CanvasRenderingContext2D,
   s: Skeleton,
   uv: Array<[number, number]>,
-  c: Parameters<typeof paint>[2],
-  opts: Parameters<typeof paint>[3] = {},
+  c: Parameters<typeof celPaint>[2],
+  opts: Parameters<typeof celPaint>[3] = {},
 ): Path2D => {
   const path = panel(s, uv)
-  paint(ctx, path, c, {
+  celPaint(ctx, path, c, {
     shadow: 0.44, radius: 4.6, pivot: bodyPoint(s, 0.55, 0), rim: 0.5, line: 0.48, occlusion: 0.24, ...opts,
   })
   return path
@@ -224,13 +225,13 @@ export const spikeHair = (
 export function plate(
   ctx: CanvasRenderingContext2D,
   pts: Pt[],
-  c: Parameters<typeof paint>[2],
+  c: Parameters<typeof celPaint>[2],
   pivot: Pt,
   radius: number,
   seam?: Pt[],
 ): Path2D {
   const path = blob(pts, 0.55)
-  paint(ctx, path, c, { shadow: 0.5, radius, pivot, rim: 0.8, line: 0.5, occlusion: 0.3 })
+  celPaint(ctx, path, c, { shadow: 0.5, radius, pivot, rim: 0.8, line: 0.5, occlusion: 0.3 })
   if (seam) {
     ctx.save()
     ctx.clip(path)
@@ -254,13 +255,13 @@ export function bolts(
   to: Pt,
   n: number,
   r: number,
-  c: Parameters<typeof paint>[2],
+  c: Parameters<typeof celPaint>[2],
 ): void {
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0.5 : i / (n - 1)
     const x = from[0] + (to[0] - from[0]) * t
     const y = from[1] + (to[1] - from[1]) * t
-    paint(ctx, ellipsePath(x, y, r, r), c, { shadow: 0.5, radius: r, pivot: [x, y], rim: 0.3, line: 0.3 })
+    celPaint(ctx, ellipsePath(x, y, r, r), c, { shadow: 0.5, radius: r, pivot: [x, y], rim: 0.3, line: 0.3 })
     glint(ctx, x - r * 0.3, y - r * 0.35, r * 0.34, r * 0.24, -0.6, '#FFFFFF', 0.7)
   }
 }
@@ -278,7 +279,7 @@ export function fin(
   angle: number,
   len: number,
   width: number,
-  c: Parameters<typeof paint>[2],
+  c: Parameters<typeof celPaint>[2],
   sweep = 0.5,
 ): void {
   const ux = Math.cos(angle)
@@ -294,7 +295,7 @@ export function fin(
     Q(len * 0.4, width * 0.9),
     Q(0, width * 0.6),
   ] as Pt[], 0.8)
-  paint(ctx, path, c, { shadow: 0.48, radius: width, pivot: root, rim: 0.5, line: 0.46, occlusion: 0.2 })
+  celPaint(ctx, path, c, { shadow: 0.48, radius: width, pivot: root, rim: 0.5, line: 0.46, occlusion: 0.2 })
   ctx.save()
   ctx.clip(path)
   ctx.globalAlpha = 0.45
@@ -304,4 +305,206 @@ export function fin(
     ctx.stroke(curve([Q(len * 0.12, width * k), Q(len * 0.85, width * (k - sweep * 0.2))] as Pt[]))
   }
   ctx.restore()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stretched limbs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A long tapering tube of limb, lit like a cylinder.
+ *
+ * `celPaint()` cuts its terminator with a half-plane, which is right for a compact
+ * form and wrong for a twenty-unit tube: the plane crosses the tube once and
+ * leaves most of its length flat. A cylinder's shadow instead runs *along* it,
+ * so this builds the same silhouette and then fills a band hugging the edge
+ * that faces away from the light — the tube gets a hard terminator down its
+ * whole length, which is what the rest of the character already has.
+ */
+export function stretchLimb(
+  ctx: CanvasRenderingContext2D,
+  a: Pt,
+  b: Pt,
+  r0: number,
+  r1: number,
+  c: Cel,
+  opts: { band?: number; rim?: number; line?: number } = {},
+): Path2D {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len
+  const uy = dy / len
+  // The normal pointing away from the key light is the side that goes dark.
+  let nx = -uy
+  let ny = ux
+  if (nx * KEY_LIGHT.x + ny * KEY_LIGHT.y > 0) {
+    nx = -nx
+    ny = -ny
+  }
+  const at = (t: number, k: number): Pt => {
+    const r = r0 + (r1 - r0) * t
+    // A slight belly and a pinch just before the wrist: a straight-sided tube
+    // is a pipe, and the taper is the only thing that says this is an arm.
+    const swell = 1 + Math.sin(t * Math.PI) * 0.12 - Math.max(0, t - 0.82) * 1.1
+    return [a[0] + ux * len * t + nx * r * swell * k, a[1] + uy * len * t + ny * r * swell * k]
+  }
+  const pts: Pt[] = []
+  for (let i = 0; i <= 6; i++) pts.push(at(i / 6, 1))
+  pts.push([b[0] + ux * r1 * 0.7, b[1] + uy * r1 * 0.7])
+  for (let i = 6; i >= 0; i--) pts.push(at(i / 6, -1))
+  pts.push([a[0] - ux * r0 * 0.7, a[1] - uy * r0 * 0.7])
+  const path = blob(pts, 0.7)
+
+  ctx.save()
+  ctx.fillStyle = c.core
+  ctx.fill(path)
+  ctx.save()
+  ctx.clip(path)
+  // The shadow band: the same outline, pushed across the tube until only a
+  // strip of it still overlaps the far edge.
+  const bandW = opts.band ?? 0.68
+  const shift = (2 - bandW) * Math.max(r0, r1)
+  ctx.translate(nx * shift, ny * shift)
+  ctx.fillStyle = c.shade
+  ctx.fill(path)
+  ctx.globalAlpha = 0.5
+  ctx.translate(nx * Math.max(r0, r1) * 0.5, ny * Math.max(r0, r1) * 0.5)
+  ctx.fillStyle = c.deep
+  ctx.fill(path)
+  ctx.restore()
+
+  const rim = opts.rim ?? 0.55
+  if (rim > 0) {
+    ctx.save()
+    ctx.clip(path)
+    ctx.strokeStyle = c.light
+    ctx.lineWidth = rim * 2
+    ctx.translate(-KEY_LIGHT.x * rim * 0.95, -KEY_LIGHT.y * rim * 0.95)
+    ctx.stroke(path)
+    ctx.restore()
+  }
+  ctx.strokeStyle = c.line
+  ctx.lineWidth = opts.line ?? 0.5
+  ctx.stroke(path)
+  ctx.restore()
+  return path
+}
+
+/**
+ * A fist seen from behind the knuckles.
+ *
+ * Three knuckle lobes across the leading edge, a thumb laid over the near side
+ * and a wrist that is narrower than both. Without the wrist the fist is a ball
+ * on a stick; without the knuckles it is a ball.
+ */
+export function bigFist(
+  ctx: CanvasRenderingContext2D,
+  at: Pt,
+  angle: number,
+  r: number,
+  c: Cel,
+): void {
+  const ux = Math.cos(angle)
+  const uy = Math.sin(angle)
+  const nx = -uy
+  const ny = ux
+  const Q = (x: number, y: number): Pt => [at[0] + ux * x + nx * y, at[1] + uy * x + ny * y]
+
+  // Wrist first: a short pinched cuff the fist widens out of.
+  stretchLimb(ctx, Q(-r * 1.5, 0), Q(-r * 0.2, 0), r * 0.6, r * 0.78, c, { band: 0.6, line: 0.44 })
+
+  const knuckle = (k: number) => Q(r * (0.95 + Math.cos(k * 1.05) * 0.16), r * k * 0.62)
+  const path = blob([
+    Q(-r * 0.35, -r * 1.02),
+    Q(r * 0.5, -r * 1.08),
+    knuckle(-1.35),
+    knuckle(0),
+    knuckle(1.35),
+    Q(r * 0.35, r * 1.12),
+    Q(-r * 0.5, r * 0.98),
+  ] as Pt[], 0.82)
+  celPaint(ctx, path, c, {
+    shadow: 0.44, radius: r * 1.05, pivot: at, rim: 0.62, line: 0.52, occlusion: 0.24,
+  })
+  // Two creases between the knuckles, and the thumb across the near side.
+  ctx.save()
+  ctx.clip(path)
+  ctx.globalAlpha = 0.55
+  ctx.strokeStyle = c.line
+  ctx.lineWidth = 0.4
+  ctx.lineCap = 'round'
+  for (const k of [-0.66, 0.66]) {
+    ctx.stroke(curve([Q(r * 0.42, r * k * 0.7), Q(r * 1.0, r * k * 0.72)] as Pt[]))
+  }
+  ctx.restore()
+  celPaint(
+    ctx,
+    blob([
+      Q(-r * 0.5, r * 0.2),
+      Q(r * 0.5, r * 0.5),
+      Q(r * 0.72, r * 1.02),
+      Q(r * 0.1, r * 1.12),
+      Q(-r * 0.55, r * 0.86),
+    ] as Pt[], 0.8),
+    c,
+    { shadow: 0.46, radius: r * 0.6, pivot: Q(0, r * 0.7), rim: 0.34, line: 0.46 },
+  )
+}
+
+/**
+ * An open hand, palm forward, fingers splayed.
+ *
+ * The difference between a hand and a lump on the end of an arm is that the
+ * hand is *wider* than the limb it grows out of and its outline is broken:
+ * three finger lobes and a thumb thrown clear of the palm. Both matter at
+ * sprite size — a rounded cap on a tube reads as a cork whatever is drawn
+ * inside it.
+ */
+export function openPalm(
+  ctx: CanvasRenderingContext2D,
+  at: Pt,
+  angle: number,
+  r: number,
+  c: Cel,
+  thumb: 1 | -1 = -1,
+): void {
+  const ux = Math.cos(angle)
+  const uy = Math.sin(angle)
+  const nx = -uy * thumb
+  const ny = ux * thumb
+  const Q = (x: number, y: number): Pt => [at[0] + ux * x + nx * y, at[1] + uy * x + ny * y]
+
+  // The thumb first, so the palm's ink line closes over its root.
+  celPaint(
+    ctx,
+    blob([Q(-r * 0.2, -r * 0.5), Q(r * 0.9, -r * 1.05), Q(r * 1.5, -r * 1.5),
+      Q(r * 1.15, -r * 1.9), Q(r * 0.1, -r * 1.25)] as Pt[], 0.8),
+    c,
+    { shadow: 0.44, radius: r * 0.6, pivot: Q(r * 0.6, -r), rim: 0.34, line: 0.44 },
+  )
+
+  const finger = (k: number, len: number): Pt[] => [
+    Q(r * 1.15, r * (k - 0.34)),
+    Q(r * len, r * (k - 0.36)),
+    Q(r * (len + 0.28), r * k),
+    Q(r * len, r * (k + 0.34)),
+    Q(r * 1.15, r * (k + 0.32)),
+  ]
+  const palm = blob([
+    Q(-r * 0.3, -r * 0.95),
+    Q(r * 1.2, -r * 1.1),
+    Q(r * 1.3, r * 1.35),
+    Q(-r * 0.2, r * 1.15),
+    Q(-r * 0.7, r * 0.1),
+  ] as Pt[], 0.8)
+  celPaint(ctx, palm, c, {
+    shadow: 0.44, radius: r * 1.1, pivot: at, rim: 0.5, line: 0.5, occlusion: 0.22,
+  })
+  // Three fingers, uneven lengths — a row of equal ones reads as a comb.
+  for (const [k, len] of [[-0.78, 2.15], [0, 2.35], [0.78, 2.05]] as Array<[number, number]>) {
+    celPaint(ctx, blob(finger(k, len), 0.7), c, {
+      shadow: 0.46, radius: r * 0.4, pivot: Q(r * 1.6, r * k), rim: 0.3, line: 0.44,
+    })
+  }
 }

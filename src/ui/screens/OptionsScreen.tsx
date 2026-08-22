@@ -1,6 +1,19 @@
-import { motion } from 'framer-motion'
+import { useEffect } from 'react'
+import { motion as m } from 'framer-motion'
 import { useSettings } from '../../store/settingsStore'
 import { useT } from '../../i18n/useT'
+import { useUiMotion } from '../hooks/useUiMotion'
+import { Paper } from '../art/Paper'
+import { Nail, Rope, ShipWheel } from '../art/Icons'
+import { UI } from '../theme'
+
+/**
+ * Settings, written on the same sheet as everything else.
+ *
+ * The controls stay native — a range is a range and a button is a button — so
+ * the keyboard, the screen reader and the browser's own affordances all keep
+ * working; only their skin is ours.
+ */
 
 function Slider({
   label,
@@ -11,18 +24,28 @@ function Slider({
   value: number
   onChange: (v: number) => void
 }) {
+  const pct = Math.round(value * 100)
   return (
     <label className="flex items-center justify-between gap-4 py-2">
-      <span className="font-mono text-[11px] uppercase tracking-widest text-op-parchment/70">{label}</span>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-40 cursor-pointer appearance-none rounded-full bg-op-navy accent-op-gold"
-      />
+      <span className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: UI.inkSoft }}>
+        {label}
+      </span>
+      <span className="flex items-center gap-3">
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={value}
+          aria-label={label}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="op-range h-2 w-40 cursor-pointer appearance-none rounded-full"
+          style={{
+            background: `linear-gradient(90deg, ${UI.brass} 0%, ${UI.brassLit} ${pct}%, rgba(42,29,20,0.22) ${pct}%, rgba(42,29,20,0.22) 100%)`,
+          }}
+        />
+        <span className="w-8 text-right font-body text-xs font-extrabold tabnum ink">{pct}</span>
+      </span>
     </label>
   )
 }
@@ -40,19 +63,34 @@ function Toggle<T extends string>({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <span className="font-mono text-[11px] uppercase tracking-widest text-op-parchment/70">{label}</span>
-      <div className="flex overflow-hidden rounded-md border border-op-gold/30">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={`px-3 py-1.5 font-body text-xs transition ${
-              o.value === value ? 'bg-op-gold text-op-deep font-bold' : 'text-op-parchment/70 hover:bg-op-gold/15'
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
+      <span className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: UI.inkSoft }}>
+        {label}
+      </span>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="flex overflow-hidden rounded-[4px] border"
+        style={{ borderColor: 'rgba(42,29,20,0.55)', boxShadow: 'inset 0 2px 4px rgba(42,29,20,0.25)' }}
+      >
+        {options.map((o) => {
+          const on = o.value === value
+          return (
+            <button
+              key={o.value}
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(o.value)}
+              className="px-3 py-1.5 font-body text-xs font-bold transition"
+              style={{
+                background: on ? `linear-gradient(180deg, ${UI.brassLit}, ${UI.brass})` : 'transparent',
+                color: on ? '#2A1808' : UI.inkSoft,
+                textShadow: on ? '0 1px 0 rgba(255,245,220,0.5)' : 'none',
+              }}
+            >
+              {o.label}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -61,60 +99,107 @@ function Toggle<T extends string>({
 export function OptionsScreen({ onBack }: { onBack: () => void }) {
   const t = useT()
   const s = useSettings()
+  const motion = useUiMotion()
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onBack()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onBack])
+
   return (
-    <motion.div
+    <m.div
       key="options"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16 }}
-      className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_at_50%_0%,#14406e_0%,#0a1628_50%,#050a14_100%)] p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: motion ? 0.28 : 0 }}
+      className="wood relative flex h-full w-full items-center justify-center overflow-hidden p-6"
     >
-      <div className="op-panel w-[min(460px,92vw)] p-6">
-        <h2 className="op-title mb-4 text-center text-3xl text-op-gold">{t('options.title')}</h2>
-        <Slider label={t('options.master')} value={s.master} onChange={(v) => s.set({ master: v })} />
-        <Slider label={t('options.music')} value={s.music} onChange={(v) => s.set({ music: v })} />
-        <Slider label={t('options.sfx')} value={s.sfx} onChange={(v) => s.set({ sfx: v })} />
-        <Toggle
-          label={t('options.lang')}
-          value={s.lang}
-          options={[
-            { value: 'es' as const, label: 'ES' },
-            { value: 'en' as const, label: 'EN' },
-          ]}
-          onChange={(v) => s.set({ lang: v })}
-        />
-        <Toggle
-          label={t('options.touch')}
-          value={s.touchControls}
-          options={[
-            { value: 'auto' as const, label: 'Auto' },
-            { value: 'on' as const, label: 'On' },
-            { value: 'off' as const, label: 'Off' },
-          ]}
-          onChange={(v) => s.set({ touchControls: v })}
-        />
-        <Toggle
-          label={t('options.effects')}
-          value={s.effects}
-          options={[
-            { value: 'full' as const, label: 'Full' },
-            { value: 'reduced' as const, label: 'Low' },
-          ]}
-          onChange={(v) => s.set({ effects: v })}
-        />
-        <Toggle
-          label="CRT"
-          value={s.crt ? 'on' : 'off'}
-          options={[
-            { value: 'off' as const, label: 'Off' },
-            { value: 'on' as const, label: 'On' },
-          ]}
-          onChange={(v) => s.set({ crt: v === 'on' })}
-        />
-        <button className="op-button mt-5 w-full" onClick={onBack}>
-          {t('options.back')}
-        </button>
-      </div>
-    </motion.div>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 50% at 50% 10%, rgba(255,197,110,0.2) 0%, rgba(255,197,110,0) 65%), radial-gradient(ellipse 90% 85% at 50% 55%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.72) 100%)',
+        }}
+      />
+
+      <m.div
+        initial={{ y: motion ? 18 : 0, rotate: motion ? 0.8 : 0.4 }}
+        animate={{ y: 0, rotate: 0.4 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+        className="relative z-10"
+        style={{ filter: 'drop-shadow(0 18px 22px rgba(0,0,0,0.7))' }}
+      >
+        <Paper seed={31} edges="all" bite={1.2} age={0.45} className="w-[min(470px,92vw)] px-7 pb-6 pt-7">
+          <span className="absolute left-4 top-2">
+            <Nail size={14} />
+          </span>
+          <span className="absolute right-4 top-2">
+            <Nail size={14} />
+          </span>
+
+          <h2 className="flex items-center justify-center gap-3 text-center font-display text-3xl leading-none ink">
+            <ShipWheel size={26} />
+            {t('options.title')}
+          </h2>
+          <div className="mx-auto mb-2 mt-2 flex justify-center opacity-70">
+            <Rope length={240} thickness={7} />
+          </div>
+
+          <Slider label={t('options.master')} value={s.master} onChange={(v) => s.set({ master: v })} />
+          <Slider label={t('options.music')} value={s.music} onChange={(v) => s.set({ music: v })} />
+          <Slider label={t('options.sfx')} value={s.sfx} onChange={(v) => s.set({ sfx: v })} />
+
+          <div className="my-2 flex justify-center opacity-50">
+            <Rope length={200} thickness={6} />
+          </div>
+
+          <Toggle
+            label={t('options.lang')}
+            value={s.lang}
+            options={[
+              { value: 'es' as const, label: 'ES' },
+              { value: 'en' as const, label: 'EN' },
+            ]}
+            onChange={(v) => s.set({ lang: v })}
+          />
+          <Toggle
+            label={t('options.touch')}
+            value={s.touchControls}
+            options={[
+              { value: 'auto' as const, label: 'Auto' },
+              { value: 'on' as const, label: 'On' },
+              { value: 'off' as const, label: 'Off' },
+            ]}
+            onChange={(v) => s.set({ touchControls: v })}
+          />
+          <Toggle
+            label={t('options.effects')}
+            value={s.effects}
+            options={[
+              { value: 'full' as const, label: 'Full' },
+              { value: 'reduced' as const, label: 'Low' },
+            ]}
+            onChange={(v) => s.set({ effects: v })}
+          />
+          <Toggle
+            label={t('options.crt')}
+            value={s.crt ? 'on' : 'off'}
+            options={[
+              { value: 'off' as const, label: 'Off' },
+              { value: 'on' as const, label: 'On' },
+            ]}
+            onChange={(v) => s.set({ crt: v === 'on' })}
+          />
+
+          <button className="op-button op-button--primary mt-5 w-full" onClick={onBack}>
+            {t('options.back')}
+          </button>
+        </Paper>
+      </m.div>
+    </m.div>
   )
 }

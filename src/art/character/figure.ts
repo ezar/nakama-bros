@@ -1,9 +1,10 @@
-import { createSurface, overlayTint, type Surface } from '../ink'
-import { drawHairBack, drawHairFront, drawHead } from './head'
+import { mix } from '../color'
+import { createSurface, silhouetteOf, type Pt, type Surface } from '../ink'
+import { drawHairBack, drawHairFront, drawHead, drawNeck } from './head'
 import type { Look } from './looks'
 import type { Pose, Skeleton } from './rig'
 import {
-  CX, GROUND_Y, SEG, angleOf, drawArm, drawLeg, recedePalette, solve,
+  CX, GROUND_Y, SIZE, angleOf, drawArm, drawLeg, recedePalette, solve,
 } from './rig'
 
 /**
@@ -33,27 +34,34 @@ export function drawFigure(
   ctx.scale(p.squashX * scale, p.squashY * scale)
   ctx.translate(-CX, -GROUND_Y)
 
-  const s: Skeleton = solve(p)
+  const s: Skeleton = solve(p, look.size ?? SIZE)
+
   const pal = look.pal
   const far = recedePalette(pal)
   // Cloth hanging behind the body is only a hand's width back, not an arm's.
   const mid = recedePalette(pal, 0.14)
 
+  const [hx, hy] = s.head
+  const r = s.headR
+
   look.props?.(ctx, s, 'behind')
   look.backCloth?.(ctx, s, mid)
 
-  drawLeg(ctx, s.legBack, s.footBack, look.legs(far))
-  drawArm(ctx, s.armBack, far.skin, look.arms(far))
+  // The hair mass falls *behind* the body, not over it. Drawn with the head it
+  // is drawn after the costume, and anyone with hair past their shoulders — the
+  // navigator, the archaeologist — ends up wearing it as a cape with the whole
+  // torso hidden underneath.
+  drawHairBack(ctx, hx, hy, r, pal.hair, look.hairBack(hx, hy, r, s))
 
+  drawLeg(ctx, s.legBack, s.footBack, { ...look.legs(far), dim: true })
+  drawArm(ctx, s.armBack, far.skin, { ...look.arms(far), dim: true })
+
+  drawNeck(ctx, s, pal.skin, look.face.jaw ?? 1)
   look.torso(ctx, s, pal)
 
   drawLeg(ctx, s.legFront, s.footFront, look.legs(pal))
   look.overLegs?.(ctx, s, pal)
 
-  // Hair mass sits over the shoulders but behind the face.
-  const [hx, hy] = s.head
-  const r = SEG.headR
-  drawHairBack(ctx, hx, hy, r, pal.hair, look.hairBack(hx, hy, r, s))
   drawHead(ctx, s, {
     skin: pal.skin,
     hair: pal.hair,
@@ -80,13 +88,48 @@ export function drawFigure(
 }
 
 /**
+ * The unbroken contour around a whole figure.
+ *
+ * `atlas` will do this for a sheet, but it stamps the frame's alpha outward
+ * twelve times; eight is indistinguishable at this line width and a third
+ * cheaper, and across five hundred frames that is real time. The ring is
+ * composited underneath, so the line sits outside the silhouette rather than
+ * eating into it.
+ */
+export function contourPass(surface: Surface, color: string, width: number): void {
+  const { canvas, scale } = surface
+  const w = canvas.width
+  const h = canvas.height
+  const ring = document.createElement('canvas')
+  ring.width = w
+  ring.height = h
+  const rctx = ring.getContext('2d')!
+  const r = width * scale
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    rctx.drawImage(canvas, Math.cos(a) * r, Math.sin(a) * r)
+  }
+  rctx.globalCompositeOperation = 'source-in'
+  rctx.fillStyle = color
+  rctx.fillRect(0, 0, w, h)
+
+  const ctx = surface.ctx
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalCompositeOperation = 'destination-over'
+  ctx.drawImage(ring, 0, 0)
+  ctx.restore()
+}
+
+/**
  * Multiple-image smear.
  *
- * On the fastest transitions — the frame a punch lands, the frame a dash
- * starts — the eye wants a shape that spans where the body was and where it is.
- * Ghosts are rendered whole into their own surface and composited at low alpha,
- * rather than drawn part by part, so overlapping limbs do not double-darken
- * into a muddy blob.
+ * On the frame a punch lands the eye wants a shape that spans where the body
+ * was and where it is. The trailing copies are tinted toward the character's
+ * own signature colour rather than washed to white: a grey double exposure
+ * reads as dirt on the sprite, a coloured one reads as speed. They are also
+ * only ever offset *along the direction of travel*, so the smear has a
+ * direction instead of a blur.
  */
 export interface Ghost {
   pose: Pose
@@ -98,16 +141,91 @@ export interface Ghost {
 
 export function drawGhosts(s: Surface, look: Look, ghosts: Ghost[], scale: number): void {
   const ctx = s.ctx
+  const trail = mix(look.banner, '#FFFFFF', 0.5)
   for (const g of ghosts) {
     const scratch = createSurface(s.w, s.h, s.scale)
     drawFigure(scratch.ctx, look, g.pose, scale)
-    // Washed toward white before compositing: an unlightened copy reads as a
-    // dirty double exposure, a pale one reads as speed.
-    overlayTint(scratch, '#FFFFFF', 0.55)
+    // A flat silhouette, not a second rendering of the character. A dimmed copy
+    // of the full drawing reads as a dirty double exposure — the grey smudge
+    // the first pass had on every fast frame — where one flat shape in the
+    // character's own colour reads as the body having been there a moment ago.
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = g.alpha
-    ctx.drawImage(scratch.canvas, (g.dx ?? 0) * s.scale, (g.dy ?? 0) * s.scale)
+    ctx.drawImage(silhouetteOf(scratch, trail), (g.dx ?? 0) * s.scale, (g.dy ?? 0) * s.scale)
     ctx.restore()
   }
+}
+
+/**
+ * A directional smear: the figure's own silhouette, stretched along one axis
+ * and faded out behind it.
+ *
+ * This is what a skid or a dash wants instead of a second drawing. It is built
+ * from the alpha of the figure already on the surface — so it can never drift
+ * out of register with the body, and it costs one silhouette instead of a whole
+ * second rendering of the character — then composited underneath with
+ * `destination-over` so the body stays crisp in front of its own trail.
+ */
+export interface Smear {
+  /** Colour of the trail — the character's own signature, washed toward white. */
+  color: string
+  /** Direction and length of the trail in world units — where the body came from. */
+  dx: number
+  dy?: number
+  /** Peak opacity at the body, falling to nothing at the tail. */
+  alpha?: number
+  /** Number of stretched copies. Three is plenty; more only costs fill rate. */
+  steps?: number
+}
+
+export function drawSmear(surface: Surface, sm: Smear): void {
+  const sil = silhouetteOf(surface, sm.color)
+  const steps = sm.steps ?? 3
+  const a0 = sm.alpha ?? 0.34
+  const ctx = surface.ctx
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // Behind whatever is already on the surface: the trail is where the body was.
+  ctx.globalCompositeOperation = 'destination-over'
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    ctx.globalAlpha = a0 * (1 - t) * (1 - t * 0.4)
+    ctx.drawImage(sil, sm.dx * t * surface.scale, (sm.dy ?? 0) * t * surface.scale)
+  }
+  ctx.restore()
+}
+
+/**
+ * Speed lines raked along the direction of travel.
+ *
+ * Drawn *behind* the figure and clipped to nothing, they cost one stroke each
+ * and do what a ghost cannot: they say which way the body is going even on a
+ * frame where the pose barely changes.
+ */
+export function drawStreaks(
+  ctx: CanvasRenderingContext2D,
+  from: Pt,
+  angle: number,
+  color: string,
+  lines: Array<[number, number, number]>,
+  seed = 0,
+): void {
+  const ux = Math.cos(angle)
+  const uy = Math.sin(angle)
+  const nx = -uy
+  const ny = ux
+  ctx.save()
+  ctx.lineCap = 'round'
+  for (const [off, len, a] of lines) {
+    const wob = Math.sin((off + seed) * 3.1) * 0.6
+    ctx.globalAlpha = a
+    ctx.strokeStyle = color
+    ctx.lineWidth = 0.55 + a * 0.9
+    ctx.beginPath()
+    ctx.moveTo(from[0] + nx * off, from[1] + ny * off)
+    ctx.lineTo(from[0] + nx * (off + wob) + ux * len, from[1] + ny * (off + wob) + uy * len)
+    ctx.stroke()
+  }
+  ctx.restore()
 }

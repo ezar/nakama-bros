@@ -1,12 +1,14 @@
 import { cel, mix } from '../color'
 import {
-  blob, crescentPath, curve, ellipsePath, glint, paint, roundRectPath, type Pt,
+  blob, crescentPath, curve, ellipsePath, glint, roundRectPath, type Pt,
 } from '../ink'
+import { celPaint } from './paint'
 import { PAL } from '../palette'
 import { browShadow } from './head'
 import type { Look } from './parts'
 import {
-  P, bolts, collar, fin, limbFormLite, paintPanel, plate, skinCel, spikeHair, waistWrap,
+  P, bolts, collar, fin, limbFormLite, openPalm, paintPanel, plate, skinCel, spikeHair,
+  stretchLimb, waistWrap,
 } from './parts'
 import type { Build, Palette } from './rig'
 import {
@@ -32,9 +34,9 @@ const LILAC = mix(PAL.poison, PAL.cream, 0.45)
 const CYBER_BLUE = mix(PAL.seaLight, PAL.foam, 0.18)
 const STEEL = mix(PAL.steel, PAL.mist, 0.42)
 const STEEL_DARK = mix(PAL.slate, PAL.ink, 0.3)
-const BONE = mix(PAL.cream, PAL.mist, 0.22)
+const BONE = mix(PAL.cream, PAL.mist, 0.46)
 const CRAVAT = mix(PAL.danger, PAL.ink, 0.42)
-const COAT_INDIGO = mix(PAL.dusk, PAL.night, 0.42)
+const COAT_INDIGO = mix(PAL.dusk, PAL.night, 0.14)
 const FISH_BLUE = mix(PAL.sea, PAL.marineBlue, 0.45)
 const KIMONO = mix(PAL.marineNavy, PAL.night, 0.2)
 const KIMONO_OUTER = mix(PAL.sea, PAL.marineNavy, 0.42)
@@ -59,9 +61,9 @@ function bloomArms(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
   const petal = cel(LILAC)
   const arms: Array<[number, number, number]> = [
     // distance along the strike, offset across it, phase lead
-    [14, -7.5, 0],
-    [19, 1.5, 0.18],
-    [12.5, 9.5, 0.34],
+    [15, -8.5, 0],
+    [21, 1.5, 0.18],
+    [13, 10.5, 0.34],
   ]
   const ux = Math.cos(angle)
   const uy = Math.sin(angle)
@@ -72,40 +74,26 @@ function bloomArms(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
     if (k <= 0.01) continue
     const bx = hand[0] + ux * d + nx * off
     const by = hand[1] + uy * d + ny * off
-    // The blossom: five petals, deliberately uneven, opening before the arm.
+    // The blossom opens first and stays behind the arm, so the arm grows out of
+    // it rather than lying on top of it.
     for (let i = 0; i < 5; i++) {
       const a = angle + Math.PI + i * 1.32 + off * 0.04
-      const len = (2.6 + (i % 2) * 0.9) * k
+      const len = (2.2 + (i % 2) * 0.8) * k
       const px = bx + Math.cos(a) * len * 0.7
       const py = by + Math.sin(a) * len * 0.7
-      paint(ctx, ellipsePath(px, py, len, len * 0.5, a), petal, {
+      celPaint(ctx, ellipsePath(px, py, len, len * 0.5, a), petal, {
         shadow: 0.42, radius: len, pivot: [bx, by], rim: 0.4, line: 0.38,
       })
     }
-    // The forearm, growing out of the blossom along the strike.
-    const reach = (5.2 + off * 0.06) * k
+    // The forearm gets the same cel treatment as a real limb — tapered, with a
+    // terminator down its length and a wrist — because the moment it reads as a
+    // sausage the whole trick becomes silly instead of unsettling.
+    const reach = (6.4 + off * 0.05) * k
     const wx = bx + ux * reach
     const wy = by + uy * reach
-    paint(ctx, limbFormLite([bx, by], [wx, wy], 1.55 * k), skin, {
-      shadow: 0.44, radius: 1.7, pivot: [bx, by], rim: 0.55, line: 0.46, occlusion: 0.2,
-    })
-    // An open hand: palm plus a splayed thumb, which is what makes it a hand.
-    const px = wx + ux * 1.5
-    const py = wy + uy * 1.5
-    paint(ctx, blob([
-      [px - nx * 1.5 * k, py - ny * 1.5 * k],
-      [px + ux * 2.4 * k - nx * 1.3 * k, py + uy * 2.4 * k - ny * 1.3 * k],
-      [px + ux * 2.9 * k, py + uy * 2.9 * k],
-      [px + ux * 2.2 * k + nx * 1.5 * k, py + uy * 2.2 * k + ny * 1.5 * k],
-      [px + nx * 1.7 * k, py + ny * 1.7 * k],
-    ] as Pt[], 0.85), skin, {
-      shadow: 0.42, radius: 2.2, pivot: [px, py], rim: 0.5, line: 0.46,
-    })
-    paint(ctx, limbFormLite(
-      [px - ux * 0.6 - nx * 1.2 * k, py - uy * 0.6 - ny * 1.2 * k],
-      [px + ux * 1.4 * k - nx * 2.3 * k, py + uy * 1.4 * k - ny * 2.3 * k],
-      0.6 * k,
-    ), skin, { shadow: 0.4, radius: 0.7, pivot: [px, py], line: 0.4 })
+    stretchLimb(ctx, [bx, by], [wx, wy], 1.75 * k, 1.35 * k, skin, { band: 0.62, line: 0.46 })
+    // An open hand, wider than the arm it grows out of.
+    openPalm(ctx, [wx + ux * 0.3, wy + uy * 0.3], angle, 1.75 * k, skin, off > 0 ? 1 : -1)
     // Petals shedding: the only motion cue the attack needs.
     ctx.save()
     ctx.globalAlpha = 0.6 * k
@@ -143,7 +131,7 @@ const robin: Look = {
     // silhouette in the cast.
     const left = bodyPoint(s, 0.86, -4.9)
     const right = bodyPoint(s, 0.86, 4.6)
-    paint(ctx, blob(hemShape(left, right, 21, s, 1.5), 0.85), pal.coat, {
+    celPaint(ctx, blob(hemShape(left, right, 21, s, 1.5), 0.85), pal.coat, {
       shadow: 0.54, radius: 6, pivot: bodyPoint(s, 0.3, 0), rim: 0.4, line: 0.5, occlusion: 0.3,
     })
   },
@@ -182,14 +170,14 @@ const robin: Look = {
     }
   },
   hairBack: (cx, cy, r, s) => [
-    [cx - r * 1.28, cy - r * 0.5],
-    lag([cx - r * 0.7, cy - r * 1.24], s, 0.35),
-    lag([cx + r * 0.62, cy - r * 1.2], s, 0.35),
-    [cx + r * 1.24, cy - r * 0.42],
-    lag([cx + r * 1.4, cy + r * 2.2], s, 2.2),
-    lag([cx + r * 0.9, cy + r * 4.3], s, 3.6),
-    lag([cx - r * 0.5, cy + r * 4.4], s, 4.0),
-    lag([cx - r * 1.36, cy + r * 2.0], s, 2.6),
+    [cx - r * 1.16, cy - r * 0.52],
+    lag([cx - r * 0.66, cy - r * 1.22], s, 0.35),
+    lag([cx + r * 0.6, cy - r * 1.18], s, 0.35),
+    [cx + r * 1.14, cy - r * 0.44],
+    lag([cx + r * 1.2, cy + r * 1.3], s, 1.4),
+    lag([cx + r * 0.68, cy + r * 2.5], s, 2.4),
+    lag([cx - r * 0.44, cy + r * 2.6], s, 2.8),
+    lag([cx - r * 1.2, cy + r * 1.2], s, 1.8),
   ] as Pt[],
   hairFront: (cx, cy, r, s) => [
     // A centre parting, so the fringe is two shapes rather than a helmet.
@@ -209,11 +197,11 @@ const robin: Look = {
     ] as Pt[],
     // One long lock in front of the shoulder, lagging hard.
     [
-      [cx - r * 1.02, cy - r * 0.6],
-      [cx - r * 1.34, cy - r * 0.1],
-      lag([cx - r * 1.24, cy + r * 2.4], s, 2.4),
-      lag([cx - r * 0.92, cy + r * 2.3], s, 2.4),
-      [cx - r * 0.86, cy - r * 0.3],
+      [cx - r * 1.0, cy - r * 0.6],
+      [cx - r * 1.26, cy - r * 0.1],
+      lag([cx - r * 1.16, cy + r * 1.9], s, 2.0),
+      lag([cx - r * 0.88, cy + r * 1.8], s, 2.0),
+      [cx - r * 0.84, cy - r * 0.3],
     ] as Pt[],
   ],
   attackStyle: 'bloom',
@@ -238,20 +226,20 @@ function armourArm(ctx: CanvasRenderingContext2D, joints: [Pt, Pt, Pt], _scale: 
   const Q = (x: number, y: number): Pt => [elbow[0] + ux * x + nx * y, elbow[1] + uy * x + ny * y]
   const len = Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])
   plate(ctx, [
-    Q(-0.6, -3.4), Q(len * 0.5, -3.9), Q(len + 1.2, -3.0),
-    Q(len + 1.4, 2.8), Q(len * 0.5, 3.8), Q(-0.6, 3.3),
-  ] as Pt[], steel, elbow, 3.6, [Q(0.4, -1.2), Q(len * 0.6, -0.8), Q(len + 0.9, -1.4)] as Pt[])
-  bolts(ctx, Q(1.2, 2.2), Q(len * 0.9, 2.4), 3, 0.52, cel(STEEL_DARK))
+    Q(-0.2, -2.9), Q(len * 0.5, -3.3), Q(len + 0.5, -2.4),
+    Q(len + 0.6, 2.3), Q(len * 0.5, 3.2), Q(-0.2, 2.8),
+  ] as Pt[], steel, elbow, 3.1, [Q(0.6, -1.0), Q(len * 0.6, -0.7), Q(len + 0.3, -1.2)] as Pt[])
+  bolts(ctx, Q(1.0, 1.9), Q(len * 0.86, 2.0), 3, 0.46, cel(STEEL_DARK))
   // A pauldron capping the deltoid, so the shoulder reads as hardware too.
   const sang = Math.atan2(elbow[1] - root[1], elbow[0] - root[0])
   const sx = Math.cos(sang)
   const sy = Math.sin(sang)
   plate(ctx, [
-    [root[0] - sy * 3.5 - sx * 1.6, root[1] + sx * 3.5 - sy * 1.6],
-    [root[0] - sy * 3.9 + sx * 2.6, root[1] + sx * 3.9 + sy * 2.6],
-    [root[0] + sy * 3.4 + sx * 3.0, root[1] - sx * 3.4 + sy * 3.0],
-    [root[0] + sy * 3.7 - sx * 1.4, root[1] - sx * 3.7 - sy * 1.4],
-  ] as Pt[], steel, root, 3.6)
+    [root[0] - sy * 3.0 - sx * 1.3, root[1] + sx * 3.0 - sy * 1.3],
+    [root[0] - sy * 3.3 + sx * 2.2, root[1] + sx * 3.3 + sy * 2.2],
+    [root[0] + sy * 2.9 + sx * 2.5, root[1] - sx * 2.9 + sy * 2.5],
+    [root[0] + sy * 3.2 - sx * 1.2, root[1] - sx * 3.2 - sy * 1.2],
+  ] as Pt[], steel, root, 3.1)
 }
 
 /** A cyborg fist: the punch lands as machinery, with exhaust and a shock ring. */
@@ -264,16 +252,19 @@ function mechaFist(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
   const tip: Pt = [hand[0] + c * reach, hand[1] + sn * reach]
   // Exhaust behind the fist — the reason it hits that hard.
   if (t > 0) {
+    // Exhaust, not smoke: a bright cone thrown backward out of the shoulder,
+    // drawn additively so it reads as thrust rather than as dirt on the sprite.
     ctx.save()
-    ctx.globalAlpha = 0.45 * t
-    ctx.fillStyle = PAL.mist
+    ctx.globalCompositeOperation = 'lighter'
     for (let i = 0; i < 3; i++) {
-      const d = -3 - i * 4.5
-      ctx.fill(ellipsePath(hand[0] + c * d, hand[1] + sn * d, 3 + i * 1.6, 2.4 + i * 1.4, angle))
+      ctx.globalAlpha = (0.32 - i * 0.09) * t
+      ctx.fillStyle = i === 0 ? PAL.foam : CYBER_BLUE
+      const d = -4 - i * 5
+      ctx.fill(ellipsePath(hand[0] + c * d, hand[1] + sn * d, 4 + i * 2.4, 1.8 + i * 1.1, angle))
     }
     ctx.restore()
   }
-  paint(ctx, limbFormLite(hand, tip, 2.9), steel, {
+  celPaint(ctx, limbFormLite(hand, tip, 2.9), steel, {
     shadow: 0.48, radius: 3, pivot: hand, rim: 0.8, line: 0.48,
   })
   const fist = blob([
@@ -283,7 +274,7 @@ function mechaFist(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
     [tip[0] + c * 3.4 + sn * 3.4, tip[1] + sn * 3.4 - c * 3.4],
     [tip[0] - c * 1.4 + sn * 4.0, tip[1] - sn * 1.4 - c * 4.0],
   ] as Pt[], 0.7)
-  paint(ctx, fist, steel, { shadow: 0.46, radius: 4.4, pivot: tip, rim: 0.9, line: 0.52, occlusion: 0.26 })
+  celPaint(ctx, fist, steel, { shadow: 0.46, radius: 4.4, pivot: tip, rim: 0.9, line: 0.52, occlusion: 0.26 })
   ctx.save()
   ctx.clip(fist)
   ctx.strokeStyle = dark.core
@@ -370,20 +361,20 @@ const franky: Look = {
     }
     // A heavy belt with a square buckle, low on the waist.
     waistWrap(ctx, s, cel(STEEL_DARK), -0.12, 0.12, 0.9, FRANKY_BUILD)
-    paint(ctx, roundRectPath(bodyPoint(s, 0.0, -1.5)[0], bodyPoint(s, 0.0, -1.5)[1] - 0.4, 3.0, 2.2, 0.4),
+    celPaint(ctx, roundRectPath(bodyPoint(s, 0.0, -1.5)[0], bodyPoint(s, 0.0, -1.5)[1] - 0.4, 3.0, 2.2, 0.4),
       cel(PAL.gold), { shadow: 0.42, radius: 1.6, pivot: bodyPoint(s, 0, 0), rim: 0.5, line: 0.45 })
   },
-  hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.3, cy - r * 0.3, r * 1.2, 8, 1.9, 0.34, 3.7),
+  hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.3, cy - r * 0.34, r * 1.02, 8, 2.0, 0.2, 3.7),
   hairFront: (cx, cy, r, s) => [
     // A swept crest that overhangs the brow — height where his legs are short.
     [
-      [cx - r * 1.12, cy - r * 0.42],
-      lag([cx - r * 1.0, cy - r * 1.5], s, 0.5),
-      lag([cx + r * 0.2, cy - r * 2.0], s, 0.45),
-      lag([cx + r * 1.24, cy - r * 1.32], s, 0.4),
-      [cx + r * 1.02, cy - r * 0.66],
-      [cx + r * 0.2, cy - r * 1.0],
-      [cx - r * 0.6, cy - r * 0.8],
+      [cx - r * 1.0, cy - r * 0.5],
+      lag([cx - r * 0.86, cy - r * 1.34], s, 0.5),
+      lag([cx + r * 0.16, cy - r * 1.66], s, 0.45),
+      lag([cx + r * 1.06, cy - r * 1.12], s, 0.4),
+      [cx + r * 0.92, cy - r * 0.7],
+      [cx + r * 0.18, cy - r * 0.98],
+      [cx - r * 0.54, cy - r * 0.84],
     ] as Pt[],
   ],
   headgear: (ctx, cx, cy, r, s) => {
@@ -399,7 +390,7 @@ const franky: Look = {
       [cx + r * 0.2, y + r * 0.3],
       [cx - r * 1.0, y + r * 0.16],
     ] as Pt[], 0.65)
-    paint(ctx, shade, glass, { shadow: 0.4, radius: r, pivot: [cx, y], rim: 0.5, line: 0.5 })
+    celPaint(ctx, shade, glass, { shadow: 0.4, radius: r, pivot: [cx, y], rim: 0.5, line: 0.5 })
     glint(ctx, cx + r * 0.45, y - r * 0.2, r * 0.4, r * 0.12, -0.35, PAL.foam, 0.75)
     glint(ctx, cx - r * 0.55, y - r * 0.16, r * 0.2, r * 0.1, -0.35, PAL.foam, 0.5)
     browShadow(ctx, cx, cy, r, 0.5, 0.14)
@@ -423,25 +414,28 @@ function caneSword(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
   const tip: Pt = [hand[0] + c * len, hand[1] + sn * len]
   if (t > 0) {
     ctx.save()
-    ctx.globalAlpha = 0.5 * t
     ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = 0.34 * t
     ctx.fillStyle = PAL.foam
-    ctx.fill(crescentPath(hand[0], hand[1], len * 0.95, 2.4, angle - 1.9, angle + 0.3))
+    ctx.fill(crescentPath(hand[0], hand[1], len * 0.95, 1.5, angle - 1.9, angle + 0.3))
+    ctx.globalAlpha = 0.6 * t
+    ctx.fillStyle = PAL.white
+    ctx.fill(crescentPath(hand[0], hand[1], len * 0.95, 0.55, angle - 1.5, angle + 0.15))
     ctx.restore()
   }
-  paint(ctx, blob([
+  celPaint(ctx, blob([
     [hand[0] - sn * 0.62, hand[1] + c * 0.62],
     [tip[0] - sn * 0.24, tip[1] + c * 0.24],
     [tip[0] + c * 1.4, tip[1] + sn * 1.4],
     [hand[0] + sn * 0.62, hand[1] - c * 0.62],
   ] as Pt[], 0.25), steel, { shadow: 0.24, radius: 1.4, pivot: hand, rim: 0.8, line: 0.4 })
   // The cane's grip and its little collar, back along the hand.
-  paint(ctx, limbFormLite(
+  celPaint(ctx, limbFormLite(
     [hand[0] - c * 0.4, hand[1] - sn * 0.4],
     [hand[0] - c * 4.2, hand[1] - sn * 4.2],
     0.72,
   ), cel(mix(PAL.ink, PAL.night, 0.3)), { shadow: 0.42, radius: 1, pivot: hand, line: 0.4 })
-  paint(ctx, ellipsePath(hand[0], hand[1], 1.0, 0.5, angle), cel(PAL.goldDeep), {
+  celPaint(ctx, ellipsePath(hand[0], hand[1], 1.0, 0.5, angle), cel(PAL.goldDeep), {
     shadow: 0.4, radius: 1, pivot: hand, line: 0.36,
   })
   if (t > 0.4) {
@@ -467,14 +461,15 @@ const brook: Look = {
   // Everything long, everything thin. The masses on his limbs are barely half
   // the cast's, so the ink line does almost all the work.
   size: proportion({
-    thigh: 1.3, shin: 1.32, torso: 1.06, neck: 1.7, upperArm: 1.3, foreArm: 1.32,
+    thigh: 1.2, shin: 1.2, torso: 1.06, neck: 1.6, upperArm: 1.32, foreArm: 1.34,
     headR: 0.86, armRoot: 0.82, legRoot: 0.78,
   }),
   face: { skull: true, jaw: 0.92 },
   portrait: { expression: 'joy', turn: 0.28, tilt: 0.06 },
   banner: COAT_INDIGO,
   pal: P({
-    skin: BONE, hair: mix(PAL.ink, PAL.night, 0.5), shirt: mix(PAL.cream, PAL.mist, 0.3),
+    // The afro has to separate from the coat: same family, two clear values.
+    skin: BONE, hair: mix(PAL.ink, PAL.dusk, 0.06), shirt: mix(PAL.cream, PAL.mist, 0.12),
     trousers: mix(PAL.ink, PAL.night, 0.45), boots: mix(PAL.ink, PAL.night, 0.62),
     accent: CRAVAT, sash: PAL.goldDeep, coat: COAT_INDIGO, trim: PAL.goldDeep,
   }),
@@ -489,7 +484,7 @@ const brook: Look = {
   backCloth: (ctx, s, pal) => {
     const left = bodyPoint(s, 0.9, -3.9)
     const right = bodyPoint(s, 0.9, 3.6)
-    paint(ctx, blob(hemShape(left, right, 19, s, 1.7), 0.85), pal.coat, {
+    celPaint(ctx, blob(hemShape(left, right, 19, s, 1.7), 0.85), pal.coat, {
       shadow: 0.54, radius: 5, pivot: bodyPoint(s, 0.3, 0), rim: 0.4, line: 0.5, occlusion: 0.3,
     })
   },
@@ -510,7 +505,7 @@ const brook: Look = {
     collar(ctx, s, pal.coat, 2.4, 0.26)
     // The cravat: the one warm note on a cold figure, and it hangs and swings.
     const knot = bodyPoint(s, 1.02, 0.3)
-    paint(ctx, blob([
+    celPaint(ctx, blob([
       [knot[0] - 1.3, knot[1] - 0.5], [knot[0] + 1.3, knot[1] - 0.6],
       [knot[0] + 1.5, knot[1] + 1.0], [knot[0] - 1.4, knot[1] + 1.1],
     ] as Pt[], 0.6), pal.accent, {
@@ -541,33 +536,42 @@ const brook: Look = {
     }
   },
   hairBack: (cx, cy, r, s) => {
-    // The afro: a mass three times the width of the skull, held a frame behind
-    // the head. It is the entire silhouette read, so it is deliberately lumpy —
-    // a smooth ball would look like a helmet.
-    const hx = cx - s.drag * 0.6
-    const hy = cy - r * 1.5 + s.lift * 0.4
+    // The afro: half again the width of the skull and held a frame behind the
+    // head. It is the whole silhouette read, so it is deliberately lumpy — a
+    // smooth ball reads as a helmet — but it has to stay inside the frame: at
+    // its first size the top of it was cropped off every sheet.
+    const hx = cx - s.drag * 0.5
+    // Sat high and kept narrower than it was: at 1.88r wide and centred barely
+    // a radius above the skull, the mass wrapped down past the cheeks and the
+    // whole head read as a hood rather than as hair on top of a face.
+    const hy = cy - r * 1.1 + s.lift * 0.4
     const pts: Pt[] = []
     for (let i = 0; i < 11; i++) {
       const a = (i / 11) * Math.PI * 2 - 0.4
-      const wob = 1 + Math.sin(i * 2.7) * 0.13 + Math.sin(i * 5.1) * 0.07
-      pts.push(lag([hx + Math.cos(a) * r * 1.95 * wob, hy + Math.sin(a) * r * 1.8 * wob], s, 0.5 + Math.max(0, -Math.sin(a)) * 0.5))
+      const wob = 1 + Math.sin(i * 2.7) * 0.15 + Math.sin(i * 5.1) * 0.08
+      // Flattened underneath, so the lower arc of the ball never reaches the jaw.
+      const down = Math.max(0, Math.sin(a))
+      const ry = r * (1.18 - down * 0.42) * wob
+      pts.push(lag([hx + Math.cos(a) * r * 1.42 * wob, hy + Math.sin(a) * ry], s, 0.42 + Math.max(0, -Math.sin(a)) * 0.4))
     }
     return pts
   },
   hairFront: (cx, cy, r, s) => [
     // Two locks falling past the jaw, which is what keeps the afro attached to
     // the head instead of hovering over it.
+    // Short sideburns that stop at the cheekbone. They used to fall past the
+    // jaw, which joined the afro to itself around the face and shut it in.
     [
-      [cx - r * 1.0, cy - r * 0.9],
-      lag([cx - r * 1.5, cy - r * 0.1], s, 0.9),
-      lag([cx - r * 1.2, cy + r * 1.5], s, 1.5),
-      [cx - r * 0.82, cy - r * 0.3],
+      [cx - r * 0.98, cy - r * 0.92],
+      lag([cx - r * 1.22, cy - r * 0.42], s, 0.7),
+      lag([cx - r * 1.04, cy + r * 0.24], s, 1),
+      [cx - r * 0.8, cy - r * 0.4],
     ] as Pt[],
     [
-      [cx + r * 0.9, cy - r * 0.94],
-      lag([cx + r * 1.42, cy - r * 0.2], s, 0.85),
-      lag([cx + r * 1.12, cy + r * 1.3], s, 1.4),
-      [cx + r * 0.76, cy - r * 0.36],
+      [cx + r * 0.9, cy - r * 0.96],
+      lag([cx + r * 1.16, cy - r * 0.46], s, 0.65),
+      lag([cx + r * 0.98, cy + r * 0.16], s, 0.95),
+      [cx + r * 0.74, cy - r * 0.44],
     ] as Pt[],
   ],
   props: (ctx, s, phase) => {
@@ -575,12 +579,12 @@ const brook: Look = {
     // The cane scabbard, slung on the far hip: a long thin diagonal that says
     // "sword" without a blade showing.
     const hip = bodyPoint(s, 0.16, -2.6)
-    const a = 2.42
-    const tip: Pt = [hip[0] + Math.cos(a) * 20, hip[1] + Math.sin(a) * 20]
-    paint(ctx, limbFormLite(hip, tip, 0.72), cel(mix(PAL.ink, PAL.dusk, 0.3)), {
+    const a = 2.66
+    const tip: Pt = [hip[0] + Math.cos(a) * 15, hip[1] + Math.sin(a) * 15]
+    celPaint(ctx, limbFormLite(hip, tip, 0.72), cel(mix(PAL.ink, PAL.dusk, 0.3)), {
       shadow: 0.5, radius: 1, pivot: hip, rim: 0.4, line: 0.42,
     })
-    paint(ctx, limbFormLite(hip, [hip[0] - Math.cos(a) * 4.6, hip[1] - Math.sin(a) * 4.6], 0.66),
+    celPaint(ctx, limbFormLite(hip, [hip[0] - Math.cos(a) * 4.6, hip[1] - Math.sin(a) * 4.6], 0.66),
       cel(PAL.goldDeep), { shadow: 0.44, radius: 0.9, pivot: hip, line: 0.4 })
   },
   attackStyle: 'slash',
@@ -606,7 +610,7 @@ function kimonoSleeve(c: Palette['coat']) {
     // Hung from the arm, dropped by gravity, dragged by the pose: the sleeve is
     // where a fishman's bulk becomes cloth.
     const drop = 7.5
-    paint(ctx, blob([
+    celPaint(ctx, blob([
       Q(-2.2, -2.6), Q(3.4, -2.6),
       [Q(3.4, 0)[0], Q(3.4, 0)[1] + drop * 0.8],
       [Q(0.4, 0)[0], Q(0.4, 0)[1] + drop],
@@ -628,7 +632,7 @@ function palmWater(ctx: CanvasRenderingContext2D, hand: Pt, angle: number, t: nu
   const cy = hand[1] + sn * d
   // The compressed core: a lens of water, not a ball, so it reads as pressure
   // travelling in one direction.
-  paint(ctx, ellipsePath(cx, cy, 4 + t * 4.5, 6.5 + t * 5, angle), water, {
+  celPaint(ctx, ellipsePath(cx, cy, 4 + t * 4.5, 6.5 + t * 5, angle), water, {
     shadow: 0.34, radius: 5, pivot: [cx, cy], rim: 0.7, line: 0.44,
   })
   ctx.save()
@@ -667,7 +671,7 @@ const jinbe: Look = {
     headR: 1.08, armRoot: 1.3, legRoot: 1.2,
   }),
   face: {
-    eye: 0.94, eyeAspect: 0.82, brow: 1.45, jaw: 1.22, tusk: 0.55, gills: true,
+    eye: 0.94, eyeAspect: 0.82, brow: 1.45, jaw: 1.22, tusk: 0.26, gills: true,
     blush: 0.2, nose: 0.7, iris: mix(PAL.gold, PAL.bloodOrange, 0.4),
   },
   portrait: { expression: 'determined', turn: 0.3, tilt: -0.02 },
@@ -717,20 +721,20 @@ const jinbe: Look = {
     // The obi: broad, gold, and the one horizontal on a very vertical costume.
     waistWrap(ctx, s, pal.sash, -0.06, 0.3, 1.0, JINBE_BUILD)
     const knot = bodyPoint(s, 0.12, -4.4)
-    paint(ctx, roundRectPath(knot[0] - 1.6, knot[1] - 1.4, 3.4, 2.8, 0.6), pal.sash, {
+    celPaint(ctx, roundRectPath(knot[0] - 1.6, knot[1] - 1.4, 3.4, 2.8, 0.6), pal.sash, {
       shadow: 0.46, radius: 1.8, pivot: knot, rim: 0.45, line: 0.46,
     })
   },
   hairBack: (cx, cy, r, s) => [
-    [cx - r * 1.1, cy - r * 0.4],
-    lag([cx - r * 0.86, cy - r * 1.06], s, 0.3),
-    lag([cx + r * 0.4, cy - r * 1.5], s, 0.3),
-    // The topknot, tied high and back.
-    lag([cx - r * 0.2, cy - r * 2.1], s, 0.6),
-    lag([cx - r * 0.9, cy - r * 1.7], s, 0.6),
-    [cx + r * 1.02, cy - r * 0.66],
-    [cx + r * 1.06, cy + r * 0.2],
-    [cx - r * 1.06, cy + r * 0.3],
+    [cx - r * 1.06, cy - r * 0.4],
+    lag([cx - r * 0.9, cy - r * 1.02], s, 0.3),
+    // The topknot, tied high and back — rooted in the mass so it cannot float.
+    lag([cx - r * 0.5, cy - r * 1.32], s, 0.5),
+    lag([cx - r * 0.06, cy - r * 1.62], s, 0.6),
+    lag([cx + r * 0.3, cy - r * 1.28], s, 0.5),
+    [cx + r * 0.96, cy - r * 0.72],
+    [cx + r * 1.02, cy + r * 0.2],
+    [cx - r * 1.02, cy + r * 0.3],
   ] as Pt[],
   hairFront: (cx, cy, r, s) => [
     [
