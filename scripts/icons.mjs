@@ -245,7 +245,10 @@ const browser = await chromium.launch({
   executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? PINNED,
   args: ['--force-color-profile=srgb', '--hide-scrollbars'],
 })
-await rm(OUT, { recursive: true, force: true })
+// Clearing the directory is for a full run only. In preview mode it would
+// delete the thirty-four launch images the build actually ships and put back
+// the one this run happens to render.
+if (!ONLY) await rm(OUT, { recursive: true, force: true })
 await mkdir(SPLASH, { recursive: true })
 
 // The face is inlined, but a mis-parsed data URI would still fall back
