@@ -31,15 +31,22 @@ export const GROUND_Y = FH - 1.5
 
 /** Segment lengths, in world units. */
 export const SEG = {
-  thigh: 8,
-  shin: 7.4,
+  thigh: 7.9,
+  shin: 7.3,
   foot: 2.8,
-  torso: 10.8,
-  neck: 1.2,
+  torso: 10.2,
+  neck: 1.15,
   upperArm: 6.1,
   foreArm: 5.6,
   hand: 1.6,
-  headR: 4.25,
+  /**
+   * The head is deliberately large for the body — a shade over four heads tall.
+   * At 36 world units a "correct" six-head figure leaves a head five pixels
+   * across, and no amount of drawing gets an expression into that. The extra
+   * radius is spent entirely on the face; the build is shortened to pay for it
+   * so the character still stands the same height in the level.
+   */
+  headR: 4.78,
 } as const
 
 /**
@@ -249,8 +256,8 @@ export function solve(p: Pose, size: Proportion = SIZE): Skeleton {
   // narrow-set arms are what made the old figure read as a stick.
   const arm = (a: [number, number], side: number): [Pt, Pt, Pt] => {
     const root: Pt = [
-      shoulder[0] + across[0] * side * 3.05 * size.armRoot - up[0] * 0.7,
-      shoulder[1] + across[1] * side * 3.05 * size.armRoot - up[1] * 0.7 + p.roll * side,
+      shoulder[0] + across[0] * side * 3.35 * size.armRoot - up[0] * 0.55,
+      shoulder[1] + across[1] * side * 3.35 * size.armRoot - up[1] * 0.55 + p.roll * side,
     ]
     const elbow = step(root, a[0], seg.upperArm)
     const hand = step(elbow, a[0] + a[1], seg.foreArm)

@@ -39,7 +39,9 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
   const straw = cel(PAL.strawGold)
   const tilt = -s.drag * 0.05 + s.lean * 0.4
   const hx = cx - s.drag * 0.5
-  const y = cy - r * 1.04 + s.lift * 0.28
+  // High enough that the brim's lower edge clears the brow: the hat is the
+  // silhouette, but the face is the character, and the brim was eating it.
+  const y = cy - r * 1.36 + s.lift * 0.28
   const brimPts: Pt[] = []
   const wobble = [1, 0.96, 1.03, 0.98, 1.02, 0.95, 1.04, 0.97]
   for (let i = 0; i < 8; i++) {
@@ -82,7 +84,7 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
     ] as Pt[]))
   }
   ctx.restore()
-  browShadow(ctx, cx, cy, r, 0.46, 0.1)
+  browShadow(ctx, cx, cy, r, 0.6, 0.12)
 }
 
 function bandanaHead(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
@@ -409,7 +411,7 @@ const LOOKS_BASE = {
       waistWrap(ctx, s, pal.sash, -0.04, 0.22, 0.8)
       tails(ctx, s, pal.shirt, 0.16, 4.4, 6.0, 1.5, 0.62)
     },
-    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.35, cy - r * 0.16, r * 1.14, 9, 1.5, 0.16, 1.7),
+    hairBack: (cx, cy, r, s) => spikeHair(cx - s.drag * 0.35, cy - r * 0.2, r * 1.02, 9, 1.6, 0.11, 1.7),
     hairFront: (cx, cy, r, s) => [
       [
         [cx - r * 1.0, cy - r * 0.52],
