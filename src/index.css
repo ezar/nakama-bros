@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    background: #050a14;
+    color: #fff5e4;
+    font-family: theme('fontFamily.body');
+    overscroll-behavior: none;
+  }
+
+  body {
+    /* The game owns the viewport; nothing should ever scroll behind it. */
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+}
+
+@layer components {
+  .op-panel {
+    @apply rounded-xl border border-op-gold/25 bg-op-ocean/85 backdrop-blur-sm;
+    box-shadow: 0 18px 48px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 245, 228, 0.08);
+  }
+
+  .op-button {
+    @apply relative rounded-lg px-6 py-3 font-body font-semibold tracking-wide transition;
+    @apply border border-op-gold/40 bg-gradient-to-b from-op-gold/25 to-op-gold/5 text-op-cream;
+  }
+
+  .op-button:hover {
+    @apply border-op-gold/80 from-op-gold/40 to-op-gold/10;
+    transform: translateY(-1px);
+  }
+
+  .op-button:active {
+    transform: translateY(1px);
+  }
+
+  .op-button--primary {
+    @apply border-op-gold bg-gradient-to-b from-op-gold to-op-gold-dim font-extrabold text-op-deep;
+  }
+
+  .op-title {
+    @apply font-display tracking-wide;
+    text-shadow: 0 3px 0 #b8942e, 0 6px 18px rgba(0, 0, 0, 0.75);
+  }
+}
+
+/* Respect a user's motion preference for all decorative UI animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
