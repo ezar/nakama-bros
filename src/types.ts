@@ -13,9 +13,29 @@
 /** Tile edge length in world units (== pixels at 1x zoom). */
 export const TILE = 16
 
-/** Internal render resolution. Integer-scaled to the viewport. 16:9. */
-export const GAME_W = 480
-export const GAME_H = 270
+/**
+ * The camera viewport, in world units. About 24 x 13.5 tiles — a close,
+ * modern framing where the character reads as a character rather than a token.
+ */
+export const GAME_W = 384
+export const GAME_H = 216
+
+/**
+ * Device pixels per world unit in the render buffer.
+ *
+ * The art is cel-shaded vector work, not pixel art, so the frame buffer is
+ * rendered at this multiple of world units (1152 x 648) with smoothing on and
+ * then scaled to the window. Sprites are rasterised at the same multiple, which
+ * is what keeps curves and linework clean instead of chunky.
+ */
+export const RENDER_SCALE = 3
+
+/** Sprite sheets are drawn at this multiple of world units. Matches RENDER_SCALE. */
+export const ART_SCALE = 3
+
+/** Frame buffer dimensions in device pixels. */
+export const BUFFER_W = GAME_W * RENDER_SCALE
+export const BUFFER_H = GAME_H * RENDER_SCALE
 
 /** Physics runs at a locked step; rendering interpolates between steps. */
 export const FIXED_DT = 1 / 60
@@ -113,12 +133,15 @@ export interface TileFlags {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface Frame {
-  /** Source rect inside the sheet image. */
+  /** Source rect inside the sheet image, in device pixels. */
   sx: number
   sy: number
   sw: number
   sh: number
-  /** Offset from the entity's origin (feet-centre) to the frame's top-left. */
+  /** Destination size in world units (sw / ART_SCALE). */
+  w: number
+  h: number
+  /** Offset in world units from the entity origin (feet-centre) to the frame's top-left. */
   ox: number
   oy: number
   /** Frame duration in seconds. */
