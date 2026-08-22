@@ -16,7 +16,7 @@ const LIGHT_Y = -0.8
 
 export type ParticleShape =
   // Original set — gameplay code already uses these names.
-  | 'pixel' | 'circle' | 'spark' | 'ring' | 'shard' | 'smoke' | 'star'
+  | 'pixel' | 'circle' | 'spark' | 'ring-3' | 'shard' | 'smoke' | 'star'
   // Cel-shaded additions.
   | 'puff' | 'streak' | 'droplet' | 'petal' | 'bubble' | 'glow' | 'sprite' | 'shock'
 
@@ -626,7 +626,7 @@ export class ParticleSystem {
         ctx.restore()
         break
 
-      case 'ring':
+      case 'ring-3':
       case 'shock': {
         ctx.save()
         ctx.strokeStyle = color
@@ -1127,7 +1127,7 @@ export const EMITTERS: Record<
     })
     ps.emit({
       x, y, vx: 0, vy: 0, life: 0.55, size: 6 * s, sizeEnd: 78 * s,
-      color: PAL.cream, colorEnd: rgba(PAL.bloodOrange, 0), shape: 'ring',
+      color: PAL.cream, colorEnd: rgba(PAL.bloodOrange, 0), shape: 'ring-3',
       additive: true, alpha: 0.9, fadeAt: 0.25,
     })
     ps.burst(N(o, 16), x, y, {
@@ -1312,7 +1312,7 @@ export const EMITTERS: Record<
     })
     ps.emit({
       x, y, vx: 0, vy: 0, life: 0.24, size: 3 * s, sizeEnd: 15 * s,
-      color: PAL.cream, colorEnd: rgba(PAL.strawGold, 0), shape: 'ring',
+      color: PAL.cream, colorEnd: rgba(PAL.strawGold, 0), shape: 'ring-3',
       additive: true, alpha: 0.7, fadeAt: 0.1,
     })
     ps.burst(N(o, 6), x, y, {

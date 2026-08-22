@@ -290,7 +290,7 @@ export const Hud = memo(function Hud({ hud, compass, compact = false }: Props) {
           </span>
           {hud.tier !== 'base' && (
             <span
-              className="rounded-sm px-1.5 py-0.5 font-body text-[9px] font-extrabold tracking-[0.12em]"
+              className="rounded-xs px-1.5 py-0.5 font-body text-[9px] font-extrabold tracking-[0.12em]"
               style={{
                 color: '#140B04',
                 background: TIER_COLOR[hud.tier],

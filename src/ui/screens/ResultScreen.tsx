@@ -203,7 +203,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
                 </div>
                 {isRecord && (
                   <div
-                    className="mt-1 inline-block rotate-[-3deg] rounded-sm px-1.5 py-0.5 font-body text-[9px] font-extrabold uppercase tracking-[0.18em]"
+                    className="mt-1 inline-block -rotate-3 rounded-xs px-1.5 py-0.5 font-body text-[9px] font-extrabold uppercase tracking-[0.18em]"
                     style={{ background: UI.wax, color: UI.paperLit }}
                   >
                     {t('clear.record')}

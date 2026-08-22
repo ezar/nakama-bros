@@ -41,7 +41,7 @@ export function PauseScreen({ onResume, onRestart, onQuit }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(5,9,16,0.72)] backdrop-blur-sm"
+      className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(5,9,16,0.72)] backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
       aria-label={t('pause.title')}

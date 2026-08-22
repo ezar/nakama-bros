@@ -87,13 +87,13 @@ function Preview() {
       )
     case 'pause':
       return (
-        <div className="h-full w-full bg-[#0d2137]">
+        <div className="h-full w-full bg-op-ocean">
           <PauseScreen onResume={noop} onRestart={noop} onQuit={noop} />
         </div>
       )
     case 'over':
       return (
-        <div className="h-full w-full bg-[#0d2137]">
+        <div className="h-full w-full bg-op-ocean">
           <GameOverScreen onRetry={noop} onMenu={noop} />
         </div>
       )

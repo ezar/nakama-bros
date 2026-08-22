@@ -318,13 +318,13 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
               <div className="flex items-baseline gap-3">
                 <span className="font-display text-3xl leading-none ink">{crew.name}</span>
                 <span
-                  className="rounded-sm px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-[0.18em]"
+                  className="rounded-xs px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-[0.18em]"
                   style={{ background: crew.accent, color: '#1A1008' }}
                 >
                   {t('crew.special')}
                 </span>
               </div>
-              <p className="mt-1.5 max-w-[26rem] font-body text-sm leading-snug" style={{ color: UI.inkSoft }}>
+              <p className="mt-1.5 max-w-104 font-body text-sm leading-snug" style={{ color: UI.inkSoft }}>
                 {blurb}
               </p>
             </div>

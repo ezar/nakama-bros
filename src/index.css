@@ -1,6 +1,483 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-op-navy: #0a1628;
+  --color-op-ocean: #0d2137;
+  --color-op-deep: #071020;
+  --color-op-gold: #f4c542;
+  --color-op-gold-dim: #b8942e;
+  --color-op-red: #d63031;
+  --color-op-cyan: #00b4d8;
+  --color-op-cream: #fff5e4;
+  --color-op-parchment: #e8d5b7;
+  --color-op-wood: #8b6914;
+  --color-op-green: #27ae60;
+  --color-op-paper: #efe0be;
+  --color-op-paper-lit: #f7edd3;
+  --color-op-paper-dim: #dcc59a;
+  --color-op-paper-deep: #c0a277;
+  --color-op-ink: #2a1d14;
+  --color-op-ink-soft: #6a5340;
+  --color-op-oak: #43291a;
+  --color-op-oak-dark: #251610;
+  --color-op-oak-lit: #6b4527;
+  --color-op-brass: #c8973f;
+  --color-op-brass-light: #f1d386;
+  --color-op-brass-dark: #7c5a21;
+  --color-op-wax: #8e2b22;
+  --color-op-wax-light: #c0463a;
+  --color-op-rope: #c9a566;
+  --color-op-sea: #255c74;
+  --color-op-sea-deep: #0a2438;
+  --color-op-foam: #dcedf0;
+
+  --font-display: 'Pirata One', Georgia, serif;
+  --font-body: 'Rubik', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-pulse-gold: pulse-gold 1.6s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-rock: rock 6.5s ease-in-out infinite;
+  --animate-bob: bob 4.5s ease-in-out infinite;
+  --animate-flap: flap 0.62s ease-in-out infinite;
+  --animate-lantern-flicker: lantern-flicker 3.4s ease-in-out infinite;
+  --animate-clock-urgent: clock-urgent 1s ease-in-out infinite;
+  --animate-flare: flare 520ms ease-out 1;
+  --animate-seal-thump: seal-thump 420ms cubic-bezier(0.2, 1.4, 0.4, 1) 1 both;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  @keyframes pulse-gold {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(244, 197, 66, 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 14px rgba(244, 197, 66, 0);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes rock {
+    0%,
+    100% {
+      transform: rotate(-2.4deg) translateY(0px);
+    }
+    25% {
+      transform: rotate(0deg) translateY(3px);
+    }
+    50% {
+      transform: rotate(2.4deg) translateY(0px);
+    }
+    75% {
+      transform: rotate(0deg) translateY(-3px);
+    }
+  }
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes drift-back {
+    from {
+      transform: translateX(-50%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes flap {
+    0%,
+    100% {
+      transform: scaleY(1);
+    }
+    35% {
+      transform: scaleY(0.35);
+    }
+    60% {
+      transform: scaleY(1.15);
+    }
+  }
+  @keyframes lantern-flicker {
+    0%,
+    100% {
+      opacity: 0.86;
+    }
+    18% {
+      opacity: 1;
+    }
+    32% {
+      opacity: 0.7;
+    }
+    55% {
+      opacity: 0.96;
+    }
+    77% {
+      opacity: 0.78;
+    }
+  }
+  @keyframes clock-urgent {
+    0%,
+    100% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    50% {
+      transform: scale(1.07);
+      filter: brightness(1.35);
+    }
+  }
+  @keyframes flare {
+    0% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    30% {
+      transform: scale(1.55);
+      filter: brightness(2.4);
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+  }
+  @keyframes seal-thump {
+    0% {
+      transform: scale(2.6) rotate(-18deg);
+      opacity: 0;
+    }
+    55% {
+      transform: scale(0.92) rotate(-9deg);
+      opacity: 1;
+    }
+    75% {
+      transform: scale(1.06) rotate(-11deg);
+    }
+    100% {
+      transform: scale(1) rotate(-10deg);
+      opacity: 1;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility paper-grain {
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+
+  /* Paper fibre. One tiled noise field, multiplied into the sheet. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      94deg,
+      rgba(120, 84, 40, 0.05) 0px,
+      rgba(120, 84, 40, 0) 2px,
+      rgba(120, 84, 40, 0) 5px,
+      rgba(150, 110, 60, 0.04) 7px
+    );
+  background-size:
+    160px 160px,
+    auto;
+  mix-blend-mode: multiply;
+  opacity: 0.2;
+}
+
+@utility wood {
+  /* Oiled oak: planks with a seam, a slow colour drift and a fine grain. */
+  background-color: #3b2416;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w)' opacity='0.5'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.5) 0px,
+      rgba(0, 0, 0, 0.5) 2px,
+      rgba(255, 226, 180, 0.06) 4px,
+      rgba(255, 255, 255, 0) 8px,
+      rgba(255, 255, 255, 0) 173px,
+      rgba(0, 0, 0, 0.5) 175px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0px,
+      rgba(0, 0, 0, 0.28) 2px,
+      rgba(255, 255, 255, 0) 5px,
+      rgba(255, 255, 255, 0) 268px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.16) 0px,
+      rgba(0, 0, 0, 0.16) 1px,
+      rgba(255, 255, 255, 0) 3px,
+      rgba(255, 255, 255, 0) 97px
+    ),
+    linear-gradient(178deg, #4e3220 0%, #33200f 55%, #241407 100%);
+  background-size:
+    220px 220px,
+    auto,
+    auto,
+    auto,
+    auto;
+  background-blend-mode: soft-light, normal, normal, normal, normal;
+}
+
+@utility wood-dark {
+  background-color: #22140c;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w2)' opacity='0.5'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.45) 0px,
+      rgba(0, 0, 0, 0.45) 2px,
+      rgba(255, 226, 180, 0.04) 4px,
+      rgba(255, 255, 255, 0) 8px,
+      rgba(255, 255, 255, 0) 211px,
+      rgba(0, 0, 0, 0.45) 213px
+    ),
+    linear-gradient(180deg, #2e1c11 0%, #1b0f08 100%);
+  background-size:
+    220px 220px,
+    auto,
+    auto;
+  background-blend-mode: soft-light, normal, normal;
+}
+
+@utility brass {
+  /* Tarnished brass, lit from the upper left like everything else. */
+  background-image: linear-gradient(
+    160deg,
+    #f4dc9c 0%,
+    #cfa04a 24%,
+    #8d6524 52%,
+    #c99a46 74%,
+    #6d4a1a 100%
+  );
+}
+
+@utility op-panel {
+  @apply relative rounded-lg border-2 border-op-brass/70;
+  background-image:
+    repeating-linear-gradient(
+      87deg,
+      rgba(255, 226, 180, 0.035) 0px,
+      rgba(255, 226, 180, 0) 4px,
+      rgba(0, 0, 0, 0.09) 8px,
+      rgba(0, 0, 0, 0) 14px
+    ),
+    linear-gradient(172deg, #4a2f1c 0%, #2c1a0e 100%);
+  box-shadow:
+    0 22px 48px -20px rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(255, 226, 180, 0.16),
+    inset 0 -18px 30px -18px rgba(0, 0, 0, 0.8);
+}
+
+@utility op-button {
+  /* ── Controls ─────────────────────────────────────────────────────────── */
+
+  /* A brass plate screwed to the wood. Hover lifts it, press seats it. */
+  @apply relative rounded-md px-6 py-3 font-body font-semibold tracking-wide text-op-cream;
+  @apply border border-op-brass-dark;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 226, 180, 0.16) 0%,
+      rgba(0, 0, 0, 0.3) 100%
+    ),
+    linear-gradient(172deg, #54341f 0%, #2c1a0e 100%);
+  background-color: #43291a;
+  box-shadow:
+    0 4px 0 0 #1c0f07,
+    0 10px 18px -8px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 226, 180, 0.22);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+
+  &:hover {
+    filter: brightness(1.14);
+    transform: translateY(-2px);
+    box-shadow:
+      0 6px 0 0 #1c0f07,
+      0 14px 22px -8px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 226, 180, 0.28);
+  }
+
+  &:active {
+    transform: translateY(2px);
+    box-shadow:
+      0 1px 0 0 #1c0f07,
+      0 4px 10px -6px rgba(0, 0, 0, 0.9),
+      inset 0 2px 6px rgba(0, 0, 0, 0.55);
+  }
+
+  &[data-pressed='true'] {
+    transform: translateY(2px);
+    box-shadow:
+      0 1px 0 0 #1c0f07,
+      0 4px 10px -6px rgba(0, 0, 0, 0.9),
+      inset 0 2px 6px rgba(0, 0, 0, 0.55);
+  }
+
+  &:disabled {
+    filter: grayscale(0.7) brightness(0.6);
+    transform: none;
+    cursor: not-allowed;
+  }
+}
+
+@utility op-button--primary {
+  @apply border-op-brass-light/70 font-extrabold text-op-ink;
+  background-image: linear-gradient(
+    168deg,
+    #ffeab2 0%,
+    #f3d489 18%,
+    #e0ae43 46%,
+    #b8842c 78%,
+    #8a5f1c 100%
+  );
+  background-color: #e0ae43;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.55);
+  box-shadow:
+    0 4px 0 0 #5c3d12,
+    0 12px 22px -8px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 250, 230, 0.6);
+}
+
+@utility op-title {
+  @apply font-display tracking-wide;
+  text-shadow:
+    0 2px 0 #7c5a21,
+    0 4px 0 rgba(40, 22, 8, 0.9),
+    0 10px 22px rgba(0, 0, 0, 0.8);
+}
+
+@utility ink {
+  /* Ink on paper: never pure black, always slightly bled. */
+  color: var(--color-op-ink);
+  text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.35);
+}
+
+@utility op-range {
+  /* Range: the thumb is a brass rivet, the track is set into the sheet. */
+  box-shadow: inset 0 1px 3px rgba(42, 29, 20, 0.55);
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #4a3210;
+    background: radial-gradient(
+      circle at 34% 30%,
+      #f7e6b6 0%,
+      #e8c579 24%,
+      #c8973f 58%,
+      #6d4a1a 100%
+    );
+    box-shadow:
+      0 2px 5px rgba(0, 0, 0, 0.55),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+
+  &::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #4a3210;
+    background: radial-gradient(
+      circle at 34% 30%,
+      #f7e6b6 0%,
+      #c8973f 58%,
+      #6d4a1a 100%
+    );
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+  }
+}
+
+@utility logo-word {
+  /* ── Logo ─────────────────────────────────────────────────────────────── */
+  @apply font-body font-extrabold uppercase;
+  letter-spacing: -0.012em;
+  background-image: linear-gradient(
+    178deg,
+    #fff3d0 4%,
+    #f6cf6a 26%,
+    #e0a838 44%,
+    #b07c22 58%,
+    #f0c85e 74%,
+    #8a5c18 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility logo-shine {
+  background-image: linear-gradient(
+    104deg,
+    rgba(255, 255, 255, 0) 38%,
+    rgba(255, 255, 255, 0.92) 47%,
+    rgba(255, 255, 255, 0) 56%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 6.5s ease-in-out infinite;
+}
+
+@utility safe-b {
+  padding-bottom: calc(var(--safe-b) + 0px);
+}
+
+@utility tabnum {
+  font-variant-numeric: tabular-nums;
+}
 
 @layer base {
   :root {
@@ -20,7 +497,7 @@
     margin: 0;
     background: #050a14;
     color: #fff5e4;
-    font-family: theme('fontFamily.body');
+    font-family: var(--font-body);
     overscroll-behavior: none;
   }
 
@@ -45,257 +522,12 @@
   }
 
   :focus-visible {
-    outline: 2px solid theme('colors.op-gold');
+    outline: 2px solid var(--color-op-gold);
     outline-offset: 3px;
     border-radius: 4px;
     box-shadow:
       0 0 0 5px rgba(5, 10, 20, 0.75),
       0 0 18px rgba(244, 197, 66, 0.55);
-  }
-}
-
-@layer components {
-  /* ── Surfaces ─────────────────────────────────────────────────────────── */
-
-  /* Paper fibre. One tiled noise field, multiplied into the sheet. */
-  .paper-grain {
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
-      repeating-linear-gradient(
-        94deg,
-        rgba(120, 84, 40, 0.05) 0px,
-        rgba(120, 84, 40, 0) 2px,
-        rgba(120, 84, 40, 0) 5px,
-        rgba(150, 110, 60, 0.04) 7px
-      );
-    background-size: 160px 160px, auto;
-    mix-blend-mode: multiply;
-    opacity: 0.2;
-  }
-
-  /* Oiled oak: planks with a seam, a slow colour drift and a fine grain. */
-  .wood {
-    background-color: #3b2416;
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w)' opacity='0.5'/%3E%3C/svg%3E"),
-      repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.5) 0px,
-        rgba(0, 0, 0, 0.5) 2px,
-        rgba(255, 226, 180, 0.06) 4px,
-        rgba(255, 255, 255, 0) 8px,
-        rgba(255, 255, 255, 0) 173px,
-        rgba(0, 0, 0, 0.5) 175px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.28) 0px,
-        rgba(0, 0, 0, 0.28) 2px,
-        rgba(255, 255, 255, 0) 5px,
-        rgba(255, 255, 255, 0) 268px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.16) 0px,
-        rgba(0, 0, 0, 0.16) 1px,
-        rgba(255, 255, 255, 0) 3px,
-        rgba(255, 255, 255, 0) 97px
-      ),
-      linear-gradient(178deg, #4E3220 0%, #33200f 55%, #241407 100%);
-    background-size: 220px 220px, auto, auto, auto, auto;
-    background-blend-mode: soft-light, normal, normal, normal, normal;
-  }
-
-  .wood-dark {
-    background-color: #22140c;
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w2)' opacity='0.5'/%3E%3C/svg%3E"),
-      repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.45) 0px,
-        rgba(0, 0, 0, 0.45) 2px,
-        rgba(255, 226, 180, 0.04) 4px,
-        rgba(255, 255, 255, 0) 8px,
-        rgba(255, 255, 255, 0) 211px,
-        rgba(0, 0, 0, 0.45) 213px
-      ),
-      linear-gradient(180deg, #2e1c11 0%, #1b0f08 100%);
-    background-size: 220px 220px, auto, auto;
-    background-blend-mode: soft-light, normal, normal;
-  }
-
-  /* Tarnished brass, lit from the upper left like everything else. */
-  .brass {
-    background-image: linear-gradient(
-      160deg,
-      #f4dc9c 0%,
-      #cfa04a 24%,
-      #8d6524 52%,
-      #c99a46 74%,
-      #6d4a1a 100%
-    );
-  }
-
-  .op-panel {
-    @apply relative rounded-lg border-2 border-op-brass/70;
-    background-image:
-      repeating-linear-gradient(
-        87deg,
-        rgba(255, 226, 180, 0.035) 0px,
-        rgba(255, 226, 180, 0) 4px,
-        rgba(0, 0, 0, 0.09) 8px,
-        rgba(0, 0, 0, 0) 14px
-      ),
-      linear-gradient(172deg, #4a2f1c 0%, #2c1a0e 100%);
-    box-shadow:
-      0 22px 48px -20px rgba(0, 0, 0, 0.95),
-      inset 0 1px 0 rgba(255, 226, 180, 0.16),
-      inset 0 -18px 30px -18px rgba(0, 0, 0, 0.8);
-  }
-
-  /* ── Controls ─────────────────────────────────────────────────────────── */
-
-  /* A brass plate screwed to the wood. Hover lifts it, press seats it. */
-  .op-button {
-    @apply relative rounded-md px-6 py-3 font-body font-semibold tracking-wide text-op-cream;
-    @apply border border-op-brass-dark;
-    background-image: linear-gradient(180deg, rgba(255, 226, 180, 0.16) 0%, rgba(0, 0, 0, 0.3) 100%),
-      linear-gradient(172deg, #54341f 0%, #2c1a0e 100%);
-    background-color: #43291a;
-    box-shadow:
-      0 4px 0 0 #1c0f07,
-      0 10px 18px -8px rgba(0, 0, 0, 0.9),
-      inset 0 1px 0 rgba(255, 226, 180, 0.22);
-    transition:
-      transform 120ms ease,
-      box-shadow 120ms ease,
-      filter 120ms ease;
-  }
-
-  .op-button:hover {
-    filter: brightness(1.14);
-    transform: translateY(-2px);
-    box-shadow:
-      0 6px 0 0 #1c0f07,
-      0 14px 22px -8px rgba(0, 0, 0, 0.9),
-      inset 0 1px 0 rgba(255, 226, 180, 0.28);
-  }
-
-  .op-button:active,
-  .op-button[data-pressed='true'] {
-    transform: translateY(2px);
-    box-shadow:
-      0 1px 0 0 #1c0f07,
-      0 4px 10px -6px rgba(0, 0, 0, 0.9),
-      inset 0 2px 6px rgba(0, 0, 0, 0.55);
-  }
-
-  .op-button--primary {
-    @apply border-op-brass-light/70 font-extrabold text-op-ink;
-    background-image: linear-gradient(
-      168deg,
-      #ffeab2 0%,
-      #f3d489 18%,
-      #e0ae43 46%,
-      #b8842c 78%,
-      #8a5f1c 100%
-    );
-    background-color: #e0ae43;
-    text-shadow: 0 1px 0 rgba(255, 240, 200, 0.55);
-    box-shadow:
-      0 4px 0 0 #5c3d12,
-      0 12px 22px -8px rgba(0, 0, 0, 0.9),
-      inset 0 1px 0 rgba(255, 250, 230, 0.6);
-  }
-
-  .op-button:disabled {
-    filter: grayscale(0.7) brightness(0.6);
-    transform: none;
-    cursor: not-allowed;
-  }
-
-  .op-title {
-    @apply font-display tracking-wide;
-    text-shadow:
-      0 2px 0 #7c5a21,
-      0 4px 0 rgba(40, 22, 8, 0.9),
-      0 10px 22px rgba(0, 0, 0, 0.8);
-  }
-
-  /* Ink on paper: never pure black, always slightly bled. */
-  .ink {
-    color: theme('colors.op-ink');
-    text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  /* Range: the thumb is a brass rivet, the track is set into the sheet. */
-  .op-range {
-    box-shadow: inset 0 1px 3px rgba(42, 29, 20, 0.55);
-  }
-
-  .op-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid #4a3210;
-    background: radial-gradient(circle at 34% 30%, #f7e6b6 0%, #e8c579 24%, #c8973f 58%, #6d4a1a 100%);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55), inset 0 -2px 4px rgba(0, 0, 0, 0.35);
-    cursor: pointer;
-  }
-
-  .op-range::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid #4a3210;
-    background: radial-gradient(circle at 34% 30%, #f7e6b6 0%, #c8973f 58%, #6d4a1a 100%);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
-    cursor: pointer;
-  }
-
-  /* ── Logo ─────────────────────────────────────────────────────────────── */
-
-  .logo-word {
-    @apply font-body font-extrabold uppercase;
-    letter-spacing: -0.012em;
-    background-image: linear-gradient(
-      178deg,
-      #fff3d0 4%,
-      #f6cf6a 26%,
-      #e0a838 44%,
-      #b07c22 58%,
-      #f0c85e 74%,
-      #8a5c18 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .logo-shine {
-    background-image: linear-gradient(
-      104deg,
-      rgba(255, 255, 255, 0) 38%,
-      rgba(255, 255, 255, 0.92) 47%,
-      rgba(255, 255, 255, 0) 56%
-    );
-    background-size: 260% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    animation: sheen 6.5s ease-in-out infinite;
-  }
-}
-
-@layer utilities {
-  .safe-b {
-    padding-bottom: calc(var(--safe-b) + 0px);
-  }
-
-  .tabnum {
-    font-variant-numeric: tabular-nums;
   }
 }
 

@@ -414,7 +414,7 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
           <div className="pointer-events-none absolute bottom-[4%] right-[4%] opacity-65">
             <CompassRose size={132} />
           </div>
-          <div className="pointer-events-none absolute -left-[2%] bottom-[1%] opacity-95">
+          <div className="pointer-events-none absolute left-[-2%] bottom-[1%] opacity-95">
             <KrakenArm size={215} />
           </div>
           <div className="pointer-events-none absolute right-[3%] top-[1%] opacity-85">
