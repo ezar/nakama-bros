@@ -82,7 +82,7 @@ function strawHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
     ] as Pt[]))
   }
   ctx.restore()
-  browShadow(ctx, cx, cy, r, 0.46, 0.2)
+  browShadow(ctx, cx, cy, r, 0.46, 0.1)
 }
 
 function bandanaHead(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
@@ -110,7 +110,7 @@ function bandanaHead(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: n
       r * 1.4,
     )
   }
-  browShadow(ctx, cx, cy, r, 0.44, 0.16)
+  browShadow(ctx, cx, cy, r, 0.44, 0.09)
 }
 
 function topHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, s: Skeleton): void {
@@ -156,7 +156,7 @@ function topHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number
   ctx.fill(roundRectPath(hx - r * 0.12, y - r * 1.12, r * 0.24, r * 0.56, 0.06))
   ctx.fill(roundRectPath(hx - r * 0.28, y - r * 0.96, r * 0.56, r * 0.24, 0.06))
   ctx.restore()
-  browShadow(ctx, cx, cy, r, 0.5, 0.16)
+  browShadow(ctx, cx, cy, r, 0.5, 0.09)
 }
 
 function goggles(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {

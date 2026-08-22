@@ -180,10 +180,10 @@ function drawFace(
   const ink = mix(o.hair.line, '#180F22', 0.4)
   // Turn shifts the features toward the facing side and squeezes the far eye.
   const shift = r * 0.24 * o.turn
-  const eyeY = cy + r * 0.14 + e.look * r * 0.1
-  const nearX = cx + shift + r * 0.4
-  const farX = cx + shift - r * 0.52
-  const nearW = r * 0.38 * st.eye
+  const eyeY = cy + r * 0.07 + e.look * r * 0.1
+  const nearX = cx + shift + r * 0.38
+  const farX = cx + shift - r * 0.46
+  const nearW = r * 0.33 * st.eye
   const farW = nearW * (1 - o.turn * 0.4)
   const iris = st.iris ?? mix(o.hair.core, '#2E2440', 0.4)
 
@@ -245,7 +245,7 @@ function drawFace(
     // iris, glint, lash. A rim, a pupil and a lit floor on top of those is
     // three more tones than the eye has room for, and they average to grey.
     ctx.fillStyle = iris
-    ctx.fill(ellipsePath(x + w * 0.08, eyeY + h * 0.06, w * 0.68, h * 1.06))
+    ctx.fill(ellipsePath(x + w * 0.1, eyeY + h * 0.04, w * 0.5, h * 0.88))
     ctx.restore()
     glint(ctx, x - w * 0.26, eyeY - h * 0.3, w * 0.3, h * 0.34, -0.5, '#FFFFFF', 1)
 
@@ -256,7 +256,7 @@ function drawFace(
       [x - w * 0.36, eyeY - h * 1.08],
       [x + w * 0.7, eyeY - h * 0.86],
       [x + w * 1.22, eyeY - h * 0.4],
-    ] as Pt[]), 0.74 * st.lash * (near ? 1 : 0.78), ink, 0.5)
+    ] as Pt[]), 0.55 * st.lash * (near ? 1 : 0.78), ink, 0.5)
     // Lower lid: thin, and only under the near eye.
     if (near) {
       ctx.globalAlpha = 0.45
@@ -671,11 +671,11 @@ export function browShadow(
   cy: number,
   r: number,
   drop: number,
-  strength = 0.26,
+  strength = 0.14,
 ): void {
   ctx.save()
   ctx.globalAlpha = strength
   ctx.fillStyle = '#2A2038'
-  ctx.fill(ellipsePath(cx + r * 0.1, cy - r * drop, r * 0.94, r * 0.34))
+  ctx.fill(ellipsePath(cx + r * 0.1, cy - r * drop, r * 0.78, r * 0.24))
   ctx.restore()
 }
