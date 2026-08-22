@@ -1,59 +1,54 @@
+import { ART_SCALE } from '../types'
 import type { Anim, Frame, SpriteSheet } from '../types'
-import { createSurface, outline as applyOutline, rimLight, innerShadow, type Surface } from './pixel'
+import { createSurface, silhouetteOutline, type Surface } from './ink'
 
 export interface FrameSpec {
   /** Seconds this frame is shown. */
   dur: number
-  /** Draw the frame into its own surface. Origin is the frame's top-left. */
+  /**
+   * Draw the frame. The context is in WORLD UNITS with the origin at the
+   * frame's top-left, already scaled by ART_SCALE, so painters never think
+   * about resolution.
+   */
   draw: (s: Surface, ctx: CanvasRenderingContext2D) => void
 }
 
 export interface AnimSpec {
   loop?: boolean
-  /** Outline colour, or null to skip. */
-  outline?: string | null
-  /** Include diagonal neighbours in the outline pass. */
-  outlineDiagonal?: boolean
-  /** Rim-light colour, or null to skip. */
-  rim?: string | null
-  rimDirX?: number
-  rimDirY?: number
-  rimStrength?: number
-  /** Ambient-occlusion pass under overhangs. */
-  ao?: string | null
-  /** Per-animation frame size override. */
+  /** Frame size in world units, overriding the sheet default. */
   fw?: number
   fh?: number
-  /** Per-animation origin override, relative to the entity's bottom-centre. */
+  /** Origin offset in world units, relative to the entity's bottom-centre. */
   ox?: number
   oy?: number
+  /**
+   * Draw a single unbroken contour around the whole frame. Cel art reads far
+   * better with one silhouette line than with a stroke per body part, so this
+   * is on by default for characters.
+   */
+  contour?: string | null
+  contourWidth?: number
 }
 
 export interface SheetOptions {
-  /** Default frame width / height. */
+  /** Default frame size in world units. */
   fw: number
   fh: number
-  /**
-   * Offset from the entity origin (bottom-centre of the hitbox) to the frame's
-   * top-left corner. Usually `(-fw / 2, -fh)`.
-   */
+  /** Default origin offset. Usually (-fw / 2, -fh) so the frame stands on its feet. */
   ox?: number
   oy?: number
-  /** Applied to every animation unless overridden. */
-  outline?: string | null
-  rim?: string | null
-  ao?: string | null
-  /** Max sheet width before wrapping to a new row. */
+  contour?: string | null
+  contourWidth?: number
+  /** Max sheet width in device pixels before wrapping to a new row. */
   maxWidth?: number
 }
 
 /**
  * Builds a packed sprite sheet from code-drawn frames.
  *
- * Each frame is rendered into its own scratch surface so per-frame passes
- * (outline, rim light, ambient occlusion) see a clean silhouette, then blitted
- * into a single sheet canvas — one texture, one `drawImage` per sprite at
- * runtime.
+ * Frames are painted into their own scratch surface so the silhouette pass sees
+ * a clean alpha channel, then blitted into one sheet canvas — a single texture,
+ * one drawImage per sprite at runtime, no per-frame path work in the game loop.
  */
 export class SheetBuilder {
   private specs: Array<{ name: string; spec: AnimSpec; frames: FrameSpec[] }> = []
@@ -70,9 +65,15 @@ export class SheetBuilder {
     return this.add(name, [{ dur: 1, draw }], { loop: true, ...spec })
   }
 
+  /** Alias an existing animation under another name, sharing its frames. */
+  alias(name: string, existing: string): this {
+    const src = this.specs.find((s) => s.name === existing)
+    if (src) this.specs.push({ name, spec: src.spec, frames: src.frames })
+    return this
+  }
+
   build(): SpriteSheet {
-    const maxWidth = this.opts.maxWidth ?? 1024
-    // Lay frames out row by row, one row per animation where it fits.
+    const maxWidth = this.opts.maxWidth ?? 2048
     type Placed = { frame: Frame; surface: Surface }
     const rows: Placed[][] = []
     const anims: Record<string, Anim> = {}
@@ -98,30 +99,31 @@ export class SheetBuilder {
       const fh = spec.fh ?? this.opts.fh
       const ox = spec.ox ?? this.opts.ox ?? -fw / 2
       const oy = spec.oy ?? this.opts.oy ?? -fh
+      const pw = Math.ceil(fw * ART_SCALE)
+      const ph = Math.ceil(fh * ART_SCALE)
       const animFrames: Frame[] = []
 
       for (const f of frames) {
-        if (rowW + fw > maxWidth) flush()
+        if (rowW + pw > maxWidth) flush()
         const s = createSurface(fw, fh)
         f.draw(s, s.ctx)
 
-        const ao = spec.ao !== undefined ? spec.ao : this.opts.ao
-        if (ao) innerShadow(s, ao, 0.3, 3)
-        const rim = spec.rim !== undefined ? spec.rim : this.opts.rim
-        if (rim) {
-          rimLight(s, rim, spec.rimDirX ?? -1, spec.rimDirY ?? -1, spec.rimStrength ?? 0.7)
+        const contour = spec.contour !== undefined ? spec.contour : this.opts.contour
+        if (contour) {
+          silhouetteOutline(s, contour, spec.contourWidth ?? this.opts.contourWidth ?? 0.9)
         }
-        const ol = spec.outline !== undefined ? spec.outline : this.opts.outline
-        if (ol) applyOutline(s, ol, spec.outlineDiagonal ?? true)
 
         const placed: Placed = {
           surface: s,
-          frame: { sx: rowW, sy: sheetH, sw: fw, sh: fh, ox, oy, dur: f.dur },
+          frame: {
+            sx: rowW, sy: sheetH, sw: pw, sh: ph,
+            w: fw, h: fh, ox, oy, dur: f.dur,
+          },
         }
         row.push(placed)
         animFrames.push(placed.frame)
-        rowW += fw
-        rowH = Math.max(rowH, fh)
+        rowW += pw
+        rowH = Math.max(rowH, ph)
       }
 
       anims[name] = { name, frames: animFrames, loop: spec.loop ?? true }
@@ -129,19 +131,16 @@ export class SheetBuilder {
     }
     flush()
 
-    const sheet = createSurface(Math.max(1, sheetW), Math.max(1, sheetH))
+    const sheet = document.createElement('canvas')
+    sheet.width = Math.max(1, sheetW)
+    sheet.height = Math.max(1, sheetH)
+    const sctx = sheet.getContext('2d')!
+    sctx.imageSmoothingEnabled = true
     for (const r of rows) {
-      for (const p of r) {
-        sheet.ctx.drawImage(p.surface.canvas, p.frame.sx, p.frame.sy)
-      }
+      for (const p of r) sctx.drawImage(p.surface.canvas, p.frame.sx, p.frame.sy)
     }
 
-    return {
-      image: sheet.canvas,
-      width: sheet.w,
-      height: sheet.h,
-      anims,
-    }
+    return { image: sheet, width: sheet.width, height: sheet.height, anims }
   }
 }
 

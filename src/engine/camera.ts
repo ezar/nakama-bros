@@ -15,11 +15,11 @@ export class Camera implements CameraState {
   zoom = 1
 
   /** Half-width of the horizontal dead zone, in px. */
-  deadX = 18
+  deadX = 14
   /** Half-height of the vertical dead zone, in px. */
-  deadY = 26
+  deadY = 21
   /** How far ahead of the player the camera leads at full speed. */
-  lookAhead = 46
+  lookAhead = 40
   /** Seconds for the look-ahead to reach its target. */
   lookHalfLife = 0.28
 

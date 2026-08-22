@@ -1,87 +1,88 @@
 /**
- * The game's master palette.
+ * The master palette.
  *
- * Everything drawn — sprites, tiles, skies, UI — pulls from here, which is what
- * makes a code-generated game read as one art direction instead of a pile of
- * separate assets. Hues follow the anime's colour language: saturated primaries
- * on characters, desaturated cool tones in the environment, gold as the single
- * reward colour.
+ * Cel shading needs saturated, confident local colours: the style has no soft
+ * gradients to hide a muddy hue behind, so every value here is chosen to hold
+ * up when it is split into exactly two tones. Shadows and highlights are never
+ * written down — they are derived from these by `cel()` in `color.ts`, which is
+ * what keeps six biomes and six characters lit by the same sun.
  */
 export const PAL = {
   // Ink & neutrals
-  ink: '#0B1020',
-  inkSoft: '#131A2E',
-  shadow: '#1C2540',
-  slate: '#3A4666',
-  steel: '#5C6A8C',
-  mist: '#9AA8C4',
-  cream: '#FFF5E4',
+  ink: '#141A2E',
+  inkSoft: '#232C48',
+  shadow: '#2E3A5C',
+  slate: '#4A5878',
+  steel: '#7C8BAA',
+  mist: '#B4C0D8',
+  cream: '#FFF6E8',
   white: '#FFFFFF',
 
-  // One Piece signature hues
-  strawGold: '#F4C542',
-  strawDeep: '#B8942E',
-  luffyRed: '#D6302E',
-  luffyRedDeep: '#8E1A1C',
-  denim: '#2E5A8C',
-  skin: '#F2C7A0',
-  skinDeep: '#C98F63',
-  skinDark: '#8B5A3C',
+  // Straw Hat signatures
+  strawGold: '#F6C63C',
+  strawDeep: '#C08A2C',
+  luffyRed: '#E23B32',
+  luffyRedDeep: '#A01F22',
+  denim: '#2F5FA0',
+  skin: '#F6C9A0',
+  skinDeep: '#D89A6C',
+  skinDark: '#9A5F3C',
 
   // Crew accents
-  zoroGreen: '#3EA96B',
-  namiOrange: '#F08A3C',
-  sanjiBlue: '#2B3A66',
-  usoppBrown: '#8B5A2B',
-  chopperPink: '#E8768E',
+  zoroGreen: '#3FBE78',
+  namiOrange: '#FA9A3C',
+  sanjiGold: '#EFCF72',
+  sanjiSuit: '#1F2A4A',
+  usoppBrown: '#9A6535',
+  chopperPink: '#F0849A',
 
   // Sea & sky
-  seaDeep: '#0A2A4A',
-  sea: '#136A8A',
-  seaLight: '#2FA8C4',
-  foam: '#CFF0F7',
-  skyHigh: '#1F5FA8',
-  skyMid: '#4FA3D9',
-  skyLow: '#9FD8EE',
-  sunset: '#F2874E',
-  dusk: '#5B3A7E',
-  night: '#0A1230',
+  seaDeep: '#0B3358',
+  sea: '#127EA6',
+  seaLight: '#38C2DC',
+  foam: '#DBF5FB',
+  skyHigh: '#2A6CC0',
+  skyMid: '#5AB4EA',
+  skyLow: '#B6E6F8',
+  sunset: '#FA9052',
+  dusk: '#6B4492',
+  night: '#0C1638',
 
   // Terrain
-  sand: '#E7CE9B',
-  sandDeep: '#B99A63',
-  grass: '#4FA843',
-  grassDeep: '#2F6B33',
-  dirt: '#7A5236',
-  dirtDeep: '#4E3322',
-  rock: '#6E7A90',
-  rockDeep: '#414B60',
-  wood: '#8A5A32',
-  woodDeep: '#5A3820',
-  woodLight: '#C08B52',
-  ice: '#BFE9F5',
-  iceDeep: '#6FA8C4',
+  sand: '#F0D79E',
+  sandDeep: '#C8A263',
+  grass: '#5CC34C',
+  grassDeep: '#2F7C3A',
+  dirt: '#8A5C38',
+  dirtDeep: '#553722',
+  rock: '#7C88A0',
+  rockDeep: '#464F66',
+  wood: '#9A6234',
+  woodDeep: '#603A1E',
+  woodLight: '#D19A5A',
+  ice: '#CDF0FA',
+  iceDeep: '#78B4CE',
 
   // Marine / enemies
-  marineNavy: '#1E3A6E',
-  marineWhite: '#EDEFF5',
-  marineBlue: '#3F6FB5',
-  fishmanTeal: '#2A8C86',
-  bloodOrange: '#E05A2B',
+  marineNavy: '#20407A',
+  marineWhite: '#F2F4FA',
+  marineBlue: '#4A7CC4',
+  fishmanTeal: '#2E9E96',
+  bloodOrange: '#F06A2E',
 
   // Signals
-  gold: '#F4C542',
-  goldDeep: '#B8942E',
-  danger: '#E23B3B',
-  poison: '#8E44AD',
-  heal: '#4FD37A',
-  magic: '#7FD4FF',
-  ember: '#FFB03A',
+  gold: '#F6C63C',
+  goldDeep: '#C08A2C',
+  danger: '#EE4544',
+  poison: '#9B50C0',
+  heal: '#57DE86',
+  magic: '#8ADCFF',
+  ember: '#FFBC4A',
 } as const
 
 export type PaletteKey = keyof typeof PAL
 
-/** Per-biome environment colour sets, used by tiles and backgrounds alike. */
+/** Per-biome environment colours, shared by terrain, sky and lighting. */
 export interface BiomePalette {
   skyTop: string
   skyMid: string
@@ -94,7 +95,7 @@ export interface BiomePalette {
   groundEdge: string
   accent: string
   fog: string
-  /** Direction the key light comes from, used for rim lighting. */
+  /** Direction the key light comes from. */
   lightDirX: number
   lightDirY: number
   ambient: string
@@ -102,40 +103,40 @@ export interface BiomePalette {
 
 export const BIOME_PALETTES: Record<string, BiomePalette> = {
   'east-blue': {
-    skyTop: '#1F5FA8', skyMid: '#4FA3D9', skyLow: '#BEE6F5', sunTint: '#FFE9A8',
-    farSilhouette: '#5E8FB8', midSilhouette: '#2F6B33',
-    ground: '#4FA843', groundDeep: '#2F6B33', groundEdge: '#7A5236',
-    accent: '#F4C542', fog: '#BEE6F5', lightDirX: -1, lightDirY: -1, ambient: '#8FC7E8',
+    skyTop: '#2A6CC0', skyMid: '#5AB4EA', skyLow: '#C6EBFA', sunTint: '#FFF0BE',
+    farSilhouette: '#7AAAD0', midSilhouette: '#2F7C3A',
+    ground: '#5CC34C', groundDeep: '#2F7C3A', groundEdge: '#8A5C38',
+    accent: '#38C2DC', fog: '#C6EBFA', lightDirX: -0.6, lightDirY: -0.8, ambient: '#9CD4F0',
   },
   alabasta: {
-    skyTop: '#2E6FB8', skyMid: '#79B7DE', skyLow: '#F0D9A8', sunTint: '#FFD98A',
-    farSilhouette: '#C9A470', midSilhouette: '#A87C4A',
-    ground: '#E7CE9B', groundDeep: '#B99A63', groundEdge: '#8A6A3E',
-    accent: '#E05A2B', fog: '#F0DDB4', lightDirX: -1, lightDirY: -1, ambient: '#F5DFB0',
+    skyTop: '#3A82CE', skyMid: '#8CC8EA', skyLow: '#F6DFAE', sunTint: '#FFE0A0',
+    farSilhouette: '#D2AE78', midSilhouette: '#B4854E',
+    ground: '#F0D79E', groundDeep: '#C8A263', groundEdge: '#96703E',
+    accent: '#F06A2E', fog: '#F4E2B8', lightDirX: -0.5, lightDirY: -0.86, ambient: '#F8E4B6',
   },
   skypiea: {
-    skyTop: '#3E7FD0', skyMid: '#8FD0F0', skyLow: '#EAF9FF', sunTint: '#FFFFFF',
-    farSilhouette: '#BFE0F2', midSilhouette: '#7FC8A8',
-    ground: '#8FE0C0', groundDeep: '#3E9C7C', groundEdge: '#D8F2E6',
-    accent: '#FFE9A8', fog: '#EAF9FF', lightDirX: -1, lightDirY: -1, ambient: '#DFF4FF',
+    skyTop: '#4E90DE', skyMid: '#9EDCF6', skyLow: '#F0FCFF', sunTint: '#FFFFFF',
+    farSilhouette: '#CCE8F6', midSilhouette: '#84D2AE',
+    ground: '#96E8C6', groundDeep: '#40A484', groundEdge: '#E0F6EC',
+    accent: '#FFF0BE', fog: '#F0FCFF', lightDirX: -0.6, lightDirY: -0.8, ambient: '#E6F8FF',
   },
   water7: {
-    skyTop: '#1B4E86', skyMid: '#3E86B8', skyLow: '#9FD0E4', sunTint: '#FFD1A0',
-    farSilhouette: '#4E7C9C', midSilhouette: '#8A5A32',
-    ground: '#8A5A32', groundDeep: '#5A3820', groundEdge: '#C08B52',
-    accent: '#2FA8C4', fog: '#A8CFE0', lightDirX: -1, lightDirY: -1, ambient: '#9CC4DC',
+    skyTop: '#255C98', skyMid: '#4A94C6', skyLow: '#AEDAEC', sunTint: '#FFD8A8',
+    farSilhouette: '#5E8CAC', midSilhouette: '#9A6234',
+    ground: '#9A6234', groundDeep: '#603A1E', groundEdge: '#D19A5A',
+    accent: '#38C2DC', fog: '#B6D8E8', lightDirX: -0.7, lightDirY: -0.72, ambient: '#A8CCE4',
   },
   'thriller-bark': {
-    skyTop: '#0A1230', skyMid: '#231A46', skyLow: '#4A2E5E', sunTint: '#C8A2E8',
-    farSilhouette: '#2A1C40', midSilhouette: '#181228',
-    ground: '#3A2C4E', groundDeep: '#1E1630', groundEdge: '#6B4E7E',
-    accent: '#8E44AD', fog: '#3A2C5E', lightDirX: 1, lightDirY: -1, ambient: '#6A5A8E',
+    skyTop: '#0C1638', skyMid: '#2A2052', skyLow: '#54366A', sunTint: '#D4B0F0',
+    farSilhouette: '#32224C', midSilhouette: '#1E1632',
+    ground: '#443458', groundDeep: '#241A38', groundEdge: '#7A5A8E',
+    accent: '#9B50C0', fog: '#443468', lightDirX: 0.7, lightDirY: -0.72, ambient: '#7A68A0',
   },
   wano: {
-    skyTop: '#4A2A5E', skyMid: '#C2506E', skyLow: '#F2A08A', sunTint: '#FFD0A0',
-    farSilhouette: '#7A4A6E', midSilhouette: '#3E2A44',
-    ground: '#6E4A3A', groundDeep: '#3E2A22', groundEdge: '#E8768E',
-    accent: '#E8768E', fog: '#E8A0A8', lightDirX: 1, lightDirY: -1, ambient: '#E0A0A8',
+    skyTop: '#54306A', skyMid: '#D25A78', skyLow: '#FAB098', sunTint: '#FFDCAE',
+    farSilhouette: '#8A5478', midSilhouette: '#46304C',
+    ground: '#7C5442', groundDeep: '#46302A', groundEdge: '#F0849A',
+    accent: '#F0849A', fog: '#F0AEB6', lightDirX: 0.6, lightDirY: -0.8, ambient: '#EEAEB6',
   },
 }
 

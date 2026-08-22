@@ -9,7 +9,7 @@ import { PAL } from '../../art/palette'
 export class Grunt extends Enemy {
   sheetKey = 'grunt'
   constructor(x: number, y: number) {
-    super(x, y, 12, 20)
+    super(x, y, 14, 26)
     this.speed = 32
   }
   protected think(_dt: number, _world: World): void {
@@ -22,7 +22,7 @@ export class Grunt extends Enemy {
 export class Shielder extends Enemy {
   sheetKey = 'shielder'
   constructor(x: number, y: number) {
-    super(x, y, 13, 22)
+    super(x, y, 15, 28)
     this.speed = 22
     this.health = 2
     this.points = 400
@@ -51,7 +51,7 @@ export class Shielder extends Enemy {
 export class Crab extends Enemy {
   sheetKey = 'crab'
   constructor(x: number, y: number) {
-    super(x, y, 16, 12)
+    super(x, y, 18, 15)
     this.speed = 58
     this.points = 300
   }
@@ -66,7 +66,7 @@ export class Fishman extends Enemy {
   sheetKey = 'fishman'
   private cooldown = 0
   constructor(x: number, y: number) {
-    super(x, y, 13, 24)
+    super(x, y, 15, 30)
     this.speed = 40
     this.health = 2
     this.points = 400
@@ -95,7 +95,7 @@ export class Bat extends Enemy {
   private baseY: number
   private phase = 0
   constructor(x: number, y: number) {
-    super(x, y, 14, 12)
+    super(x, y, 16, 14)
     this.gravity = 0
     this.speed = 46
     this.avoidLedges = false
@@ -117,7 +117,7 @@ export class Bat extends Enemy {
 export class Urchin extends Enemy {
   sheetKey = 'urchin'
   constructor(x: number, y: number) {
-    super(x, y, 14, 14)
+    super(x, y, 16, 16)
     this.stompable = false
     this.damageable = false
     this.speed = 0
@@ -133,7 +133,7 @@ export class Urchin extends Enemy {
 export class Barrel extends Enemy {
   sheetKey = 'crab'
   constructor(x: number, y: number) {
-    super(x, y, 14, 14)
+    super(x, y, 16, 16)
     this.speed = 90
     this.avoidLedges = false
     this.stompable = true

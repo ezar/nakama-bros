@@ -13,7 +13,7 @@ import { Player } from './entities/Player'
 import { FloatingText } from './entities/FloatingText'
 import { ParticleSystem } from '../render/particles'
 import { Renderer } from '../render/Renderer'
-import { art } from '../art'
+import { backgroundFor, foregroundFor, tilesetFor } from '../art'
 import type { World } from './world'
 import { BERRIES_PER_LIFE, SCORE } from './config'
 import { PAL } from '../art/palette'
@@ -353,15 +353,15 @@ export class Game implements World {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   private render(alpha: number): void {
-    const library = art()
     const biome = this.level.biome
     this.renderer.settings.flash = this.flash
     this.renderer.settings.flashColor = PAL.white
     this.renderer.settings.gradeColor = biome === 'thriller-bark' ? '#6A5A9E' : '#FFD9A0'
     this.renderer.draw({
       map: this.map,
-      tileset: library.tilesets[biome],
-      background: library.backgrounds[biome],
+      tileset: tilesetFor(biome),
+      background: backgroundFor(biome),
+      foreground: foregroundFor(biome),
       entities: this.entities,
       camera: this.camera,
       particles: this.particles,
