@@ -51,46 +51,35 @@ export default function App() {
   // Browsers only allow audio to start inside a user gesture — and on iOS a
   // gesture that looks like it should have unlocked the context often leaves it
   // suspended anyway. So this does not fire once and hope: it keeps listening
-  // until the engine reports it is actually running, and it re-checks whenever
-  // the app comes back to the foreground, because iOS suspends the context
-  // every time the PWA is backgrounded.
+  // for as long as the app is mounted, and it re-tries whenever the app comes
+  // back to the foreground, because iOS suspends the context every time the
+  // PWA is backgrounded and a resume outside a gesture usually will not revive
+  // it. The handlers cost nothing once the context is running: they return
+  // immediately.
   useEffect(() => {
-    let done = false
-
-    const settle = () => {
-      if (audio.isRunning()) {
-        done = true
-        detach()
-      }
-    }
-
     const unlock = () => {
+      if (audio.isRunning()) return
       void audio.ready().then(() => {
         audio.setMasterVolume(settings.master)
         audio.setMusicVolume(settings.music)
         audio.setSfxVolume(settings.sfx)
-        settle()
       })
-      // Also check on the next frame: resume() can resolve before the context
-      // has actually left 'suspended'.
-      requestAnimationFrame(settle)
     }
 
+    // Coming back to the foreground, try without a gesture first — but this
+    // often fails on iOS, and the listeners below are deliberately still
+    // attached to catch the next tap when it does.
     const onVisible = () => {
-      if (document.visibilityState !== 'visible') return
-      void audio.ready()
+      if (document.visibilityState === 'visible') unlock()
     }
 
     const events: Array<keyof WindowEventMap> = ['pointerdown', 'touchend', 'keydown', 'click']
-    const detach = () => {
-      for (const e of events) window.removeEventListener(e, unlock)
-    }
     for (const e of events) window.addEventListener(e, unlock)
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('pageshow', onVisible)
 
     return () => {
-      if (!done) detach()
+      for (const e of events) window.removeEventListener(e, unlock)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pageshow', onVisible)
     }

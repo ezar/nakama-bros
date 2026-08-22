@@ -128,7 +128,9 @@ export class AudioEngine implements AudioApi {
   async ready(): Promise<void> {
     if (this.failed) return
     if (this.started) {
-      await this.ctx?.resume().catch(() => {})
+      // Not just resume: an iOS context that was suspended by backgrounding
+      // needs the same silent-buffer kick it needed the first time.
+      await this.unlockContext()
       return
     }
     try {
@@ -164,21 +166,7 @@ export class AudioEngine implements AudioApi {
       this.music.setIntensity(this.intensity)
       this.started = true
 
-      // The gesture that got us here is spent the moment we await, so resume
-      // is fired synchronously and a one-frame silent buffer is played
-      // alongside it: on iOS the buffer is what actually moves the context out
-      // of 'suspended', where resume() alone often reports success and leaves
-      // it stuck.
-      void ctx.resume().catch(() => {})
-      try {
-        const blip = ctx.createBufferSource()
-        blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
-        blip.connect(ctx.destination)
-        blip.start(0)
-      } catch {
-        // Not fatal: the context may already be running.
-      }
-      await ctx.resume().catch(() => {})
+      await this.unlockContext()
 
       if (this.pending) {
         const p = this.pending
@@ -288,6 +276,29 @@ export class AudioEngine implements AudioApi {
 
   isRunning(): boolean {
     return this.ctx?.state === 'running'
+  }
+
+  /**
+   * Move the context to running, from a user gesture.
+   *
+   * The gesture is spent the moment we await, so resume is fired synchronously
+   * and a one-frame silent buffer is played alongside it: on iOS the buffer is
+   * what actually moves the context out of 'suspended', where resume() alone
+   * often reports success and leaves it stuck.
+   */
+  private async unlockContext(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx) return
+    void ctx.resume().catch(() => {})
+    try {
+      const blip = ctx.createBufferSource()
+      blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+      blip.connect(ctx.destination)
+      blip.start(0)
+    } catch {
+      // Not fatal: the context may already be running.
+    }
+    await ctx.resume().catch(() => {})
   }
 
   suspend(): void {
