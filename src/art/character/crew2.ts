@@ -34,9 +34,9 @@ const LILAC = mix(PAL.poison, PAL.cream, 0.45)
 const CYBER_BLUE = mix(PAL.seaLight, PAL.foam, 0.18)
 const STEEL = mix(PAL.steel, PAL.mist, 0.42)
 const STEEL_DARK = mix(PAL.slate, PAL.ink, 0.3)
-const BONE = mix(PAL.cream, PAL.mist, 0.22)
+const BONE = mix(PAL.cream, PAL.mist, 0.46)
 const CRAVAT = mix(PAL.danger, PAL.ink, 0.42)
-const COAT_INDIGO = mix(PAL.dusk, PAL.night, 0.42)
+const COAT_INDIGO = mix(PAL.dusk, PAL.night, 0.14)
 const FISH_BLUE = mix(PAL.sea, PAL.marineBlue, 0.45)
 const KIMONO = mix(PAL.marineNavy, PAL.night, 0.2)
 const KIMONO_OUTER = mix(PAL.sea, PAL.marineNavy, 0.42)
@@ -469,7 +469,7 @@ const brook: Look = {
   banner: COAT_INDIGO,
   pal: P({
     // The afro has to separate from the coat: same family, two clear values.
-    skin: BONE, hair: mix(PAL.ink, PAL.dusk, 0.16), shirt: mix(PAL.cream, PAL.mist, 0.3),
+    skin: BONE, hair: mix(PAL.ink, PAL.dusk, 0.06), shirt: mix(PAL.cream, PAL.mist, 0.12),
     trousers: mix(PAL.ink, PAL.night, 0.45), boots: mix(PAL.ink, PAL.night, 0.62),
     accent: CRAVAT, sash: PAL.goldDeep, coat: COAT_INDIGO, trim: PAL.goldDeep,
   }),
@@ -540,30 +540,38 @@ const brook: Look = {
     // head. It is the whole silhouette read, so it is deliberately lumpy — a
     // smooth ball reads as a helmet — but it has to stay inside the frame: at
     // its first size the top of it was cropped off every sheet.
-    const hx = cx - s.drag * 0.6
-    const hy = cy - r * 0.92 + s.lift * 0.4
+    const hx = cx - s.drag * 0.5
+    // Sat high and kept narrower than it was: at 1.88r wide and centred barely
+    // a radius above the skull, the mass wrapped down past the cheeks and the
+    // whole head read as a hood rather than as hair on top of a face.
+    const hy = cy - r * 1.1 + s.lift * 0.4
     const pts: Pt[] = []
     for (let i = 0; i < 11; i++) {
       const a = (i / 11) * Math.PI * 2 - 0.4
       const wob = 1 + Math.sin(i * 2.7) * 0.15 + Math.sin(i * 5.1) * 0.08
-      pts.push(lag([hx + Math.cos(a) * r * 1.88 * wob, hy + Math.sin(a) * r * 1.4 * wob], s, 0.42 + Math.max(0, -Math.sin(a)) * 0.4))
+      // Flattened underneath, so the lower arc of the ball never reaches the jaw.
+      const down = Math.max(0, Math.sin(a))
+      const ry = r * (1.18 - down * 0.42) * wob
+      pts.push(lag([hx + Math.cos(a) * r * 1.42 * wob, hy + Math.sin(a) * ry], s, 0.42 + Math.max(0, -Math.sin(a)) * 0.4))
     }
     return pts
   },
   hairFront: (cx, cy, r, s) => [
     // Two locks falling past the jaw, which is what keeps the afro attached to
     // the head instead of hovering over it.
+    // Short sideburns that stop at the cheekbone. They used to fall past the
+    // jaw, which joined the afro to itself around the face and shut it in.
     [
-      [cx - r * 1.0, cy - r * 0.9],
-      lag([cx - r * 1.5, cy - r * 0.1], s, 0.9),
-      lag([cx - r * 1.2, cy + r * 1.5], s, 1.5),
-      [cx - r * 0.82, cy - r * 0.3],
+      [cx - r * 0.98, cy - r * 0.92],
+      lag([cx - r * 1.22, cy - r * 0.42], s, 0.7),
+      lag([cx - r * 1.04, cy + r * 0.24], s, 1),
+      [cx - r * 0.8, cy - r * 0.4],
     ] as Pt[],
     [
-      [cx + r * 0.9, cy - r * 0.94],
-      lag([cx + r * 1.42, cy - r * 0.2], s, 0.85),
-      lag([cx + r * 1.12, cy + r * 1.3], s, 1.4),
-      [cx + r * 0.76, cy - r * 0.36],
+      [cx + r * 0.9, cy - r * 0.96],
+      lag([cx + r * 1.16, cy - r * 0.46], s, 0.65),
+      lag([cx + r * 0.98, cy + r * 0.16], s, 0.95),
+      [cx + r * 0.74, cy - r * 0.44],
     ] as Pt[],
   ],
   props: (ctx, s, phase) => {

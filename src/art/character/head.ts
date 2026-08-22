@@ -1,4 +1,4 @@
-import { cel, mix, type Cel } from '../color'
+import { cel, hexToRgb, mix, rgbToHsl, type Cel } from '../color'
 import { blob, curve, ellipsePath, glint, inkStroke, type Pt } from '../ink'
 import { celPaint } from './paint'
 import type { Expression, Skeleton } from './rig'
@@ -187,12 +187,19 @@ export function drawHead(
   // A face takes a much narrower rim than a jacket does. A wide one wraps the
   // jaw in cream and the head starts to read as a mask with a beard, so this is
   // a hint of light on the temple and nothing more.
+  // A rim is a ratio, not a constant: on skin that is already near white — a
+  // skull, or a very pale complexion — a cream band at full strength has no
+  // headroom left and blows out into what reads as a headband across the brow.
+  // Fade it toward nothing as the base lightens, and warm it instead of
+  // whitening it.
+  const skinL = rgbToHsl(hexToRgb(o.skin.core)).l
+  const rimFade = 1 - Math.max(0, (skinL - 0.6) / 0.4) * 0.82
   celPaint(ctx, path, o.skin, {
     shadow: 0.27,
     radius: r * 1.2,
     pivot: [cx + r * 0.1, cy - r * 0.1],
-    rim: 0.42,
-    rimColor: mix(o.skin.light, '#FFFFFF', 0.25),
+    rim: 0.42 * rimFade,
+    rimColor: mix(o.skin.light, skinL > 0.72 ? '#FFE6BE' : '#FFFFFF', 0.25),
     line: 0.5,
   })
 
@@ -603,26 +610,31 @@ function drawSkullFace(
     // The socket is a rounded triangle, tipped by the brow so the same hollow
     // reads furious or startled without changing size.
     const tilt = e.brow * dir * 0.5
-    const w = r * 0.44 * k
-    const h = r * 0.42 * (0.85 + e.open * 0.3)
+    // Narrow, tall and canted inward at the top, with a corner rather than a
+    // curve on the inner brow. Two round holes of equal weight on a pale head
+    // read as a panda, whatever size they are — the asymmetry and the angle
+    // are what make them bone.
+    const w = r * 0.27 * k
+    const h = r * 0.44 * (0.85 + e.open * 0.3)
+    const inner = dir > 0 ? -1 : 1
     const p = blob([
-      [x - w, cy - h * 0.5 + tilt * r * 0.3],
-      [x + w * 0.2, cy - h * (0.9 + e.raise * 0.1) - tilt * r * 0.3],
-      [x + w, cy - h * 0.25 - tilt * r * 0.2],
-      [x + w * 0.72, cy + h * 0.86],
-      [x - w * 0.5, cy + h * 0.92],
-    ] as Pt[], 0.9)
+      [x + inner * w * 0.95, cy - h * (0.86 + e.raise * 0.1) - tilt * r * 0.3],
+      [x - inner * w * 0.85, cy - h * (0.52 + e.raise * 0.08) + tilt * r * 0.28],
+      [x - inner * w, cy + h * 0.34],
+      [x - inner * w * 0.42, cy + h * 0.94],
+      [x + inner * w * 0.5, cy + h * 0.72],
+    ] as Pt[], 0.55)
     celPaint(ctx, p, hollow, { shadow: 0.2, radius: w, pivot: [x, cy], rim: 0, line: 0.42 })
     // The pinpoint. It is the whole gaze, so it moves with the expression.
     ctx.save()
     ctx.globalAlpha = 0.92
     ctx.fillStyle = '#F4FBFF'
     ctx.fill(ellipsePath(x + w * (0.18 + e.look * 0.4), cy + h * (0.05 + e.look * 0.5),
-      w * 0.24 * k, h * 0.26))
+      w * 0.17 * k, h * 0.15))
     ctx.restore()
   }
-  socket(cx + r * 0.42, 1, 1)
-  if (o.turn < 0.94) socket(cx - r * 0.5, 1 - o.turn * 0.35, -1)
+  socket(cx + r * 0.38, 1, 1)
+  if (o.turn < 0.94) socket(cx - r * 0.44, 1 - o.turn * 0.35, -1)
 
   // Brow ridge: one heavy bone line across both sockets, the only thing that
   // can scowl on a face with no muscles.
@@ -694,6 +706,33 @@ export function drawHairBack(
   celPaint(ctx, blob(shape, 0.95), hair, {
     shadow: 0.52, radius: r * 1.4, pivot: [cx, cy], rim: 0.5, line: 0.5, occlusion: 0.22,
   })
+
+  // A shine sized from the mass's own bounds rather than the head's, so a
+  // shape that sits well clear of the skull still catches the key light.
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+  for (const [x, y] of shape) {
+    if (x < x0) x0 = x
+    if (x > x1) x1 = x
+    if (y < y0) y0 = y
+    if (y > y1) y1 = y
+  }
+  const w = x1 - x0
+  const h = y1 - y0
+  if (w > 0.5 && h > 0.5) {
+    ctx.save()
+    ctx.clip(blob(shape, 0.95))
+    ctx.globalAlpha = 0.42
+    ctx.fillStyle = cel(hair.light).light
+    ctx.fill(blob([
+      [x0 + w * 0.14, y0 + h * 0.42],
+      [x0 + w * 0.34, y0 + h * 0.13],
+      [x0 + w * 0.72, y0 + h * 0.3],
+      [x0 + w * 0.6, y0 + h * 0.42],
+      [x0 + w * 0.36, y0 + h * 0.27],
+      [x0 + w * 0.22, y0 + h * 0.52],
+    ] as Pt[], 0.85))
+    ctx.restore()
+  }
 }
 
 /**
@@ -716,7 +755,15 @@ export function drawHairFront(
   }
   // A single band of specular across the crown — the anime hair highlight. It
   // is one shape, not a gradient, so it holds the cel logic.
+  //
+  // It is clipped to the locks that were actually drawn. Placed by head radius
+  // alone it lands wherever the crown *would* be, which on a character whose
+  // hair sits high — an afro, a tall crest — is bare forehead, and it reads as
+  // a headband rather than a shine.
+  const mass = new Path2D()
+  for (const lock of locks) mass.addPath(blob(lock, 0.9))
   ctx.save()
+  ctx.clip(mass)
   ctx.globalAlpha = 0.5
   ctx.fillStyle = cel(hair.light).light
   ctx.fill(blob([
