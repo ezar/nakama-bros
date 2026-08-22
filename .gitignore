@@ -9,3 +9,6 @@ dist-ssr
 /screenshots
 /playwright-report
 /test-results
+
+# generator scratch: the <link> block pasted into index.html
+scripts/.startup-links.html
