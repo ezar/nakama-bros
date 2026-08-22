@@ -2,7 +2,7 @@ import type { SpriteSheet } from '../types'
 import { SheetBuilder } from './atlas'
 import { mix, rgba } from './color'
 import { PAL } from './palette'
-import { blob, crescentPath, curve, ellipsePath, radialFill, type Pt, type Surface } from './ink'
+import { blob, crescentPath, ellipsePath, radialFill, type Pt, type Surface } from './ink'
 
 /**
  * Impact effects.
@@ -349,24 +349,32 @@ function gearAura(color: string) {
       ctx.lineTo(cx + off + w, y + w * 0.34)
       ctx.stroke()
     }
-    // Vapour beading off the shoulders.
-    for (let i = 0; i < 6; i++) {
-      const u = (t + i * 0.16) % 1
-      const a = (i / 6) * Math.PI * 2
-      const d = s.w * (0.16 + u * 0.2)
-      ctx.globalAlpha = (1 - u) * 0.5
-      ctx.fillStyle = mix(color, '#FFFFFF', 0.7)
-      const r = s.w * 0.05 * (1 - u * 0.4)
-      ctx.fill(ellipsePath(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.6 - u * s.h * 0.3, r, r * 0.85))
+    // Vapour beading off the shoulders. Tall, small and warm — round grey discs
+    // at this size read as dust, which is the opposite of what heat looks like.
+    for (let i = 0; i < 7; i++) {
+      const u = (t + i * 0.14) % 1
+      const a = (i / 7) * Math.PI * 2
+      const d = s.w * (0.14 + u * 0.18)
+      ctx.globalAlpha = Math.sin(u * Math.PI) * 0.7
+      ctx.fillStyle = mix(color, '#FFF4DE', 0.45 + u * 0.45)
+      const r = s.w * 0.026 * (1 - u * 0.3)
+      ctx.fill(ellipsePath(
+        cx + Math.cos(a) * d,
+        cy + Math.sin(a) * d * 0.55 - u * s.h * 0.42,
+        r, r * (1.7 + u * 1.4),
+      ))
     }
     ctx.restore()
   }
 }
 
 /**
- * Ember burst — hot fragments thrown out and falling. Each ember is a streak
- * along its own velocity with a white core, and the whole set is lopsided,
- * because a symmetric explosion reads as a firework icon.
+ * Ember burst — hot fragments thrown out and falling.
+ *
+ * The flash is a hard-edged spike star, not a radial gradient: a soft blob is
+ * the one thing this whole style forbids, and it also swallows the embers on
+ * the frames where they are densest. Each ember is a streak drawn along its own
+ * velocity, so the burst has direction even though it starts symmetric.
  */
 function emberBurst(s: Surface, t: number): void {
   const ctx = s.ctx
@@ -374,18 +382,31 @@ function emberBurst(s: Surface, t: number): void {
   const cy = s.h / 2
   ctx.save()
   ctx.lineCap = 'round'
-  // The flash core, gone by the third frame.
-  if (t < 0.5) {
-    radialFill(ctx, cx, cy, 0, s.w * 0.3 * (1 - t * 1.4), [
-      [0, rgba('#FFF4CE', (1 - t * 2) * 0.9)],
-      [0.5, rgba(PAL.ember, (1 - t * 2) * 0.5)],
-      [1, rgba(PAL.bloodOrange, 0)],
-    ])
+
+  // Hard flash, two frames, spikes of uneven length.
+  if (t < 0.4) {
+    const f = 1 - t / 0.4
+    const pts: Pt[] = []
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      // Only the spikes vary; jittering the valleys too turns the core into a
+      // snowflake instead of a fireball.
+      const r = i % 2 === 0
+        ? s.w * 0.23 * (0.55 + f * 0.85) * (0.7 + rnd(i, 45) * 0.65)
+        : s.w * 0.1 * (0.55 + f * 0.85)
+      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r])
+    }
+    ctx.globalAlpha = f
+    ctx.fillStyle = PAL.ember
+    ctx.fill(blob(pts, 0.12))
+    ctx.fillStyle = '#FFF6D8'
+    ctx.fill(blob(pts.map(([x, y]) => [cx + (x - cx) * 0.44, cy + (y - cy) * 0.44] as Pt), 0.12))
   }
-  for (let i = 0; i < 14; i++) {
+
+  for (let i = 0; i < 16; i++) {
     const a = rnd(i, 41) * Math.PI * 2
-    const speed = s.w * (0.22 + rnd(i, 42) * 0.3)
-    const life = 0.55 + rnd(i, 43) * 0.45
+    const speed = s.w * (0.24 + rnd(i, 42) * 0.3)
+    const life = 0.7 + rnd(i, 43) * 0.3
     const u = Math.min(1, t / life)
     if (u >= 1) continue
     // Ballistic: outward, then gravity takes over.
@@ -394,66 +415,74 @@ function emberBurst(s: Surface, t: number): void {
     const vx = Math.cos(a) * speed
     const vy = Math.sin(a) * speed + u * s.h * 0.84
     const vl = Math.hypot(vx, vy) || 1
-    const tail = (2.2 + rnd(i, 44) * 2.6) * (1 - u * 0.5)
-    ctx.globalAlpha = (1 - u) ** 1.3
-    ctx.strokeStyle = u < 0.35 ? '#FFF0C0' : mix(PAL.ember, PAL.danger, u)
-    ctx.lineWidth = 1.5 * (1 - u * 0.7)
+    const tail = (3 + rnd(i, 44) * 3.4) * (1 - u * 0.4)
+    ctx.globalAlpha = (1 - u) ** 0.8
+    ctx.strokeStyle = u < 0.3 ? '#FFEFBE' : mix(PAL.ember, PAL.bloodOrange, u)
+    ctx.lineWidth = 1.9 * (1 - u * 0.55)
     ctx.beginPath()
     ctx.moveTo(px - (vx / vl) * tail, py - (vy / vl) * tail)
     ctx.lineTo(px, py)
     ctx.stroke()
-    if (u < 0.5) {
-      ctx.strokeStyle = '#FFFFFF'
-      ctx.lineWidth = 0.55
-      ctx.beginPath()
-      ctx.moveTo(px - (vx / vl) * tail * 0.35, py - (vy / vl) * tail * 0.35)
-      ctx.lineTo(px, py)
-      ctx.stroke()
-    }
+    ctx.strokeStyle = '#FFFFFF'
+    ctx.globalAlpha = (1 - u) ** 1.6
+    ctx.lineWidth = 0.7 * (1 - u * 0.5)
+    ctx.beginPath()
+    ctx.moveTo(px - (vx / vl) * tail * 0.3, py - (vy / vl) * tail * 0.3)
+    ctx.lineTo(px, py)
+    ctx.stroke()
   }
   ctx.restore()
 }
 
 /**
- * Coin pop — the flourish when a berry is banked. A ring of hard gold shards
- * plus one bright chevron, so it is legible even when six fire at once.
+ * Coin pop — the flourish when a berry is banked.
+ *
+ * Biased upward and broken up: a concentric ring of evenly-spaced shards reads
+ * as a portal, so the ring only survives two frames, it breaks into arcs, and
+ * the shards leave it behind on their own trajectories.
  */
 function coinPop(s: Surface, t: number): void {
   const ctx = s.ctx
   const cx = s.w / 2
-  const cy = s.h / 2
+  const cy = s.h * 0.55
   ctx.save()
-  ctx.globalAlpha = (1 - t) ** 1.2
-  // Ring snapping open.
-  ctx.strokeStyle = PAL.gold
-  ctx.lineWidth = 2 * (1 - t)
-  ctx.beginPath()
-  ctx.arc(cx, cy, s.w * (0.12 + t * 0.3), 0, Math.PI * 2)
-  ctx.stroke()
-  // Shards: diamonds flying out along their own radius.
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + rnd(i, 51) * 0.5
-    const d = s.w * (0.12 + t * (0.3 + rnd(i, 52) * 0.22))
-    const px = cx + Math.cos(a) * d
-    const py = cy + Math.sin(a) * d * 0.9 - t * s.h * 0.12
-    const r = s.w * 0.075 * (1 - t * 0.65)
+  ctx.lineCap = 'round'
+
+  // The ring, only while the pop is still happening, and already coming apart.
+  if (t < 0.55) {
+    const f = 1 - t / 0.55
+    ctx.globalAlpha = f ** 1.3
+    ctx.strokeStyle = PAL.gold
+    ctx.lineWidth = 2.6 * f
+    const r = s.w * (0.1 + (1 - f) * 0.26)
+    for (let i = 0; i < 4; i++) {
+      const a0 = i * 1.57 + 0.3 + (1 - f) * 0.8
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, r, r * 0.86, 0, a0, a0 + 1.15 * f + 0.15)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = f ** 2
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill(ellipsePath(cx, cy, s.w * 0.08 * f, s.w * 0.08 * f))
+  }
+
+  // Shards: diamonds thrown up and out, tumbling, well past the ring.
+  for (let i = 0; i < 9; i++) {
+    const a = -Math.PI / 2 + (rnd(i, 51) - 0.5) * 3.4
+    const speed = s.w * (0.3 + rnd(i, 52) * 0.28)
+    const u = Math.min(1, t / (0.75 + rnd(i, 53) * 0.25))
+    if (u >= 1) continue
+    const px = cx + Math.cos(a) * speed * u
+    const py = cy + Math.sin(a) * speed * u + u * u * s.h * 0.5
+    const r = s.w * 0.09 * (1 - u * 0.55)
     ctx.save()
+    ctx.globalAlpha = (1 - u) ** 0.9
     ctx.translate(px, py)
-    ctx.rotate(a + t * 3)
-    ctx.fillStyle = i % 2 ? PAL.gold : PAL.cream
-    ctx.fill(blob([[0, -r], [r * 0.42, 0], [0, r], [-r * 0.42, 0]] as Pt[], 0.15))
+    ctx.rotate(a + u * 5 * (rnd(i, 54) > 0.5 ? 1 : -1))
+    ctx.fillStyle = i % 3 === 0 ? PAL.cream : PAL.gold
+    ctx.fill(blob([[0, -r], [r * 0.45, 0], [0, r], [-r * 0.45, 0]] as Pt[], 0.15))
     ctx.restore()
   }
-  // The lead chevron, pointing up, which is what the eye actually tracks.
-  ctx.globalAlpha = (1 - t) ** 2
-  ctx.fillStyle = '#FFFFFF'
-  const g = s.w * 0.2 * (1 - t)
-  ctx.fill(blob([
-    [cx, cy - s.h * (0.14 + t * 0.3)],
-    [cx + g * 0.34, cy - s.h * (0.02 + t * 0.3)],
-    [cx, cy - s.h * (0.07 + t * 0.3)],
-    [cx - g * 0.34, cy - s.h * (0.02 + t * 0.3)],
-  ] as Pt[], 0.2))
   ctx.restore()
 }
 
@@ -568,8 +597,8 @@ function lightningArc(s: Surface, t: number): void {
   const segs = 9
   for (let i = 0; i <= segs; i++) {
     const u = i / segs
-    const jitter = i === 0 || i === segs ? 0 : (rnd(i, 91 + step * 7) - 0.5) * s.w * 0.55
-    spine.push([s.w * 0.5 + jitter + (u - 0.5) * s.w * 0.2, u * s.h])
+    const jitter = i === 0 || i === segs ? 0 : (rnd(i, 91 + step * 7) - 0.5) * s.w * 0.42
+    spine.push([s.w * 0.5 + jitter + (u - 0.5) * s.w * 0.14, u * s.h])
   }
   const stroke = (pts: Pt[], w: number, color: string, alpha: number) => {
     ctx.globalAlpha = alpha
@@ -605,41 +634,70 @@ function lightningArc(s: Surface, t: number): void {
 }
 
 /**
- * Sand swirl — Alabasta's wind picking grit up off the ground. Ribbons that
- * curl around a rising column, thinning as they climb.
+ * Sand swirl — Alabasta's wind picking grit up off the ground.
+ *
+ * Drawn as dashes on the vortex path, not as continuous ribbons: a smooth
+ * unbroken tube reads as rope or a helix diagram, and sand is by definition
+ * particulate. A low plume anchors it to the ground so it is not floating.
  */
 function sandSwirl(s: Surface, t: number): void {
   const ctx = s.ctx
   const cx = s.w / 2
-  const base = s.h * 0.9
+  const base = s.h * 0.92
   ctx.save()
   ctx.lineCap = 'round'
-  for (let b = 0; b < 4; b++) {
-    const pts: Pt[] = []
-    const lead = b * 1.5 + t * Math.PI * 2
-    for (let k = 0; k <= 12; k++) {
-      const u = k / 12
-      const rad = s.w * (0.32 - u * 0.2) * (0.6 + rnd(b, 101) * 0.6)
-      const a = lead + u * 4.2
-      pts.push([cx + Math.cos(a) * rad, base - u * s.h * 0.82 + Math.sin(a) * rad * 0.16])
-    }
-    ctx.globalAlpha = (1 - t) * (0.55 + rnd(b, 102) * 0.4)
-    ctx.strokeStyle = b % 2 ? PAL.sand : mix(PAL.sand, '#FFFFFF', 0.5)
-    ctx.lineWidth = 2.2 * (1 - t * 0.5)
-    ctx.stroke(curve(pts))
-    ctx.strokeStyle = rgba(PAL.sandDeep, 0.5)
-    ctx.lineWidth = 0.7
-    ctx.stroke(curve(pts.map(([x, y]) => [x, y + 1.1] as Pt)))
+
+  // Ground plume: flat lobes spreading at the foot of the column.
+  for (let i = 0; i < 5; i++) {
+    const u = (t * 0.8 + rnd(i, 105)) % 1
+    ctx.globalAlpha = (1 - t) * (1 - u) * 0.6
+    ctx.fillStyle = mix(PAL.sand, '#FFFFFF', 0.3 - u * 0.2)
+    const w = s.w * (0.1 + u * 0.3)
+    ctx.fill(ellipsePath(
+      cx + (rnd(i, 106) - 0.5) * s.w * 0.5,
+      base - u * s.h * 0.12,
+      w, w * 0.36,
+    ))
   }
-  // Loose grains flicked out of the column.
+
+  // The vortex, as broken streaks riding four rising helices.
+  for (let b = 0; b < 4; b++) {
+    const lead = b * 1.62 + t * Math.PI * 2
+    const steps = 21
+    let prev: Pt | null = null
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps
+      const rad = s.w * (0.34 - u * 0.19) * (0.65 + rnd(b, 101) * 0.5)
+      const a = lead + u * 4.0
+      const p: Pt = [
+        cx + Math.cos(a) * rad,
+        base - u * s.h * 0.84 + Math.sin(a) * rad * 0.16,
+      ]
+      // Roughly half the steps carry a grain streak; the gaps are the point.
+      if (prev && rnd(k * 3 + b, 107) > 0.42) {
+        ctx.globalAlpha = (1 - t) * (0.4 + rnd(k + b, 108) * 0.55) * (1 - u * 0.35)
+        ctx.strokeStyle = rnd(k, 109) > 0.5
+          ? mix(PAL.sand, '#FFFFFF', 0.4)
+          : mix(PAL.sand, PAL.sandDeep, 0.5)
+        ctx.lineWidth = (0.7 + rnd(k + b * 5, 110) * 1.1) * (1 - u * 0.35)
+        ctx.beginPath()
+        ctx.moveTo(prev[0], prev[1])
+        ctx.lineTo(p[0], p[1])
+        ctx.stroke()
+      }
+      prev = p
+    }
+  }
+
+  // Loose grains flicked clear of the column.
   ctx.fillStyle = PAL.sand
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     const u = (t + rnd(i, 103)) % 1
     ctx.globalAlpha = (1 - t) * (1 - u) * 0.9
     ctx.fill(ellipsePath(
-      cx + (rnd(i, 104) - 0.5) * s.w * 0.9,
-      base - u * s.h * 0.85,
-      0.8, 0.6,
+      cx + (rnd(i, 104) - 0.5) * s.w * 0.95,
+      base - u * s.h * 0.9,
+      0.85, 0.55,
     ))
   }
   ctx.restore()

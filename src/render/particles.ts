@@ -151,6 +151,8 @@ interface Particle {
   aim: boolean
   /** Stable 0..1 per particle — drives lobe placement and sway phase. */
   seed: number
+  /** Its own slot, so recycling never has to search the pool. */
+  idx: number
   trailBuf: Float32Array | null
   trailLen: number
   t: number
@@ -199,7 +201,7 @@ export class ParticleSystem {
         fadeIn: 0, alpha: 1, shade: 0, ink: null, rim: null, glow: 0, trail: 0,
         sprites: null, sway: 0, swayFreq: 3, collide: false, bounce: 0.35,
         friction: 0.7, stick: false, attract: null, arriveTag: null, aim: false,
-        seed: 0, trailBuf: null, trailLen: 0, t: 0, alive: false,
+        seed: 0, idx: i, trailBuf: null, trailLen: 0, t: 0, alive: false,
       })
       this.free.push(i)
     }
@@ -246,7 +248,9 @@ export class ParticleSystem {
       // never silently drops all of its particles.
       idx = this.cursor
       this.cursor = (this.cursor + 1) % MAX
-      if (this.pool[idx].alive) this.live--
+      // Mark the victim dead so the live count below is bookkept exactly once.
+      this.pool[idx].alive = false
+      this.live--
     }
     const p = this.pool[idx]
     p.x = def.x
@@ -456,7 +460,7 @@ export class ParticleSystem {
     p.alive = false
     p.trailLen = 0
     this.live--
-    this.free.push(this.pool.indexOf(p))
+    this.free.push(p.idx)
   }
 
   /** Draw one pass. `behind` selects the layer. */

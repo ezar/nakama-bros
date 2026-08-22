@@ -50,14 +50,14 @@ export const defaultPostFx = (): PostFxSettings => ({
   grade: 0.55,
   gradeColor: mix(PAL.cream, PAL.sand, 0.55),
   gradeShadow: PAL.shadow,
-  gradeGain: 1.06,
-  gradeGamma: 1.07,
+  gradeGain: 1,
+  gradeGamma: 1.08,
   flash: 0,
   flashColor: PAL.white,
   speed: 0,
   damage: 0,
   scanlines: 0,
-  grain: 0.16,
+  grain: 0.12,
   haze: 0,
   hazeY: 0.5,
   hazeH: 0.5,
@@ -89,14 +89,24 @@ const TAPS = [-2, -1, 0, 1, 2]
  * through a scratch buffer, so self-compositing is safe here.
  */
 export class PostFx {
+  /**
+   * A copy of the frame, refreshed between passes.
+   *
+   * `target` and `source` are the same canvas, and drawing a canvas onto
+   * itself forces the browser to snapshot it first: measured at 1152x648 that
+   * is 2.5 ms per pass against 1.0 ms for the same blend read from another
+   * canvas, while the copy itself is nearly free. So every pass that needs the
+   * image reads it from here.
+   */
+  private frame = canvas(BUFFER_W, BUFFER_H)
   private downA = canvas(BUFFER_W / 4, BUFFER_H / 4)
   private downB = canvas(BUFFER_W / 4, BUFFER_H / 4)
-  private halfR = canvas(BUFFER_W / 2, BUFFER_H / 2)
-  private halfB = canvas(BUFFER_W / 2, BUFFER_H / 2)
+  private chanR = canvas(BUFFER_W, BUFFER_H)
+  private chanB = canvas(BUFFER_W, BUFFER_H)
   private band: HTMLCanvasElement | null = null
   private vignetteCache: HTMLCanvasElement | null = null
   private vignetteStrength = -1
-  private grainPattern: CanvasPattern | null = null
+  private grainPlate: HTMLCanvasElement | null = null
 
   apply(target: CanvasRenderingContext2D, source: HTMLCanvasElement, s: PostFxSettings): void {
     const t = performance.now() / 1000
@@ -105,15 +115,25 @@ export class PostFx {
     target.imageSmoothingEnabled = true
     target.imageSmoothingQuality = 'low'
 
-    if ((s.haze ?? 0) > 0.01) this.heatHaze(target, source, s.haze!, s.hazeY ?? 0.5, s.hazeH ?? 0.5, t)
+    if ((s.haze ?? 0) > 0.01) {
+      this.sync(source)
+      this.heatHaze(target, s.haze!, s.hazeY ?? 0.5, s.hazeH ?? 0.5, t)
+    }
     if (s.speed > 0.01) {
-      this.speedBlur(target, source, s.speed)
-      this.chromatic(target, source, s.speed)
+      this.sync(source)
+      this.speedBlur(target, s.speed)
+      this.sync(source)
+      this.chromatic(target, s.speed)
     }
     if (s.bloom > 0.001) {
-      this.bloom(target, source, s.bloom, s.bloomThreshold, s.bloomRadius ?? 1.5)
+      this.sync(source)
+      this.bloom(target, s.bloom, s.bloomThreshold, s.bloomRadius ?? 1.5)
     }
-    if (s.grade > 0.001) this.grade(target, source, s)
+    if (s.grade > 0.001) {
+      // Re-read after bloom: the grade has to see the light that was added.
+      this.sync(source)
+      this.grade(target, s)
+    }
     if (s.vignette > 0) target.drawImage(this.vignette(s.vignette), 0, 0)
     if ((s.grain ?? 0) > 0.001) this.grain(target, s.grain!)
     if (s.damage > 0.01) this.damageVignette(target, s.damage)
@@ -146,9 +166,17 @@ export class PostFx {
    * toward black, above it they survive. The gain that follows puts the bright
    * end back where it started.
    */
+  /** Refresh the working copy of the frame. */
+  private sync(source: HTMLCanvasElement): void {
+    const f = this.frame.getContext('2d')!
+    f.globalCompositeOperation = 'copy'
+    f.globalAlpha = 1
+    f.drawImage(source, 0, 0)
+    f.globalCompositeOperation = 'source-over'
+  }
+
   private bloom(
     target: CanvasRenderingContext2D,
-    source: HTMLCanvasElement,
     amount: number,
     threshold: number,
     radius: number,
@@ -161,7 +189,7 @@ export class PostFx {
     a.globalCompositeOperation = 'source-over'
     a.globalAlpha = 1
     a.clearRect(0, 0, w, h)
-    a.drawImage(source, 0, 0, w, h)
+    a.drawImage(this.frame, 0, 0, w, h)
 
     // Raise the frame to a power: that is a real knee. Each multiply pass
     // squares the value, so mid tones collapse toward black while anything
@@ -218,11 +246,7 @@ export class PostFx {
    * round — a flat overlay plate cannot do any of this: it washes the blacks
    * out and flattens the very contrast the cel shading depends on.
    */
-  private grade(
-    target: CanvasRenderingContext2D,
-    source: HTMLCanvasElement,
-    s: PostFxSettings,
-  ): void {
+  private grade(target: CanvasRenderingContext2D, s: PostFxSettings): void {
     const k = clamp01(s.grade)
     const gain = s.gradeGain ?? 1
     const gamma = s.gradeGamma ?? 1
@@ -231,7 +255,7 @@ export class PostFx {
     if (gain > 1.002) {
       target.globalCompositeOperation = 'lighter'
       target.globalAlpha = clamp01((gain - 1) * k)
-      target.drawImage(source, 0, 0)
+      target.drawImage(this.frame, 0, 0)
     } else if (gain < 0.998) {
       target.globalCompositeOperation = 'multiply'
       target.globalAlpha = k
@@ -245,11 +269,11 @@ export class PostFx {
     if (gamma > 1.002) {
       target.globalCompositeOperation = 'multiply'
       target.globalAlpha = clamp01((gamma - 1) * k * 3)
-      target.drawImage(source, 0, 0)
+      target.drawImage(this.frame, 0, 0)
     } else if (gamma < 0.998) {
       target.globalCompositeOperation = 'screen'
       target.globalAlpha = clamp01((1 - gamma) * k * 3)
-      target.drawImage(source, 0, 0)
+      target.drawImage(this.frame, 0, 0)
     }
 
     // Highlight tint: a multiply keeps black at black and pulls everything
@@ -271,11 +295,7 @@ export class PostFx {
   }
 
   /** Zoom blur that bites at the edges of the frame and leaves the centre sharp. */
-  private speedBlur(
-    target: CanvasRenderingContext2D,
-    source: HTMLCanvasElement,
-    amount: number,
-  ): void {
+  private speedBlur(target: CanvasRenderingContext2D, amount: number): void {
     const a = this.downA.getContext('2d')!
     const w = this.downA.width
     const h = this.downA.height
@@ -289,7 +309,7 @@ export class PostFx {
       a.globalAlpha = 1 / acc
       const dw = w * z
       const dh = h * z
-      a.drawImage(source, (w - dw) / 2, (h - dh) / 2, dw, dh)
+      a.drawImage(this.frame, (w - dw) / 2, (h - dh) / 2, dw, dh)
     }
     a.globalAlpha = 1
 
@@ -313,32 +333,35 @@ export class PostFx {
    * red and blue are added back from offset copies. Drawing the whole frame
    * twice with 'lighter', as this used to, only brightens it.
    */
-  private chromatic(
-    target: CanvasRenderingContext2D,
-    source: HTMLCanvasElement,
-    amount: number,
-  ): void {
-    const d = amount * 7
-    const hw = this.halfR.width
-    const hh = this.halfR.height
-    const r = this.halfR.getContext('2d')!
-    const b = this.halfB.getContext('2d')!
-    for (const [ctx, plate] of [[r, '#FF0000'], [b, '#0000FF']] as const) {
-      ctx.globalCompositeOperation = 'source-over'
+  private chromatic(target: CanvasRenderingContext2D, amount: number): void {
+    const d = Math.max(1, Math.round(amount * 7))
+    const w = BUFFER_W
+    const h = BUFFER_H
+    for (const [c, plate] of [[this.chanR, '#FF0000'], [this.chanB, '#0000FF']] as const) {
+      const ctx = c.getContext('2d')!
+      ctx.globalCompositeOperation = 'copy'
       ctx.globalAlpha = 1
-      ctx.clearRect(0, 0, hw, hh)
-      ctx.drawImage(source, 0, 0, hw, hh)
+      ctx.drawImage(this.frame, 0, 0)
       ctx.globalCompositeOperation = 'multiply'
       ctx.fillStyle = plate
-      ctx.fillRect(0, 0, hw, hh)
+      ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
     }
     target.globalCompositeOperation = 'multiply'
     target.fillStyle = '#00FF00'
-    target.fillRect(0, 0, BUFFER_W, BUFFER_H)
+    target.fillRect(0, 0, w, h)
+    // Source and destination rects are the same size, so these stay on the
+    // unscaled blit path — a scaled blend of a full frame costs three times as
+    // much. The d-wide column each shift leaves behind keeps its green only,
+    // and the vignette sits on top of it.
     target.globalCompositeOperation = 'lighter'
-    target.drawImage(this.halfR, d, 0, BUFFER_W, BUFFER_H)
-    target.drawImage(this.halfB, -d, 0, BUFFER_W, BUFFER_H)
+    target.drawImage(this.chanR, 0, 0, w - d, h, d, 0, w - d, h)
+    target.drawImage(this.chanB, d, 0, w - d, h, 0, 0, w - d, h)
+    // Patch the d-wide column each shift left uncovered with the unshifted
+    // channel, or the frame gets a cyan bar down one side and a yellow one
+    // down the other.
+    target.drawImage(this.chanR, 0, 0, d, h, 0, 0, d, h)
+    target.drawImage(this.chanB, w - d, 0, d, h, w - d, 0, d, h)
     target.globalCompositeOperation = 'source-over'
   }
 
@@ -349,7 +372,6 @@ export class PostFx {
    */
   private heatHaze(
     target: CanvasRenderingContext2D,
-    source: HTMLCanvasElement,
     amount: number,
     yFrac: number,
     hFrac: number,
@@ -364,14 +386,16 @@ export class PostFx {
     bctx.globalCompositeOperation = 'source-over'
     bctx.globalAlpha = 1
     bctx.clearRect(0, 0, this.band.width, this.band.height)
-    bctx.drawImage(source, 0, y0, BUFFER_W, h, 0, 0, BUFFER_W, h)
+    bctx.drawImage(this.frame, 0, y0, BUFFER_W, h, 0, 0, BUFFER_W, h)
 
     const STRIP = 4
     const amp = amount * 5
     for (let y = 0; y < h; y += STRIP) {
       // Warmer near the ground: the wave grows toward the bottom of the band.
       const depth = y / h
-      const dx = Math.sin(time * 2.6 + y * 0.07) * amp * (0.35 + depth * 0.9)
+      // The shimmer ramps in from nothing at the top of the band, so the band
+      // has no visible edge, and gets strongest near the hot ground.
+      const dx = Math.sin(time * 2.6 + y * 0.07) * amp * depth * (0.4 + depth * 0.8)
       const sh = Math.min(STRIP, h - y)
       // Overdraw one pixel horizontally so the shift never exposes the edge.
       target.drawImage(this.band, 0, y, BUFFER_W, sh, dx, y0 + y, BUFFER_W, sh)
@@ -396,35 +420,35 @@ export class PostFx {
   }
 
   /**
-   * Film grain as a cached 'overlay' pattern, offset by a whole tile each
-   * frame so it crawls instead of sitting still. One fillRect for the frame.
+   * Film grain from one pre-rendered plate, slightly larger than the frame so
+   * a random sub-rect can be taken each frame — the noise crawls without ever
+   * being regenerated, and the blit stays on the unscaled path. A repeating
+   * pattern fill was measured three times more expensive for the same look.
    */
   private grain(target: CanvasRenderingContext2D, amount: number): void {
-    if (!this.grainPattern) {
-      const size = 128
-      const c = canvas(size, size)
+    const PAD = 96
+    if (!this.grainPlate) {
+      const c = canvas(BUFFER_W + PAD, BUFFER_H + PAD)
       const ctx = c.getContext('2d')!
-      const img = ctx.createImageData(size, size)
+      const img = ctx.createImageData(c.width, c.height)
       for (let i = 0; i < img.data.length; i += 4) {
         // Mid grey is the no-op value under 'overlay'; the spread is the grain.
-        const v = 128 + (Math.random() - 0.5) * 132
+        const v = 128 + (Math.random() - 0.5) * 150
         img.data[i] = v
         img.data[i + 1] = v
         img.data[i + 2] = v
         img.data[i + 3] = 255
       }
       ctx.putImageData(img, 0, 0)
-      this.grainPattern = target.createPattern(c, 'repeat')
+      this.grainPlate = c
     }
-    if (!this.grainPattern) return
-    target.save()
+    const ox = Math.floor(Math.random() * PAD)
+    const oy = Math.floor(Math.random() * PAD)
     target.globalCompositeOperation = 'overlay'
     target.globalAlpha = clamp01(amount) * 0.5
-    // Jumping by a random whole-pixel offset re-rolls the visible noise.
-    target.translate(Math.floor(Math.random() * 128), Math.floor(Math.random() * 128))
-    target.fillStyle = this.grainPattern
-    target.fillRect(-128, -128, BUFFER_W + 256, BUFFER_H + 256)
-    target.restore()
+    target.drawImage(this.grainPlate, ox, oy, BUFFER_W, BUFFER_H, 0, 0, BUFFER_W, BUFFER_H)
+    target.globalCompositeOperation = 'source-over'
+    target.globalAlpha = 1
   }
 
   private damageVignette(target: CanvasRenderingContext2D, amount: number): void {

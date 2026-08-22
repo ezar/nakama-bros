@@ -82,7 +82,9 @@ function ironBand(
   s: Surface, x: number, y: number, w: number, h: number, rivet = true,
 ): void {
   const ctx = s.ctx
-  const iron = cel(PAL.slate)
+  // Dark forged iron. Cool blue-grey bands on warm wood read as plastic, and a
+  // mauve grey reads as pewter; a barrel hoop is nearly black.
+  const iron = cel('#524A46')
   paint(ctx, roundRectPath(x, y, w, h, h * 0.35), iron, {
     shadow: 0.46, radius: h * 0.6, pivot: [x + w / 2, y + h / 2], rim: 0.32, line: 0.35,
   })
@@ -94,15 +96,18 @@ function ironBand(
   }
 }
 
-/** A nail head driven into a plank or a poster. */
-function nail(s: Surface, x: number, y: number, r = 0.85): void {
+/**
+ * A nail head driven into a plank or a poster. Flat and warm: a domed blue
+ * highlight at this size turns every fixing into a glowing bead.
+ */
+function nail(s: Surface, x: number, y: number, r = 0.7): void {
   const ctx = s.ctx
-  ctx.fillStyle = PAL.inkSoft
-  ctx.fill(ellipsePath(x + 0.2, y + 0.3, r, r))
-  ctx.fillStyle = PAL.steel
-  ctx.fill(ellipsePath(x, y, r, r))
-  ctx.fillStyle = PAL.mist
-  ctx.fill(ellipsePath(x - r * 0.3, y - r * 0.35, r * 0.4, r * 0.32))
+  ctx.fillStyle = rgba('#2A1E16', 0.55)
+  ctx.fill(ellipsePath(x + 0.18, y + 0.25, r, r * 0.9))
+  ctx.fillStyle = '#8E8878'
+  ctx.fill(ellipsePath(x, y, r, r * 0.9))
+  ctx.fillStyle = '#C4BEA8'
+  ctx.fill(ellipsePath(x - r * 0.25, y - r * 0.3, r * 0.42, r * 0.3))
 }
 
 /**
@@ -129,18 +134,32 @@ function textBars(
   ctx.restore()
 }
 
-/** A grass tuft to break the join between a prop and the ground. */
+/**
+ * A grass tuft to break the join between a prop and the ground.
+ *
+ * Blades are unevenly spaced, unevenly tall and unevenly wide, and most of them
+ * sit in the shade value: five identical bright spikes at even spacing is a
+ * comb, and a comb is the thing that makes generated foliage look generated.
+ */
 function tuft(s: Surface, x: number, y: number, w: number, hgt: number, seed = 1): void {
   const ctx = s.ctx
-  const g = cel(PAL.grass)
-  for (let i = 0; i < 5; i++) {
+  const g = cel(PAL.grassDeep)
+  const n = 6
+  for (let i = 0; i < n; i++) {
     const f = Math.abs((Math.sin(seed * 33.7 + i * 12.9) * 4375.5) % 1)
-    const bx = x + (i / 4 - 0.5) * w
-    const tip = y - hgt * (0.5 + f * 0.7)
-    const lean = (i - 2) * 0.9 + (f - 0.5) * 2
-    ctx.fillStyle = i % 2 ? g.shade : g.core
+    const f2 = Math.abs((Math.sin(seed * 71.3 + i * 27.1) * 4375.5) % 1)
+    const bx = x + ((i + f2 * 0.9 - 0.45) / (n - 1) - 0.5) * w
+    const tall = 0.3 + f * f * 1.05
+    const tip = y - hgt * tall
+    const lean = (bx - x) * 0.55 + (f2 - 0.5) * 2.4
+    const half = 0.35 + f2 * 0.45
+    // Only the tallest couple of blades catch the light.
+    ctx.fillStyle = tall > 0.85 ? g.light : f2 > 0.6 ? g.core : g.shade
     ctx.fill(blob([
-      [bx - 0.7, y], [bx + lean * 0.6, tip + hgt * 0.3], [bx + lean, tip], [bx + 0.7, y],
+      [bx - half, y],
+      [bx + lean * 0.45 - half * 0.4, tip + hgt * tall * 0.45],
+      [bx + lean, tip],
+      [bx + half, y],
     ] as Pt[], 0.5))
   }
 }
@@ -280,8 +299,10 @@ function drawBerryAt(s: Surface, theta: number): void {
   // foreshortens the way a real stamping would.
   const k = f / BERRY_R
   const face = ellipsePath(faceX, cy, f, BERRY_R)
+  // Foreshortened faces take the light at a graze, so they keep less of their
+  // area in shadow — otherwise the transition poses go to a dark brown sliver.
   paint(ctx, face, g, {
-    shadow: 0.34, radius: BERRY_R, pivot: [faceX, cy], rim: 0.75, line: 0.4,
+    shadow: 0.34 * (0.45 + 0.55 * k), radius: BERRY_R, pivot: [faceX, cy], rim: 0.75, line: 0.4,
   })
 
   ctx.save()
@@ -383,8 +404,11 @@ function fruit(color: string) {
     const c = cel(color)
     const R = 6.6
     const body = ellipsePath(cx, cy, R, R * 1.04)
+    // The rim is bounce light off the ground, so it is tinted back toward the
+    // local colour: a white rim on a pale fruit turns the whole thing to glass.
     paint(ctx, body, c, {
-      shadow: 0.38, radius: R, pivot: [cx, cy], rim: 0.85, line: 0.6, occlusion: 0.35,
+      shadow: 0.38, radius: R, pivot: [cx, cy], rim: 0.5, rimColor: mix(c.light, color, 0.45),
+      line: 0.6, occlusion: 0.35,
     })
 
     ctx.save()
@@ -591,13 +615,18 @@ function clothFolds(s: Surface, c: Cloth, tone: Cel, strips = 14): void {
   ctx.restore()
 }
 
-/** The straw-hat jolly roger, drawn in local units around (0,0). */
-function jollyRoger(s: Surface, r: number, ink: string): void {
+/**
+ * The straw-hat jolly roger, drawn in local units around (0,0).
+ *
+ * `mono` collapses the whole mark to one colour, which is what a brand burned
+ * into a crate is: a scorch, not a printed sticker.
+ */
+function jollyRoger(s: Surface, r: number, ink: string, mono?: string): void {
   const ctx = s.ctx
   const k = r / 4
   ctx.save()
   ctx.scale(k, k)
-  ctx.fillStyle = PAL.cream
+  ctx.fillStyle = mono ?? PAL.cream
   // Crossbones behind.
   for (const a of [0.7, -0.7]) {
     ctx.save()
@@ -622,12 +651,12 @@ function jollyRoger(s: Surface, r: number, ink: string): void {
   ctx.fillRect(-0.25, 1.35, 0.5, 1.3)
   ctx.fillRect(0.55, 1.35, 0.5, 1.3)
   // Straw hat: brim, crown, red band.
-  ctx.fillStyle = PAL.strawGold
+  ctx.fillStyle = mono ?? PAL.strawGold
   ctx.fill(ellipsePath(0, -3.5, 5.1, 1.15))
   ctx.fill(roundRectPath(-2.5, -5.6, 5, 2.3, 0.9))
-  ctx.fillStyle = PAL.strawDeep
+  ctx.fillStyle = mono ? ink : PAL.strawDeep
   ctx.fill(ellipsePath(0, -3.15, 5.1, 0.55))
-  ctx.fillStyle = PAL.luffyRed
+  ctx.fillStyle = mono ? ink : PAL.luffyRed
   ctx.fill(roundRectPath(-2.55, -4.35, 5.1, 0.9, 0.35))
   ctx.restore()
 }
@@ -674,57 +703,83 @@ function drawGoal(s: Surface, t: number): void {
   ironBand(s, mx - 2.9, base - 20, 5.8, 1.7)
   ironBand(s, mx - 2.6, base - 38, 5.2, 1.5)
 
-  // Yard, slung well below the colours so the two never fight, with a furled
-  // sail lashed to it — the single detail that says "ship" rather than "pole".
-  const yardY = top + 27
-  paint(ctx, roundRectPath(mx - 11, yardY, 22, 1.8, 0.9), dark, {
-    shadow: 0.42, radius: 2, pivot: [mx, yardY + 0.9], rim: 0.5, line: 0.45,
-  })
-  const furl = blob([
-    [mx - 9.6, yardY + 1.6], [mx - 4, yardY + 4.4], [mx + 2, yardY + 4.6],
-    [mx + 9.6, yardY + 1.8], [mx + 4, yardY + 0.8], [mx - 4, yardY + 0.6],
-  ] as Pt[], 0.8)
-  paint(ctx, furl, cel('#E4D8BE'), {
-    shadow: 0.44, radius: 2.6, pivot: [mx, yardY + 2.6], rim: 0.6, line: 0.5,
-  })
+  // Crow's nest. One iconic shape beats a page of rigging: the basket reads as
+  // a ship's mast at a glance, where a lattice of ropes just reads as noise.
+  const nestY = top + 25
+  const nestH = 7.4
   ctx.save()
-  ctx.clip(furl)
-  ctx.strokeStyle = rgba(cel('#E4D8BE').deep, 0.75)
-  ctx.lineWidth = 0.55
-  for (const dx of [-7, -3.2, 1, 5.4]) {
-    ctx.beginPath()
-    ctx.moveTo(mx + dx, yardY)
-    ctx.lineTo(mx + dx - 0.6, yardY + 5)
-    ctx.stroke()
-  }
+  ctx.strokeStyle = dark.deep
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.ellipse(mx, nestY, 8.2, 2.4, 0, Math.PI, Math.PI * 2)
+  ctx.stroke()
   ctx.restore()
 
-  // Shrouds: thin rope, slack, landing on the deck block rather than running
-  // off the frame, with ratlines so they read as rigging and not as struts.
+  const basket = new Path2D()
+  basket.moveTo(mx - 8.2, nestY)
+  basket.lineTo(mx - 5.6, nestY + nestH)
+  basket.lineTo(mx + 5.6, nestY + nestH)
+  basket.lineTo(mx + 8.2, nestY)
+  basket.closePath()
+  paint(ctx, ellipsePath(mx, nestY + nestH, 5.8, 1.9), dark, {
+    shadow: 0.5, radius: 2, pivot: [mx, nestY + nestH], line: 0.45,
+  })
+  paint(ctx, basket, wood, {
+    shadow: 0.4, radius: 8, pivot: [mx, nestY + nestH / 2], rim: 0.7, line: 0.55,
+    occlusion: 0.3,
+  })
+  ctx.save()
+  ctx.clip(basket)
+  for (let i = -3; i <= 3; i++) {
+    const u = i / 3.4
+    ctx.strokeStyle = rgba(dark.deep, 0.5 - Math.abs(u) * 0.18)
+    ctx.lineWidth = 0.45
+    ctx.beginPath()
+    ctx.moveTo(mx + u * 8, nestY)
+    ctx.lineTo(mx + u * 5.4, nestY + nestH)
+    ctx.stroke()
+  }
+  ctx.strokeStyle = rgba(wood.deep, 0.55)
+  ctx.lineWidth = 0.5
+  ctx.beginPath()
+  ctx.moveTo(mx - 7.4, nestY + 3.4)
+  ctx.lineTo(mx + 7.4, nestY + 3.4)
+  ctx.stroke()
+  ctx.restore()
+  ctx.save()
+  ctx.strokeStyle = wood.light
+  ctx.lineWidth = 1.6
+  ctx.beginPath()
+  ctx.ellipse(mx, nestY, 8.2, 2.4, 0, 0, Math.PI)
+  ctx.stroke()
+  ctx.strokeStyle = wood.line
+  ctx.lineWidth = 0.45
+  ctx.beginPath()
+  ctx.ellipse(mx, nestY, 8.2, 2.4, 0, 0, Math.PI)
+  ctx.stroke()
+  ctx.restore()
+
+  // Two shrouds, and ratlines on one side only — rigging is never symmetric,
+  // and a cage of rungs around the mast kills the silhouette.
   ctx.save()
   ctx.lineCap = 'round'
   for (const dir of [-1, 1]) {
-    const a: Pt = [mx + dir * 10.2, yardY + 0.6]
-    const b: Pt = [mx + dir * 8.6, s.h * 0.66]
-    const d: Pt = [mx + dir * 6.4, base - 7.4]
-    ctx.strokeStyle = rgba('#C8B896', 0.8)
-    ctx.lineWidth = 0.5
+    const a: Pt = [mx + dir * 7.6, nestY + 1.4]
+    const b: Pt = [mx + dir * 7.2, s.h * 0.68]
+    const d: Pt = [mx + dir * 6.2, base - 7.6]
+    ctx.strokeStyle = rgba('#B8A47E', 0.7)
+    ctx.lineWidth = 0.45
     ctx.stroke(curve([a, b, d] as Pt[]))
-    ctx.strokeStyle = rgba('#8A7856', 0.55)
-    ctx.lineWidth = 0.24
-    ctx.stroke(curve([
-      [a[0] + dir * 0.35, a[1] + 0.4], [b[0] + dir * 0.35, b[1]], [d[0] + dir * 0.3, d[1]],
-    ] as Pt[]))
-    // Ratlines between the shroud and the mast.
-    ctx.strokeStyle = rgba('#C8B896', 0.45)
-    ctx.lineWidth = 0.28
-    for (let i = 1; i <= 5; i++) {
-      const u = i / 6
-      const p = pointOn([a, b, d], u)
-      ctx.beginPath()
-      ctx.moveTo(p[0], p[1])
-      ctx.lineTo(mx + dir * 2.1, p[1] + 0.4)
-      ctx.stroke()
+    if (dir < 0) {
+      ctx.strokeStyle = rgba('#B8A47E', 0.34)
+      ctx.lineWidth = 0.26
+      for (let i = 1; i <= 3; i++) {
+        const p = pointOn([a, b, d], i / 4)
+        ctx.beginPath()
+        ctx.moveTo(p[0], p[1])
+        ctx.lineTo(mx - 2.1, p[1] + 0.5)
+        ctx.stroke()
+      }
     }
   }
   ctx.restore()
@@ -794,7 +849,8 @@ function drawCheckpoint(s: Surface, t: number): void {
       [mx + dx - r, base - 0.4], [mx + dx - r * 0.7, base - r * 0.9 + dy],
       [mx + dx + r * 0.2, base - r * 1.1 + dy], [mx + dx + r, base - 0.4],
     ] as Pt[], 0.5), rock, {
-      shadow: 0.44, radius: r, pivot: [mx + dx, base - r * 0.5], rim: 0.5, line: 0.45,
+      shadow: 0.44, radius: r, pivot: [mx + dx, base - r * 0.5],
+      rim: 0.35, rimColor: mix(rock.light, rock.core, 0.55), line: 0.45,
     })
   }
 
@@ -810,30 +866,35 @@ function drawCheckpoint(s: Surface, t: number): void {
 
   const blue = cel(PAL.marineBlue)
   const c = cloth(mx + 0.8, top + 3.4, top + 11.4, 17, t, 1.5, 3.4, 1.4)
-  // Swallowtail: notch the fly by clipping the cloth against a wedge.
-  const tail = new Path2D()
-  const f0 = c.at(1, 0)
-  const f1 = c.at(1, 1)
-  const fm = c.at(0.62, 0.5)
-  tail.moveTo(f0[0] + 2, f0[1] - 2)
-  tail.lineTo(fm[0], (f0[1] + f1[1]) / 2)
-  tail.lineTo(f1[0] + 2, f1[1] + 2)
-  tail.lineTo(f0[0] + 4, f1[1] + 3)
-  tail.closePath()
+  // The swallowtail is built INTO the outline rather than punched out of a
+  // rectangle: cutting it with destination-out leaves the rectangle's ink line
+  // hanging in the notch like a wireframe.
+  const pennant = new Path2D()
+  const head: Pt[] = []
+  const foot: Pt[] = []
+  for (let i = 0; i <= 10; i++) {
+    head.push(c.at(i / 10, 0))
+    foot.push(c.at(i / 10, 1))
+  }
+  pennant.addPath(curve(head))
+  const notch = c.at(0.66, 0.5)
+  pennant.lineTo(notch[0], notch[1])
+  pennant.lineTo(foot[10][0], foot[10][1])
+  for (let i = 10; i >= 0; i--) pennant.lineTo(foot[i][0], foot[i][1])
+  pennant.closePath()
 
+  paint(ctx, pennant, blue, { shadow: 0, radius: 7, pivot: [mx + 8, top + 7], line: 0 })
   ctx.save()
-  const sheet = new Path2D()
-  sheet.addPath(c.path)
-  ctx.clip(c.path)
-  paint(ctx, c.path, blue, { shadow: 0, radius: 7, pivot: [mx + 8, top + 7], line: 0 })
+  ctx.clip(pennant)
   clothFolds(s, c, blue, 12)
   // Two chevrons, the marine mark, riding the cloth.
-  ctx.strokeStyle = rgba(PAL.marineWhite, 0.9)
+  ctx.strokeStyle = rgba(PAL.marineWhite, 0.92)
   ctx.lineWidth = 1.5
-  for (const u of [0.34, 0.52]) {
-    const a = c.at(u, 0.12)
-    const b = c.at(u + 0.14, 0.5)
-    const d = c.at(u, 0.88)
+  ctx.lineCap = 'round'
+  for (const u of [0.28, 0.46]) {
+    const a = c.at(u, 0.14)
+    const b = c.at(u + 0.15, 0.5)
+    const d = c.at(u, 0.86)
     ctx.beginPath()
     ctx.moveTo(a[0], a[1])
     ctx.lineTo(b[0], b[1])
@@ -841,17 +902,11 @@ function drawCheckpoint(s: Surface, t: number): void {
     ctx.stroke()
   }
   ctx.restore()
-  ctx.save()
-  ctx.globalCompositeOperation = 'destination-out'
-  ctx.fillStyle = PAL.white
-  ctx.fill(tail)
-  ctx.restore()
-  ctx.save()
   ctx.strokeStyle = blue.line
-  ctx.lineWidth = 0.5
-  ctx.stroke(sheet)
-  ctx.restore()
+  ctx.lineWidth = 0.45
+  ctx.stroke(pennant)
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props — the level designer's furniture. All of these stand on the frame's
@@ -863,7 +918,7 @@ function drawBarrel(s: Surface): void {
   const ctx = s.ctx
   const base = s.h - 0.5
   const cx = s.w / 2
-  const hgt = 19
+  const hgt = 18.2
   const topY = base - hgt
   const wood = cel(PAL.wood)
   const bulge = 8.4
@@ -906,206 +961,298 @@ function drawBarrel(s: Surface): void {
   ctx.strokeStyle = rgba(wood.deep, 0.6)
   ctx.lineWidth = 0.35
   ctx.stroke(ellipsePath(cx, topY + 0.9, waist * 0.6, 1.1))
-  glint(ctx, cx - 4.6, base - hgt * 0.66, 1, 3.2, -0.15, PAL.white, 0.28)
 }
 
-/** Crate — planks, corner cleats and a burned-in mark. */
+/**
+ * Crate — planks behind, battens in front, brand burned into the middle plank.
+ *
+ * The battens are painted as their own forms rather than drawn as flat bars, so
+ * each one catches the rim on its top edge and drops occlusion below it: that
+ * is the difference between a crate and a picture frame.
+ */
 function drawCrate(s: Surface): void {
   const ctx = s.ctx
   const base = s.h - 0.5
   const cx = s.w / 2
   const side = 16.4
   const topY = base - side
-  const wood = cel(adjust(PAL.wood, { light: 1.06 }))
-  const dark = cel(PAL.woodDeep)
+  const wood = cel(adjust(PAL.wood, { light: 1.14 }))
+  const batten = cel(PAL.wood)
 
   const box = roundRectPath(cx - side / 2, topY, side, side, 0.9)
   paint(ctx, box, wood, {
     shadow: 0.4, radius: side / 2, pivot: [cx, base - side / 2], rim: 0.8, line: 0.6,
   })
+
   ctx.save()
   ctx.clip(box)
-  // Three planks with visible seams, each a slightly different value.
-  for (let i = 0; i < 3; i++) {
-    const y = topY + 1.6 + i * ((side - 3.2) / 3)
-    ctx.fillStyle = rgba(i === 1 ? wood.shade : wood.core, i === 1 ? 0.5 : 0.35)
-    ctx.fillRect(cx - side / 2, y, side, (side - 3.2) / 3 - 0.5)
-    ctx.strokeStyle = rgba(dark.deep, 0.65)
-    ctx.lineWidth = 0.4
+  // Four boards, each a shade off its neighbour, with a lit edge under every
+  // seam — a single flat panel with lines scratched on it reads as a door.
+  const boards = 4
+  for (let i = 0; i < boards; i++) {
+    const y = topY + (i * side) / boards
+    const h = side / boards
+    if (i % 2) {
+      ctx.fillStyle = rgba(wood.shade, 0.4)
+      ctx.fillRect(cx - side / 2, y, side, h)
+    }
+    ctx.strokeStyle = rgba(batten.deep, 0.8)
+    ctx.lineWidth = 0.45
     ctx.beginPath()
-    ctx.moveTo(cx - side / 2, y - 0.4)
-    ctx.lineTo(cx + side / 2, y - 0.4)
+    ctx.moveTo(cx - side / 2, y)
+    ctx.lineTo(cx + side / 2, y)
+    ctx.stroke()
+    ctx.strokeStyle = rgba(wood.light, 0.45)
+    ctx.lineWidth = 0.35
+    ctx.beginPath()
+    ctx.moveTo(cx - side / 2, y + 0.5)
+    ctx.lineTo(cx + side / 2, y + 0.5)
     ctx.stroke()
   }
   grain(s, cx - side / 2, topY + 1, side, side - 2, wood, 5, 33)
-  // Diagonal brace.
-  ctx.strokeStyle = rgba(dark.core, 0.9)
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.moveTo(cx - side / 2 + 1, base - 1)
-  ctx.lineTo(cx + side / 2 - 1, topY + 1)
-  ctx.stroke()
-  ctx.strokeStyle = rgba(wood.light, 0.35)
-  ctx.lineWidth = 0.4
-  ctx.beginPath()
-  ctx.moveTo(cx - side / 2 + 1, base - 2)
-  ctx.lineTo(cx + side / 2 - 1, topY)
-  ctx.stroke()
-  ctx.restore()
-
-  // Corner cleats.
-  for (const sx of [-1, 1]) {
-    paint(ctx, roundRectPath(cx + sx * (side / 2 - 2.2) - 1.1, topY, 2.2, side, 0.5), dark, {
-      shadow: 0.44, radius: 1.6, pivot: [cx + sx * (side / 2 - 2), base - side / 2],
-      rim: 0.4, line: 0.4,
-    })
-  }
-  for (const y of [topY + 0.6, base - 2.4]) {
-    paint(ctx, roundRectPath(cx - side / 2, y, side, 1.9, 0.4), dark, {
-      shadow: 0.44, radius: 1.4, pivot: [cx, y + 1], rim: 0.4, line: 0.4,
-    })
-  }
-  // Branded mark.
-  ctx.save()
-  ctx.globalAlpha = 0.4
-  ctx.translate(cx + 0.5, base - side / 2 + 0.5)
-  jollyRoger(s, 3.2, dark.deep)
-  ctx.restore()
+  // Branded mark, scorched into the boards and cut by the seams above it.
   ctx.save()
   ctx.globalAlpha = 0.55
-  ctx.translate(cx, base - side / 2)
-  jollyRoger(s, 3.2, dark.deep)
+  ctx.translate(cx + 3.6, base - 4.6)
+  ctx.rotate(-0.06)
+  jollyRoger(s, 3.2, '#331D0C', '#4E2E14')
   ctx.restore()
-  nail(s, cx - side / 2 + 1.4, topY + 1.6, 0.55)
-  nail(s, cx + side / 2 - 1.4, base - 1.5, 0.55)
+  ctx.restore()
+
+  // Diagonal batten, proud of the boards.
+  ctx.save()
+  ctx.clip(box)
+  ctx.translate(cx, base - side / 2)
+  ctx.rotate(-Math.PI / 4)
+  paint(ctx, roundRectPath(-side * 0.72, -1.4, side * 1.44, 2.8, 0.5), batten, {
+    shadow: 0.42, radius: 1.6, pivot: [0, 0], rim: 0.55, line: 0.4, occlusion: 0.4,
+  })
+  ctx.restore()
+
+  // Edge battens: verticals first, then the rails across them.
+  for (const sx of [-1, 1]) {
+    paint(ctx, roundRectPath(cx + sx * (side / 2 - 1.6) - 1.3, topY, 2.6, side, 0.5), batten, {
+      shadow: 0.42, radius: 1.6, pivot: [cx + sx * (side / 2 - 1.6), base - side / 2],
+      rim: 0.5, line: 0.4,
+    })
+  }
+  for (const y of [topY, base - 2.6]) {
+    paint(ctx, roundRectPath(cx - side / 2, y, side, 2.6, 0.5), batten, {
+      shadow: 0.4, radius: 1.6, pivot: [cx, y + 1.3], rim: 0.55, line: 0.4, occlusion: 0.35,
+    })
+    ctx.save()
+    ctx.clip(roundRectPath(cx - side / 2, y, side, 2.6, 0.5))
+    grain(s, cx - side / 2, y, side, 2.6, batten, 2, y)
+    ctx.restore()
+  }
+  for (const sx of [-1, 1]) {
+    nail(s, cx + sx * (side / 2 - 1.6), topY + 1.3, 0.55)
+    nail(s, cx + sx * (side / 2 - 1.6), base - 1.3, 0.55)
+  }
 }
 
-/** Sake cup — a shallow sakazuki whose surface actually moves. */
+/**
+ * Sake cup — a shallow sakazuki whose surface actually moves.
+ *
+ * The sake stops short of the rim so a band of white porcelain shows above it;
+ * filled to the brim the whole cup collapses into one amber blob.
+ */
 function drawSakeCup(s: Surface, t: number): void {
   const ctx = s.ctx
   const base = s.h - 0.5
   const cx = s.w / 2
-  const clay = cel('#F2E4CE')
-  const lacquer = cel('#B9342E')
+  const clay = cel('#EDE0C8')
+  const lacquer = cel('#A82F2A')
+  const sake = cel('#E8B24E')
 
-  // Foot ring and stem.
-  paint(ctx, ellipsePath(cx, base - 0.6, 3.4, 1.1), lacquer, {
-    shadow: 0.44, radius: 2, pivot: [cx, base - 0.6], rim: 0.4, line: 0.4,
+  // Foot and stem, seen slightly from the side.
+  paint(ctx, blob([
+    [cx - 3.8, base], [cx - 2.6, base - 1.6], [cx + 2.6, base - 1.6], [cx + 3.8, base],
+  ] as Pt[], 0.35), lacquer, {
+    shadow: 0.46, radius: 3, pivot: [cx, base - 0.8], rim: 0.4, line: 0.4,
   })
-  paint(ctx, roundRectPath(cx - 1.2, base - 3.2, 2.4, 2.8, 0.5), lacquer, {
-    shadow: 0.42, radius: 1.4, pivot: [cx, base - 1.8], rim: 0.35, line: 0.4,
+  paint(ctx, blob([
+    [cx - 1.5, base - 1.4], [cx - 1.1, base - 3.6], [cx + 1.1, base - 3.6], [cx + 1.5, base - 1.4],
+  ] as Pt[], 0.3), lacquer, {
+    shadow: 0.42, radius: 1.4, pivot: [cx, base - 2.5], rim: 0.35, line: 0.4,
   })
+
   // Bowl.
   const bowl = blob([
-    [cx - 5.6, base - 6.6], [cx - 3.6, base - 3.2], [cx, base - 2.6],
-    [cx + 3.6, base - 3.2], [cx + 5.6, base - 6.6],
-  ] as Pt[], 0.55)
+    [cx - 5.9, base - 7.4], [cx - 4.2, base - 4.4], [cx, base - 3.4],
+    [cx + 4.2, base - 4.4], [cx + 5.9, base - 7.4],
+  ] as Pt[], 0.5)
   paint(ctx, bowl, clay, {
-    shadow: 0.36, radius: 5, pivot: [cx, base - 4.6], rim: 0.7, line: 0.5,
+    shadow: 0.34, radius: 5.4, pivot: [cx, base - 5.6], rim: 0.6, line: 0.5,
   })
   ctx.save()
   ctx.clip(bowl)
-  ctx.fillStyle = rgba(lacquer.core, 0.85)
-  ctx.fillRect(cx - 6, base - 7.4, 12, 1.4)
-  ctx.restore()
+  // Seen from slightly above, so the mouth is an ellipse: the inside of the
+  // bowl in shade, and the sake as a surface floating in it rather than as a
+  // fill that swallows the whole silhouette.
+  ctx.fillStyle = clay.shade
+  ctx.fill(ellipsePath(cx, base - 7.3, 5.8, 1.7))
 
-  // Sake, with a travelling ripple and a caught highlight.
-  const lift = Math.sin(t * Math.PI * 2) * 0.35
-  const surface = new Path2D()
+  const lift = Math.sin(t * Math.PI * 2) * 0.22
   const pts: Pt[] = []
   for (let i = 0; i <= 8; i++) {
     const u = i / 8
+    const a = Math.PI + u * Math.PI
     pts.push([
-      cx - 5.3 + u * 10.6,
-      base - 6.5 + Math.sin(t * Math.PI * 2 - u * 4.2) * 0.3 + lift * (0.5 - Math.abs(u - 0.5)),
+      cx + Math.cos(a) * 5.05,
+      base - 7.0 + Math.sin(a) * 1.3
+        + Math.sin(t * Math.PI * 2 - u * 4.4) * 0.22 + lift * (0.5 - Math.abs(u - 0.5)),
     ])
   }
+  const surface = new Path2D()
   surface.addPath(curve(pts))
-  surface.lineTo(cx + 5.3, base - 4.4)
-  surface.lineTo(cx - 5.3, base - 4.4)
+  surface.ellipse(cx, base - 7.0, 5.05, 1.3, 0, 0, Math.PI)
   surface.closePath()
-  ctx.save()
-  ctx.clip(bowl)
-  paint(ctx, surface, cel('#F7E9A8'), {
-    shadow: 0.3, radius: 4, pivot: [cx, base - 5.6], line: 0,
+  paint(ctx, surface, sake, {
+    shadow: 0.28, radius: 1.8, pivot: [cx, base - 7.0], line: 0,
   })
-  ctx.strokeStyle = rgba(PAL.white, 0.7)
-  ctx.lineWidth = 0.45
+  ctx.strokeStyle = rgba('#FFF3C8', 0.9)
+  ctx.lineWidth = 0.4
   ctx.stroke(curve(pts))
+  // Sake catching the light where it laps the far wall.
+  ctx.fillStyle = rgba(PAL.white, 0.55)
+  ctx.fill(ellipsePath(cx - 2, base - 7.2, 1.3, 0.32, -0.12))
   ctx.restore()
-  glint(ctx, cx - 3, base - 6, 1.2, 0.4, -0.35, PAL.white, 0.6)
+
+  // Lacquered rim band, drawn last so it caps both the clay and the sake.
+  ctx.save()
+  ctx.strokeStyle = lacquer.core
+  ctx.lineWidth = 1.2
+  ctx.stroke(ellipsePath(cx, base - 7.4, 5.9, 1.7))
+  ctx.strokeStyle = rgba(lacquer.light, 0.75)
+  ctx.lineWidth = 0.35
+  ctx.stroke(ellipsePath(cx - 0.3, base - 7.7, 5.4, 1.5))
+  ctx.strokeStyle = lacquer.line
+  ctx.lineWidth = 0.4
+  ctx.stroke(ellipsePath(cx, base - 7.4, 5.9, 1.7))
+  ctx.restore()
+  glint(ctx, cx - 3.4, base - 6.6, 1, 0.35, -0.3, PAL.white, 0.55)
 }
 
-/** Anchor — admiralty pattern, resting on one fluke. */
+/**
+ * Anchor — admiralty pattern, cast as one piece.
+ *
+ * The crown is a single closed path rather than a stroked arc with fluke shapes
+ * bolted on, so the terminator runs across the whole casting the way it would
+ * across real iron, and the flukes stop reading as separate pale wedges.
+ */
 function drawAnchor(s: Surface): void {
   const ctx = s.ctx
   const base = s.h - 0.5
   const cx = s.w / 2
-  const iron = cel('#6E7C96')
-  const rust = cel('#8A5A3E')
-  const topY = 2.6
+  const iron = cel('#5A6478')
+  const rust = cel('#7E4E32')
+  const topY = 2.4
 
-  // Ring.
-  paint(ctx, crescentPath(cx, topY + 2.4, 2.6, 1.1, 0, Math.PI * 2), iron, {
-    shadow: 0.44, radius: 2.6, pivot: [cx, topY + 2.4], rim: 0.5, line: 0.45,
+  anchorRope(s, cx, base, topY)
+  paint(ctx, crescentPath(cx, topY + 2.6, 2.7, 1.15, 0, Math.PI * 2), iron, {
+    shadow: 0.44, radius: 2.7, pivot: [cx, topY + 2.6], rim: 0.5, line: 0.45,
   })
-  // Shank.
-  paint(ctx, roundRectPath(cx - 1.5, topY + 4, 3, base - topY - 8, 1), iron, {
-    shadow: 0.44, radius: 2, pivot: [cx, s.h / 2], rim: 0.6, line: 0.5, occlusion: 0.4,
+
+  // Shank, tapering toward the crown.
+  const shank = new Path2D()
+  shank.moveTo(cx - 1.8, topY + 4.2)
+  shank.lineTo(cx - 2.5, base - 6.2)
+  shank.lineTo(cx + 2.5, base - 6.2)
+  shank.lineTo(cx + 1.8, topY + 4.2)
+  shank.closePath()
+  paint(ctx, shank, iron, {
+    shadow: 0.44, radius: 2.5, pivot: [cx, s.h / 2], rim: 0.6, line: 0.5, occlusion: 0.35,
   })
-  // Stock, canted so the thing is not bilaterally dead.
+  // A hard cel highlight down the lit side, not a soft airbrushed tube.
   ctx.save()
-  ctx.translate(cx, topY + 7.4)
-  ctx.rotate(-0.09)
-  paint(ctx, roundRectPath(-8.6, -0.9, 17.2, 1.8, 0.9), rust, {
-    shadow: 0.42, radius: 2, pivot: [0, 0], rim: 0.5, line: 0.45,
-  })
-  ctx.fillStyle = rgba(rust.deep, 0.6)
-  ctx.fill(ellipsePath(-6.2, 0.2, 1, 0.6))
-  ctx.fill(ellipsePath(5.4, -0.2, 0.8, 0.5))
+  ctx.clip(shank)
+  ctx.fillStyle = rgba(iron.light, 0.75)
+  ctx.fill(roundRectPath(cx - 1.7, topY + 5, 0.9, s.h * 0.6, 0.45))
   ctx.restore()
-  // Arms and flukes.
-  const arms = new Path2D()
-  arms.addPath(curve([
-    [cx - 9.4, base - 5.8], [cx - 5, base - 1.4], [cx, base - 1],
-    [cx + 5, base - 1.4], [cx + 9.4, base - 5.8],
-  ] as Pt[]))
+
+  // Stock, canted so the casting is not bilaterally dead.
   ctx.save()
-  ctx.strokeStyle = iron.core
-  ctx.lineWidth = 3
-  ctx.lineCap = 'round'
-  ctx.stroke(arms)
-  ctx.strokeStyle = iron.shade
-  ctx.lineWidth = 1.4
-  ctx.translate(0.5, 0.8)
-  ctx.stroke(arms)
+  ctx.translate(cx, topY + 7.6)
+  ctx.rotate(-0.1)
+  paint(ctx, blob([
+    [-9.2, -0.5], [-7.6, -1.1], [7.6, -1.1], [9.2, -0.5],
+    [9.2, 0.6], [7.6, 1.2], [-7.6, 1.2], [-9.2, 0.6],
+  ] as Pt[], 0.3), rust, {
+    shadow: 0.42, radius: 1.4, pivot: [0, 0], rim: 0.45, line: 0.45,
+  })
+  ctx.fillStyle = rgba(rust.deep, 0.55)
+  ctx.fill(ellipsePath(-6, 0.2, 1.1, 0.5))
+  ctx.fill(ellipsePath(4.8, -0.1, 0.8, 0.4))
   ctx.restore()
+
+  // Crown: a slender arm swept between two sharp flukes, drawn as one closed
+  // path. Catmull-Rom would round the tips off and turn the whole thing into a
+  // trough, so the tips are straight lines and only the arm is curved.
+  const crown = new Path2D()
+  crown.moveTo(cx - 13.4, base - 9.4)
+  crown.lineTo(cx - 8.6, base - 0.7)
+  crown.quadraticCurveTo(cx, base + 1.2, cx + 8.6, base - 0.7)
+  crown.lineTo(cx + 13.4, base - 9.4)
+  crown.lineTo(cx + 7.8, base - 6.4)
+  crown.lineTo(cx + 6.2, base - 3.3)
+  crown.quadraticCurveTo(cx, base - 1.9, cx - 6.2, base - 3.3)
+  crown.lineTo(cx - 7.8, base - 6.4)
+  crown.closePath()
+  paint(ctx, crown, iron, {
+    shadow: 0.46, radius: 8, pivot: [cx, base - 3.4], rim: 0.7, line: 0.5, occlusion: 0.4,
+  })
+  ctx.save()
+  ctx.clip(crown)
+  // The flat of each fluke, one value off the arm, so the palm reads as a
+  // plane cocked away from the shank rather than as more of the same casting.
   for (const sx of [-1, 1]) {
-    paint(ctx, blob([
-      [cx + sx * 9.6, base - 6.6], [cx + sx * 11.4, base - 2.4],
-      [cx + sx * 7.4, base - 1], [cx + sx * 6.6, base - 4.4],
-    ] as Pt[], 0.4), iron, {
-      shadow: 0.44, radius: 3, pivot: [cx + sx * 9, base - 4], rim: 0.6, line: 0.5,
-    })
+    ctx.fillStyle = rgba(sx < 0 ? iron.light : iron.deep, 0.62)
+    ctx.fill(blob([
+      [cx + sx * 12.8, base - 8.8], [cx + sx * 8.9, base - 1.6],
+      [cx + sx * 6.6, base - 3.6], [cx + sx * 7.6, base - 6.2],
+    ] as Pt[], 0.2))
   }
-  ironBand(s, cx - 2.1, topY + 12, 4.2, 1.6)
-  ctx.strokeStyle = iron.line
-  ctx.lineWidth = 0.5
-  ctx.stroke(arms)
-  // Rope through the ring — a prop should always tell you it was used.
-  ctx.save()
-  ctx.strokeStyle = cel('#D9C08A').core
-  ctx.lineWidth = 1
-  ctx.stroke(curve([
-    [cx - 1, topY + 1.6], [cx - 5.4, topY + 0.4], [cx - 9, topY + 3.4],
-  ] as Pt[]))
-  ctx.strokeStyle = rgba(cel('#D9C08A').deep, 0.7)
-  ctx.lineWidth = 0.32
-  ctx.stroke(curve([
-    [cx - 1, topY + 2.1], [cx - 5.4, topY + 0.9], [cx - 9, topY + 3.9],
-  ] as Pt[]))
+  ctx.fillStyle = rgba(iron.deep, 0.45)
+  ctx.fill(roundRectPath(cx - 3.4, base - 3.2, 6.8, 1.5, 0.7))
   ctx.restore()
-  glint(ctx, cx - 0.9, s.h * 0.5, 0.55, 5, 0, PAL.white, 0.3)
+  // A forged collar where the shank enters the crown.
+  paint(ctx, roundRectPath(cx - 3, base - 8.4, 6, 2.2, 0.7), rust, {
+    shadow: 0.44, radius: 2, pivot: [cx, base - 7.3], rim: 0.4, line: 0.45,
+  })
+
+  glint(ctx, cx + 1.4, topY + 1.5, 0.7, 0.4, -0.6, PAL.white, 0.6)
+}
+
+/** The cable, rove through the ring and flaked down on the ground beside it. */
+function anchorRope(s: Surface, cx: number, base: number, topY: number): void {
+  const ctx = s.ctx
+  const rope = cel('#A88F5E')
+  ctx.save()
+  ctx.lineCap = 'round'
+  // Rove through the ring and led straight down beside the shank. A rope that
+  // loops above the ring reads as a basket handle, not as a cable.
+  const line: Pt[] = [
+    [cx - 1.4, topY + 1.4], [cx + 2.6, topY + 1.6], [cx + 5.6, topY + 7],
+    [cx + 8.6, base - 13], [cx + 8.4, base - 4],
+  ]
+  ctx.strokeStyle = rope.core
+  ctx.lineWidth = 1.1
+  ctx.stroke(curve(line))
+  ctx.strokeStyle = rgba(rope.deep, 0.8)
+  ctx.lineWidth = 0.36
+  ctx.stroke(curve(line.map(([x, y]) => [x + 0.35, y + 0.5] as Pt)))
+  // Flaked coil on the ground; the fluke is drawn over it, which puts the rope
+  // behind the casting and gives the prop some depth.
+  for (const [ry, rx, dy] of [[1.5, 5.2, 0], [1.1, 3.8, -1.1], [0.8, 2.6, -2]]) {
+    ctx.strokeStyle = rope.core
+    ctx.lineWidth = 1.1
+    ctx.stroke(ellipsePath(cx + 8.4, base - 1.8 + dy, rx, ry))
+    ctx.strokeStyle = rgba(rope.deep, 0.7)
+    ctx.lineWidth = 0.32
+    ctx.stroke(ellipsePath(cx + 8.4, base - 1.4 + dy, rx, ry))
+  }
+  ctx.restore()
 }
 
 /** Lantern — paper shade on a post, with a flame that never repeats a frame. */
@@ -1118,22 +1265,30 @@ function drawLantern(s: Surface, t: number): void {
   const flick = Math.sin(t * Math.PI * 2) * 0.5 + Math.sin(t * Math.PI * 6 + 1.1) * 0.5
   const glowR = 11 + flick * 1.8
 
-  paint(ctx, roundRectPath(cx - 3.4, base - 2.4, 6.8, 2.4, 0.6), cel(PAL.rock), {
-    shadow: 0.46, radius: 2, pivot: [cx, base - 1.2], rim: 0.4, line: 0.45,
+  paint(ctx, blob([
+    [cx - 5.4, base], [cx - 4.2, base - 3], [cx, base - 3.6],
+    [cx + 4.2, base - 3], [cx + 5.4, base],
+  ] as Pt[], 0.4), cel(PAL.rockDeep), {
+    shadow: 0.46, radius: 4, pivot: [cx, base - 1.8], rim: 0.45, line: 0.45,
   })
   paint(ctx, roundRectPath(cx - 1.3, base - 16, 2.6, 14, 0.8), dark, {
     shadow: 0.44, radius: 1.8, pivot: [cx, base - 9], rim: 0.5, line: 0.45,
   })
-  // Arm the lantern hangs from.
-  paint(ctx, roundRectPath(cx - 1, base - 25.4, 5.4, 1.4, 0.7), dark, {
-    shadow: 0.42, radius: 1.4, pivot: [cx + 1.7, base - 24.7], rim: 0.4, line: 0.4,
+  // Arm the lantern hangs from, above the shade so the drop is visible.
+  paint(ctx, roundRectPath(cx - 1, base - 27.4, 7.2, 1.5, 0.7), dark, {
+    shadow: 0.42, radius: 1.4, pivot: [cx + 2.6, base - 26.6], rim: 0.4, line: 0.4,
   })
-  paint(ctx, roundRectPath(cx - 1.3, base - 26, 2.6, 11, 0.8), dark, {
-    shadow: 0.44, radius: 1.8, pivot: [cx, base - 20], rim: 0.5, line: 0.45,
+  paint(ctx, blob([
+    [cx + 1.2, base - 26], [cx + 3.6, base - 26], [cx + 1.2, base - 23.4],
+  ] as Pt[], 0.2), dark, {
+    shadow: 0.44, radius: 1.6, pivot: [cx + 2, base - 25], line: 0.4,
+  })
+  paint(ctx, roundRectPath(cx - 1.3, base - 28, 2.6, 13, 0.8), dark, {
+    shadow: 0.44, radius: 1.8, pivot: [cx, base - 21], rim: 0.5, line: 0.45,
   })
 
   const lx = cx + 4
-  const ly = base - 20
+  const ly = base - 16.5
   radialFill(ctx, lx, ly, 1, glowR, [
     [0, rgba(PAL.ember, 0.42)],
     [0.5, rgba(PAL.ember, 0.16)],
@@ -1141,10 +1296,13 @@ function drawLantern(s: Surface, t: number): void {
   ])
   ctx.strokeStyle = dark.core
   ctx.lineWidth = 0.5
+  ctx.lineWidth = 0.75
   ctx.beginPath()
-  ctx.moveTo(cx + 3.2, base - 24.6)
-  ctx.lineTo(lx, ly - 5.6)
+  ctx.moveTo(lx, base - 26.4)
+  ctx.lineTo(lx, ly - 5.8)
   ctx.stroke()
+  ctx.fillStyle = cel(PAL.gold).core
+  ctx.fill(ellipsePath(lx, ly - 6.4, 1, 0.85))
 
   const shade = blob([
     [lx, ly - 6], [lx + 4.2, ly - 3.6], [lx + 4.4, ly + 2.4], [lx, ly + 5],
@@ -1178,7 +1336,8 @@ function drawLantern(s: Surface, t: number): void {
   paint(ctx, roundRectPath(lx - 2, ly + 4.2, 4, 1.3, 0.4), dark, {
     shadow: 0.4, radius: 1.3, pivot: [lx, ly + 4.8], rim: 0.4, line: 0.4,
   })
-  tuft(s, cx - 3.6, base, 5, 2.6, 5)
+  tuft(s, cx - 4.4, base, 4.4, 2, 5)
+  tuft(s, cx + 4.2, base, 3.4, 1.6, 8)
 }
 
 /** Palm — a curved trunk and fronds that sway out of phase with each other. */
@@ -1187,7 +1346,6 @@ function drawPalm(s: Surface, t: number): void {
   const base = s.h - 0.5
   const cx = s.w * 0.44
   const bark = cel('#A87A4C')
-  const frondCel = cel(PAL.grassDeep)
   const sway = Math.sin(t * Math.PI * 2)
   const crownX = cx + 11 + sway * 1.4
   const crownY = 15
@@ -1219,8 +1377,10 @@ function drawPalm(s: Surface, t: number): void {
   for (let i = right.length - 1; i >= 0; i--) trunk.lineTo(right[i][0], right[i][1])
   trunk.closePath()
   paint(ctx, trunk, bark, {
-    shadow: 0.42, radius: 4.2, pivot: [cx + 4, base * 0.5], rim: 0.8, line: 0.55,
-    occlusion: 0.3,
+    shadow: 0.42, radius: 4.2, pivot: [cx + 4, base * 0.5],
+    // A full-strength rim on a tall narrow form becomes a cream stripe down the
+    // whole trunk, so it is narrowed and tinted back toward the bark.
+    rim: 0.45, rimColor: mix(bark.light, bark.core, 0.5), line: 0.55, occlusion: 0.3,
   })
   // Leaf scars, which is what makes a palm trunk a palm trunk.
   ctx.save()
@@ -1249,52 +1409,83 @@ function drawPalm(s: Surface, t: number): void {
     })
   }
 
-  // Seven fronds, each with its own phase and its own leaflet rhythm — a comb
-  // of identical fronds is the classic way a palm reads as wallpaper.
+  // Seven fronds, each one a single tapering blade with a sawtooth edge rather
+  // than a spray of separate slivers: at this size a comb of thin leaflets
+  // reads as a firework, and the crown loses all its mass.
   const fronds = 7
-  for (let i = 0; i < fronds; i++) {
+  const order = [0, 6, 1, 5, 2, 4, 3]
+  for (const i of order) {
     const spread = (i / (fronds - 1) - 0.5) * 2
     const ph = Math.sin(t * Math.PI * 2 + i * 1.4)
-    const len = 20 + (i % 3) * 3.4
-    const dir = spread * 1.35 - Math.PI / 2 + Math.sign(spread || 1) * 0.25
-    const droop = 1 + Math.abs(spread) * 0.9
+    const len = 21 + (i % 3) * 3.2
+    const side = spread === 0 ? 1 : Math.sign(spread)
+    const dir = spread * 1.32 - Math.PI / 2 + side * 0.22
+    const droop = 1 + Math.abs(spread) * 0.95
     const rib: Pt[] = []
-    for (let k = 0; k <= 6; k++) {
-      const u = k / 6
-      const a = dir + u * droop * 0.75 * Math.sign(spread || 1) + ph * 0.06 * u
+    for (let k = 0; k <= 8; k++) {
+      const u = k / 8
+      const a = dir + u * droop * 0.72 * side + ph * 0.07 * u
       rib.push([
         crownX + Math.cos(a) * len * u,
-        crownY + Math.sin(a) * len * u + u * u * 4.5 * droop,
+        crownY + Math.sin(a) * len * u + u * u * 5 * droop,
       ])
     }
-    const back = i % 2 === 0
-    const c = back ? cel(adjust(PAL.grassDeep, { light: 0.85 })) : frondCel
-    // Leaflets, alternating and shortening toward the tip.
-    ctx.save()
-    for (let k = 1; k <= 6; k++) {
-      const u = k / 6
-      const p = rib[k]
-      const q = rib[k - 1]
-      const a = Math.atan2(p[1] - q[1], p[0] - q[0])
-      const ll = (1 - u * 0.55) * 5.6 * (0.75 + ((k * 7 + i * 3) % 4) * 0.12)
-      for (const sgn of [-1, 1]) {
-        const na = a + sgn * (0.95 + u * 0.35)
-        ctx.fillStyle = sgn < 0 ? c.core : c.shade
-        ctx.fill(blob([
-          [q[0], q[1]],
-          [p[0] + Math.cos(na) * ll * 0.55, p[1] + Math.sin(na) * ll * 0.55 + 0.4],
-          [p[0] + Math.cos(na) * ll, p[1] + Math.sin(na) * ll + 1.1],
-          [p[0], p[1]],
-        ] as Pt[], 0.6))
-      }
+    // Front fronds catch the light; the ones behind the crown drop a value.
+    const back = i === 0 || i === 3 || i === 6
+    const c = back
+      ? cel(adjust(PAL.grassDeep, { light: 0.82 }))
+      : cel(adjust(PAL.grass, { light: 0.78, sat: 1.05 }))
+
+    const steps = 11
+    const up: Pt[] = []
+    const dn: Pt[] = []
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps
+      const p = pointOn(rib, u)
+      const q = pointOn(rib, Math.min(1, u + 0.06))
+      const r = pointOn(rib, Math.max(0, u - 0.06))
+      const tx = q[0] - r[0]
+      const ty = q[1] - r[1]
+      const tl = Math.hypot(tx, ty) || 1
+      const nx = -ty / tl
+      const ny = tx / tl
+      // Blade width swells just past the base and tapers to the tip; the
+      // sawtooth is what makes it read as leaflets rather than a leaf.
+      const swell = Math.sin(Math.PI * Math.pow(u, 0.62)) * 4.9
+      const tooth = k % 2 === 0 ? 1 : 0.52
+      up.push([p[0] + nx * swell * tooth, p[1] + ny * swell * tooth])
+      dn.push([p[0] - nx * swell * tooth * 0.86, p[1] - ny * swell * tooth * 0.86])
     }
-    ctx.strokeStyle = c.deep
-    ctx.lineWidth = 0.85
-    ctx.stroke(curve(rib))
-    ctx.strokeStyle = rgba(c.light, 0.55)
-    ctx.lineWidth = 0.35
-    ctx.stroke(curve(rib.map(([x, y]) => [x - 0.3, y - 0.4] as Pt)))
+    const blade = new Path2D()
+    blade.moveTo(up[0][0], up[0][1])
+    for (let k = 1; k <= steps; k++) blade.lineTo(up[k][0], up[k][1])
+    for (let k = steps; k >= 0; k--) blade.lineTo(dn[k][0], dn[k][1])
+    blade.closePath()
+    ctx.fillStyle = c.core
+    ctx.fill(blade)
+    // The trailing half of the blade turns away from the sun.
+    ctx.save()
+    ctx.clip(blade)
+    const shade = new Path2D()
+    shade.moveTo(rib[0][0], rib[0][1])
+    for (let k = 1; k <= steps; k++) {
+      const p = pointOn(rib, k / steps)
+      shade.lineTo(p[0], p[1])
+    }
+    for (let k = steps; k >= 0; k--) shade.lineTo(dn[k][0], dn[k][1] + 0.3)
+    shade.closePath()
+    ctx.fillStyle = c.shade
+    ctx.fill(shade)
     ctx.restore()
+    ctx.strokeStyle = c.deep
+    ctx.lineWidth = 0.9
+    ctx.stroke(curve(rib))
+    ctx.strokeStyle = rgba(c.light, 0.7)
+    ctx.lineWidth = 0.4
+    ctx.stroke(curve(rib.map(([x, y]) => [x - 0.35, y - 0.5] as Pt)))
+    ctx.strokeStyle = c.line
+    ctx.lineWidth = 0.4
+    ctx.stroke(blade)
   }
   paint(ctx, ellipsePath(crownX, crownY - 0.4, 3, 2.4), cel('#8A6440'), {
     shadow: 0.42, radius: 3, pivot: [crownX, crownY], rim: 0.5, line: 0.45,
@@ -1376,7 +1567,12 @@ function drawWantedPoster(s: Surface, t: number): void {
   const ctx = s.ctx
   const cx = s.w / 2
   const base = s.h - 1.2
-  const paper = cel('#EFDCB0')
+  // cel() rotates a warm base toward orange as it darkens, which turns the whole
+  // shaded half of a sheet of paper into scorch. Paper wants a desaturating
+  // ramp, so this one is mixed by hand.
+  const paper: Cel = {
+    light: '#FBF4DE', core: '#EFDCB0', shade: '#CBB78F', deep: '#9C8A69', line: '#4A3A26',
+  }
   const ink = '#3A2A1E'
   const w = 19
   const h = 26
@@ -1400,8 +1596,10 @@ function drawWantedPoster(s: Surface, t: number): void {
   })
   ctx.save()
   ctx.clip(sheet)
-  // The curl itself: a hard cel band along the lifting edge.
-  ctx.fillStyle = rgba(paper.shade, 0.9)
+  // The curl itself: a hard cel band along the lifting edge. cel() rotates a
+  // warm base toward orange in shadow, which on paper reads as scorch, so the
+  // shade is pulled back toward neutral by hand.
+  ctx.fillStyle = rgba(mix(paper.shade, '#8B7C60', 0.6), 0.95)
   ctx.fill(blob([
     [x0 + w - 4, y0 + h * 0.55],
     [x0 + w + lift * 1.6, y0 + h * 0.6],
@@ -1416,17 +1614,36 @@ function drawWantedPoster(s: Surface, t: number): void {
   // Portrait window: a straw-hatted silhouette, no face, so nothing is traced.
   ctx.fillStyle = rgba('#C9AE7C', 0.9)
   ctx.fillRect(x0 + 2, y0 + 6.2, w - 4, 11)
-  ctx.fillStyle = rgba(ink, 0.75)
+  // Shoulders, then a neck, then the head: one bell shape reads as a rock.
+  ctx.fillStyle = rgba(ink, 0.78)
   ctx.fill(blob([
-    [cx, y0 + 9], [cx + 2.6, y0 + 11], [cx + 3.2, y0 + 14.6],
-    [cx + 5.2, y0 + 17.2], [cx - 5.2, y0 + 17.2], [cx - 3.2, y0 + 14.6],
-    [cx - 2.6, y0 + 11],
-  ] as Pt[], 0.8))
+    [cx - 6, y0 + 17.4], [cx - 4.4, y0 + 14.6], [cx - 1.5, y0 + 13.4],
+    [cx + 1.5, y0 + 13.4], [cx + 4.4, y0 + 14.6], [cx + 6, y0 + 17.4],
+  ] as Pt[], 0.7))
+  ctx.fillRect(cx - 1.3, y0 + 12, 2.6, 2)
+  ctx.fill(blob([
+    [cx, y0 + 8.4], [cx + 2.5, y0 + 9.8], [cx + 2.6, y0 + 12],
+    [cx, y0 + 13.2], [cx - 2.6, y0 + 12], [cx - 2.5, y0 + 9.8],
+  ] as Pt[], 0.85))
+  // Straw hat: brim first, then the crown standing proud of it with the red
+  // band across — drawn the other way round the crown vanishes into the brim.
   ctx.fillStyle = PAL.strawDeep
-  ctx.fill(ellipsePath(cx, y0 + 8.6, 5.4, 1.3))
-  ctx.fill(roundRectPath(cx - 2.6, y0 + 6.4, 5.2, 2.4, 0.9))
+  ctx.fill(ellipsePath(cx, y0 + 9, 5.7, 1.4))
+  ctx.fillStyle = PAL.strawGold
+  ctx.fill(ellipsePath(cx, y0 + 8.7, 5.7, 1.2))
+  ctx.fillStyle = adjust(PAL.strawGold, { light: 1.06 })
+  ctx.fill(blob([
+    [cx - 2.5, y0 + 8.8], [cx - 2.3, y0 + 6.2], [cx, y0 + 5.6],
+    [cx + 2.3, y0 + 6.2], [cx + 2.5, y0 + 8.8],
+  ] as Pt[], 0.75))
   ctx.fillStyle = PAL.luffyRedDeep
-  ctx.fill(roundRectPath(cx - 2.7, y0 + 7.6, 5.4, 0.9, 0.35))
+  ctx.fill(roundRectPath(cx - 2.55, y0 + 7.4, 5.1, 1.1, 0.35))
+  ctx.strokeStyle = rgba(PAL.strawDeep, 0.9)
+  ctx.lineWidth = 0.35
+  ctx.stroke(blob([
+    [cx - 2.5, y0 + 8.8], [cx - 2.3, y0 + 6.2], [cx, y0 + 5.6],
+    [cx + 2.3, y0 + 6.2], [cx + 2.5, y0 + 8.8],
+  ] as Pt[], 0.75))
   ctx.strokeStyle = rgba(ink, 0.8)
   ctx.lineWidth = 0.4
   ctx.strokeRect(x0 + 2, y0 + 6.2, w - 4, 11)
@@ -1523,8 +1740,11 @@ function chest(open: boolean) {
       ctx.fill(ellipsePath(cx, bodyY + 0.2, 1, 1.1))
       ctx.fillRect(cx - 0.45, bodyY + 0.6, 0.9, 1.8)
       const g = (t * 2) % 1
-      glint(ctx, cx - 2.4 + g * 5, bodyY - 1.6 + g * 3, 0.8, 2.2, -0.7, PAL.white,
-        0.75 * Math.sin(g * Math.PI))
+      ctx.save()
+      ctx.clip(roundRectPath(cx - 2.8, bodyY - 2.6, 5.6, 6, 0.8))
+      glint(ctx, cx - 2.6 + g * 5.2, bodyY - 1.6 + g * 3, 0.5, 2.2, -0.7, PAL.white,
+        0.65 * Math.sin(g * Math.PI))
+      ctx.restore()
     } else {
       // Lid thrown back, seen from inside.
       const lid = new Path2D()
@@ -1614,8 +1834,13 @@ function drawLogPose(s: Surface, t: number): void {
   ctx.strokeStyle = rgba(leather.deep, 0.8)
   ctx.lineWidth = 0.4
   ctx.stroke(curve([[cx - 6, base - 1.4], [cx, base - 2.6], [cx + 6, base - 1.6]] as Pt[]))
-  ctx.fillStyle = brass.core
-  ctx.fill(roundRectPath(cx + 2.4, base - 3.2, 2, 2.6, 0.5))
+  // Buckle, drawn as a ring so it does not read as a stuck-on yellow tab.
+  ctx.strokeStyle = brass.core
+  ctx.lineWidth = 0.65
+  ctx.stroke(roundRectPath(cx + 2.2, base - 3.2, 2.4, 2.6, 0.6))
+  ctx.strokeStyle = rgba(brass.light, 0.8)
+  ctx.lineWidth = 0.3
+  ctx.stroke(roundRectPath(cx + 2.1, base - 3.35, 2.4, 2.6, 0.6))
 
   // Brass collar and the glass bulb.
   paint(ctx, roundRectPath(cx - 4.4, base - 6.2, 8.8, 2.6, 0.9), brass, {
@@ -1661,10 +1886,10 @@ function drawLogPose(s: Surface, t: number): void {
   ctx.fillStyle = brass.core
   ctx.fill(ellipsePath(cx, cy, 0.9, 0.9))
   // Glass: one hard specular crescent and one soft bloom, never a whole sheen.
-  ctx.fillStyle = rgba(PAL.white, 0.55)
-  ctx.fill(crescentPath(cx, cy, 5.4, 1.3, Math.PI * 1.08, Math.PI * 1.52))
+  ctx.fillStyle = rgba(PAL.white, 0.42)
+  ctx.fill(crescentPath(cx, cy, 5.5, 0.7, Math.PI * 1.12, Math.PI * 1.46))
   ctx.restore()
-  glint(ctx, cx - 2.6, cy - 3.2, 1.5, 0.9, -0.6, PAL.white, 0.7)
+  glint(ctx, cx - 2.8, cy - 3.4, 1.2, 0.55, -0.6, PAL.white, 0.6)
   ctx.strokeStyle = cel('#9FC8D8').line
   ctx.lineWidth = 0.55
   ctx.stroke(bulb)
@@ -1845,9 +2070,9 @@ export function buildItemSheets(): Record<string, SpriteSheet> {
     'treasure-chest': treasure,
     barrel: mk(drawBarrel, 1, 1, 22, 22),
     crate: mk(drawCrate, 1, 1, 20, 19),
-    'sake-cup': mk(drawSakeCup, 4, 0.14, 16, 11),
-    anchor: mk(drawAnchor, 1, 1, 28, 30),
-    lantern: mk(drawLantern, 6, 0.11, 26, 32),
+    'sake-cup': mk(drawSakeCup, 4, 0.14, 18, 13),
+    anchor: mk(drawAnchor, 1, 1, 30, 30),
+    lantern: mk(drawLantern, 6, 0.11, 26, 34),
     'palm-tree': mk(drawPalm, 6, 0.16, 78, 88),
     signpost: mk(drawSignpost, 4, 0.2, 30, 32),
   }
