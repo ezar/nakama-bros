@@ -166,7 +166,7 @@ export abstract class Enemy extends Entity {
         ctx.globalCompositeOperation = 'lighter'
         ctx.drawImage(
           this.sheet.image, frame.sx, frame.sy, frame.sw, frame.sh,
-          Math.round(frame.ox), Math.round(frame.oy), frame.sw, frame.sh,
+          frame.ox, frame.oy, frame.w, frame.h,
         )
         ctx.restore()
       }
