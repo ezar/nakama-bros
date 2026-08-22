@@ -1,38 +1,66 @@
 import { BUFFER_H, BUFFER_W } from '../types'
+import { PAL } from '../art/palette'
+import { mix } from '../art/color'
+import { clamp01 } from '../engine/math'
 
 export interface PostFxSettings {
   /** Additive glow pulled from the brightest pixels. */
   bloom: number
-  /** Brightness a pixel must reach before it blooms, 0..1. */
+  /** Where the knee sits, 0..1. At or above 0.55 the bright pass squares the
+   *  frame three times (v^8), below it twice (v^4) for a looser, dreamier glow. */
   bloomThreshold: number
+  /** Glow radius in device pixels at the quarter-res scratch. Keep it small:
+   *  a wide blur is a smear, not a light. */
+  bloomRadius?: number
   /** Darkening toward the frame edges. */
   vignette: number
-  /** Colour grade strength. */
+  /** Master colour-grade strength. 0 bypasses the whole grade. */
   grade: number
-  /** Colour the grade pushes toward — set per biome and time of day. */
+  /** Colour multiplied into the lit end — set per biome and time of day. */
   gradeColor: string
+  /** Colour added into the black end. Cool shadows against a warm key. */
+  gradeShadow?: string
+  /** Exposure. 1 is neutral, 1.1 is a stop of headroom. */
+  gradeGain?: number
+  /** >1 deepens the mid tones, <1 lifts them. Endpoints stay put. */
+  gradeGamma?: number
   /** Full-screen flash 0..1, decayed by the caller. */
   flash: number
   flashColor: string
-  /** 0..1 — radial blur and chromatic split during dashes. */
+  /** 0..1 — radial speed blur and chromatic split during dashes. */
   speed: number
   /** 0..1 — red edge pulse when the player is hurt. */
   damage: number
   /** Optional scanline overlay for the retro toggle. */
   scanlines: number
+  /** 0..1 film grain. ~0.2 is film, 1 is a broken VHS. */
+  grain?: number
+  /** 0..1 heat shimmer. Alabasta at noon, a boss's fire aura. */
+  haze?: number
+  /** Band the shimmer covers, as fractions of the frame height. */
+  hazeY?: number
+  hazeH?: number
 }
 
 export const defaultPostFx = (): PostFxSettings => ({
-  bloom: 0.55,
-  bloomThreshold: 0.62,
-  vignette: 0.34,
-  grade: 0.14,
-  gradeColor: '#FFD9A0',
+  bloom: 0.42,
+  bloomThreshold: 0.72,
+  bloomRadius: 1.5,
+  vignette: 0.3,
+  grade: 0.55,
+  gradeColor: mix(PAL.cream, PAL.sand, 0.55),
+  gradeShadow: PAL.shadow,
+  gradeGain: 1.06,
+  gradeGamma: 1.07,
   flash: 0,
-  flashColor: '#FFFFFF',
+  flashColor: PAL.white,
   speed: 0,
   damage: 0,
   scanlines: 0,
+  grain: 0.16,
+  haze: 0,
+  hazeY: 0.5,
+  hazeH: 0.5,
 })
 
 const canvas = (w: number, h: number) => {
@@ -42,35 +70,52 @@ const canvas = (w: number, h: number) => {
   return c
 }
 
+/** Five-tap Gaussian. Applied as a running-normalised alpha chain, so the
+ *  result is a true weighted average and the pass keeps the frame's exposure. */
+const KERNEL = [0.11, 0.24, 0.3, 0.24, 0.11]
+const TAPS = [-2, -1, 0, 1, 2]
+
 /**
  * Screen-space finishing pass, run on the device-resolution frame buffer.
  *
- * The order mirrors a film pipeline: bloom (light), grade (colour), vignette
- * and chromatic split (lens), then event overlays (damage, flash). Every pass
- * works on a quarter-resolution scratch buffer where it can, which is what
- * keeps a multi-tap blur affordable at 1152x648.
+ * The order mirrors a film pipeline: lens distortion (haze, speed, chromatic),
+ * then light (bloom), then colour (grade), then the physical frame (vignette,
+ * grain), then event overlays (damage, flash). Everything that can work on a
+ * quarter-resolution scratch does, which is what keeps a multi-tap blur
+ * affordable at 1152x648 — the whole chain budgets around 2 ms.
+ *
+ * `target` and `source` are normally the same canvas: every pass either reads
+ * a snapshot (drawImage of the source onto itself is defined that way) or goes
+ * through a scratch buffer, so self-compositing is safe here.
  */
 export class PostFx {
   private downA = canvas(BUFFER_W / 4, BUFFER_H / 4)
   private downB = canvas(BUFFER_W / 4, BUFFER_H / 4)
+  private halfR = canvas(BUFFER_W / 2, BUFFER_H / 2)
+  private halfB = canvas(BUFFER_W / 2, BUFFER_H / 2)
+  private band: HTMLCanvasElement | null = null
   private vignetteCache: HTMLCanvasElement | null = null
   private vignetteStrength = -1
+  private grainPattern: CanvasPattern | null = null
 
   apply(target: CanvasRenderingContext2D, source: HTMLCanvasElement, s: PostFxSettings): void {
+    const t = performance.now() / 1000
     target.save()
     target.setTransform(1, 0, 0, 1, 0, 0)
+    target.imageSmoothingEnabled = true
+    target.imageSmoothingQuality = 'low'
 
-    if (s.speed > 0.01) this.chromatic(target, source, s.speed)
-    if (s.bloom > 0) this.bloom(target, source, s.bloom, s.bloomThreshold)
-    if (s.grade > 0) {
-      target.globalCompositeOperation = 'overlay'
-      target.globalAlpha = s.grade
-      target.fillStyle = s.gradeColor
-      target.fillRect(0, 0, BUFFER_W, BUFFER_H)
-      target.globalCompositeOperation = 'source-over'
-      target.globalAlpha = 1
+    if ((s.haze ?? 0) > 0.01) this.heatHaze(target, source, s.haze!, s.hazeY ?? 0.5, s.hazeH ?? 0.5, t)
+    if (s.speed > 0.01) {
+      this.speedBlur(target, source, s.speed)
+      this.chromatic(target, source, s.speed)
     }
+    if (s.bloom > 0.001) {
+      this.bloom(target, source, s.bloom, s.bloomThreshold, s.bloomRadius ?? 1.5)
+    }
+    if (s.grade > 0.001) this.grade(target, source, s)
     if (s.vignette > 0) target.drawImage(this.vignette(s.vignette), 0, 0)
+    if ((s.grain ?? 0) > 0.001) this.grain(target, s.grain!)
     if (s.damage > 0.01) this.damageVignette(target, s.damage)
     if (s.scanlines > 0) {
       target.globalAlpha = s.scanlines * 0.4
@@ -84,19 +129,29 @@ export class PostFx {
       target.fillRect(0, 0, BUFFER_W, BUFFER_H)
       target.globalAlpha = 1
     }
+
+    target.globalCompositeOperation = 'source-over'
+    target.globalAlpha = 1
     target.restore()
   }
 
   /**
-   * Threshold, downsample, blur, add back. The threshold is done by drawing the
-   * frame through a 'color-dodge' pass against a grey plate, which keeps only
-   * the values above the knee — far cheaper than reading pixels back.
+   * Bright pass, blur, add back.
+   *
+   * The old version drew the frame through a dodge against a grey plate, which
+   * does not actually threshold anything — it just scaled the whole image, so
+   * dark pixels bloomed too and the frame turned to milk. This raises the
+   * frame to the fourth power instead (two multiply passes), which is a real
+   * knee: at the threshold the curve is an identity, below it values collapse
+   * toward black, above it they survive. The gain that follows puts the bright
+   * end back where it started.
    */
   private bloom(
     target: CanvasRenderingContext2D,
     source: HTMLCanvasElement,
     amount: number,
     threshold: number,
+    radius: number,
   ): void {
     const a = this.downA.getContext('2d')!
     const b = this.downB.getContext('2d')!
@@ -107,47 +162,220 @@ export class PostFx {
     a.globalAlpha = 1
     a.clearRect(0, 0, w, h)
     a.drawImage(source, 0, 0, w, h)
-    // Crush everything below the threshold toward black.
-    a.globalCompositeOperation = 'multiply'
-    a.drawImage(this.downA, 0, 0)
-    a.globalCompositeOperation = 'source-over'
-    a.globalAlpha = 1 - threshold
-    a.fillStyle = '#000000'
-    a.globalCompositeOperation = 'destination-out'
-    a.fillStyle = `rgba(0,0,0,${1 - threshold})`
-    a.globalCompositeOperation = 'source-over'
 
-    // Two separable box passes.
-    b.clearRect(0, 0, w, h)
-    b.globalAlpha = 0.3
-    for (const dx of [-3, -1.5, 0, 1.5, 3]) b.drawImage(this.downA, dx, 0)
-    a.clearRect(0, 0, w, h)
-    a.globalAlpha = 0.3
-    for (const dy of [-3, -1.5, 0, 1.5, 3]) a.drawImage(this.downB, 0, dy)
+    // Raise the frame to a power: that is a real knee. Each multiply pass
+    // squares the value, so mid tones collapse toward black while anything
+    // near white survives untouched — v^8 leaves 1.0 at 1.0, takes a 0.75
+    // mid tone down to 0.1 and a 0.5 shadow to 0.004.
+    //
+    // No gain follows. Scaling the result back up is what the old pass did in
+    // spirit, and it is exactly what turns a bright sky into milk: at these
+    // resolutions the sky is already 0.9, and any restore gain multiplies it
+    // straight through the ceiling.
+    const passes = threshold >= 0.55 ? 3 : 2
+    for (let i = 0; i < passes; i++) {
+      b.globalCompositeOperation = 'source-over'
+      b.globalAlpha = 1
+      b.clearRect(0, 0, w, h)
+      b.drawImage(this.downA, 0, 0)
+      a.globalCompositeOperation = 'multiply'
+      a.drawImage(this.downB, 0, 0)
+    }
+    a.globalCompositeOperation = 'source-over'
     a.globalAlpha = 1
-    b.globalAlpha = 1
+
+    // Two separable Gaussian taps. Small radius on purpose: this is a glow
+    // around a highlight, not a soft-focus filter over the whole frame.
+    this.blurPass(b, this.downA, radius, 0)
+    this.blurPass(a, this.downB, 0, radius)
 
     target.globalCompositeOperation = 'lighter'
     target.globalAlpha = amount
-    target.imageSmoothingEnabled = true
     target.drawImage(this.downA, 0, 0, BUFFER_W, BUFFER_H)
     target.globalCompositeOperation = 'source-over'
     target.globalAlpha = 1
   }
 
-  /** Split the red and blue channels outward from the centre. */
+  private blurPass(
+    dst: CanvasRenderingContext2D,
+    src: HTMLCanvasElement,
+    dx: number,
+    dy: number,
+  ): void {
+    dst.globalCompositeOperation = 'source-over'
+    dst.clearRect(0, 0, src.width, src.height)
+    let acc = 0
+    for (let i = 0; i < KERNEL.length; i++) {
+      acc += KERNEL[i]
+      dst.globalAlpha = KERNEL[i] / acc
+      dst.drawImage(src, dx * TAPS[i], dy * TAPS[i])
+    }
+    dst.globalAlpha = 1
+  }
+
+  /**
+   * Lift / gamma / gain, in that order of effect but composited the other way
+   * round — a flat overlay plate cannot do any of this: it washes the blacks
+   * out and flattens the very contrast the cel shading depends on.
+   */
+  private grade(
+    target: CanvasRenderingContext2D,
+    source: HTMLCanvasElement,
+    s: PostFxSettings,
+  ): void {
+    const k = clamp01(s.grade)
+    const gain = s.gradeGain ?? 1
+    const gamma = s.gradeGamma ?? 1
+
+    // Gain — exposure. Adding the frame to itself is a straight multiply.
+    if (gain > 1.002) {
+      target.globalCompositeOperation = 'lighter'
+      target.globalAlpha = clamp01((gain - 1) * k)
+      target.drawImage(source, 0, 0)
+    } else if (gain < 0.998) {
+      target.globalCompositeOperation = 'multiply'
+      target.globalAlpha = k
+      const v = Math.round(clamp01(gain) * 255)
+      target.fillStyle = `rgb(${v},${v},${v})`
+      target.fillRect(0, 0, BUFFER_W, BUFFER_H)
+    }
+
+    // Gamma — blending the frame with its own square bends the mid tones while
+    // leaving 0 and 1 pinned, which is exactly what a gamma control does.
+    if (gamma > 1.002) {
+      target.globalCompositeOperation = 'multiply'
+      target.globalAlpha = clamp01((gamma - 1) * k * 3)
+      target.drawImage(source, 0, 0)
+    } else if (gamma < 0.998) {
+      target.globalCompositeOperation = 'screen'
+      target.globalAlpha = clamp01((1 - gamma) * k * 3)
+      target.drawImage(source, 0, 0)
+    }
+
+    // Highlight tint: a multiply keeps black at black and pulls everything
+    // lit toward the biome's key colour.
+    target.globalCompositeOperation = 'multiply'
+    target.globalAlpha = k * 0.34
+    target.fillStyle = s.gradeColor
+    target.fillRect(0, 0, BUFFER_W, BUFFER_H)
+
+    // Lift: a small additive plate in the shadow colour. This is the only
+    // pass allowed to touch the blacks, and it tints rather than greys them.
+    target.globalCompositeOperation = 'lighter'
+    target.globalAlpha = k * 0.13
+    target.fillStyle = s.gradeShadow ?? PAL.shadow
+    target.fillRect(0, 0, BUFFER_W, BUFFER_H)
+
+    target.globalCompositeOperation = 'source-over'
+    target.globalAlpha = 1
+  }
+
+  /** Zoom blur that bites at the edges of the frame and leaves the centre sharp. */
+  private speedBlur(
+    target: CanvasRenderingContext2D,
+    source: HTMLCanvasElement,
+    amount: number,
+  ): void {
+    const a = this.downA.getContext('2d')!
+    const w = this.downA.width
+    const h = this.downA.height
+    a.globalCompositeOperation = 'source-over'
+    a.clearRect(0, 0, w, h)
+    const steps = 5
+    let acc = 0
+    for (let i = 0; i < steps; i++) {
+      const z = 1 + (i / (steps - 1)) * (0.015 + amount * 0.075)
+      acc += 1
+      a.globalAlpha = 1 / acc
+      const dw = w * z
+      const dh = h * z
+      a.drawImage(source, (w - dw) / 2, (h - dh) / 2, dw, dh)
+    }
+    a.globalAlpha = 1
+
+    // Punch the middle out so the streaks only appear where the eye is not.
+    const g = a.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.62)
+    g.addColorStop(0, 'rgba(0,0,0,1)')
+    g.addColorStop(0.45, 'rgba(0,0,0,0.85)')
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    a.globalCompositeOperation = 'destination-out'
+    a.fillStyle = g
+    a.fillRect(0, 0, w, h)
+    a.globalCompositeOperation = 'source-over'
+
+    target.globalAlpha = clamp01(amount * 1.1)
+    target.drawImage(this.downA, 0, 0, BUFFER_W, BUFFER_H)
+    target.globalAlpha = 1
+  }
+
+  /**
+   * A real channel split: the frame is reduced to its green channel and the
+   * red and blue are added back from offset copies. Drawing the whole frame
+   * twice with 'lighter', as this used to, only brightens it.
+   */
   private chromatic(
     target: CanvasRenderingContext2D,
     source: HTMLCanvasElement,
     amount: number,
   ): void {
-    const d = amount * 5
+    const d = amount * 7
+    const hw = this.halfR.width
+    const hh = this.halfR.height
+    const r = this.halfR.getContext('2d')!
+    const b = this.halfB.getContext('2d')!
+    for (const [ctx, plate] of [[r, '#FF0000'], [b, '#0000FF']] as const) {
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 1
+      ctx.clearRect(0, 0, hw, hh)
+      ctx.drawImage(source, 0, 0, hw, hh)
+      ctx.globalCompositeOperation = 'multiply'
+      ctx.fillStyle = plate
+      ctx.fillRect(0, 0, hw, hh)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+    target.globalCompositeOperation = 'multiply'
+    target.fillStyle = '#00FF00'
+    target.fillRect(0, 0, BUFFER_W, BUFFER_H)
     target.globalCompositeOperation = 'lighter'
-    target.globalAlpha = 0.28 * amount
-    target.drawImage(source, -d, 0)
-    target.drawImage(source, d, 0)
+    target.drawImage(this.halfR, d, 0, BUFFER_W, BUFFER_H)
+    target.drawImage(this.halfB, -d, 0, BUFFER_W, BUFFER_H)
     target.globalCompositeOperation = 'source-over'
-    target.globalAlpha = 1
+  }
+
+  /**
+   * Desert shimmer: the band is copied out and redrawn as horizontal slices,
+   * each pushed sideways by a travelling wave. Slices are cheap — the whole
+   * band is only a few hundred thousand pixels.
+   */
+  private heatHaze(
+    target: CanvasRenderingContext2D,
+    source: HTMLCanvasElement,
+    amount: number,
+    yFrac: number,
+    hFrac: number,
+    time: number,
+  ): void {
+    const y0 = Math.floor(clamp01(yFrac) * BUFFER_H)
+    const bh = Math.max(8, Math.floor(clamp01(hFrac) * BUFFER_H))
+    if (y0 >= BUFFER_H) return
+    const h = Math.min(bh, BUFFER_H - y0)
+    if (!this.band || this.band.height < h) this.band = canvas(BUFFER_W, Math.max(h, 8))
+    const bctx = this.band.getContext('2d')!
+    bctx.globalCompositeOperation = 'source-over'
+    bctx.globalAlpha = 1
+    bctx.clearRect(0, 0, this.band.width, this.band.height)
+    bctx.drawImage(source, 0, y0, BUFFER_W, h, 0, 0, BUFFER_W, h)
+
+    const STRIP = 4
+    const amp = amount * 5
+    for (let y = 0; y < h; y += STRIP) {
+      // Warmer near the ground: the wave grows toward the bottom of the band.
+      const depth = y / h
+      const dx = Math.sin(time * 2.6 + y * 0.07) * amp * (0.35 + depth * 0.9)
+      const sh = Math.min(STRIP, h - y)
+      // Overdraw one pixel horizontally so the shift never exposes the edge.
+      target.drawImage(this.band, 0, y, BUFFER_W, sh, dx, y0 + y, BUFFER_W, sh)
+    }
   }
 
   private vignette(strength: number): HTMLCanvasElement {
@@ -155,8 +383,8 @@ export class PostFx {
     const c = canvas(BUFFER_W, BUFFER_H)
     const ctx = c.getContext('2d')!
     const g = ctx.createRadialGradient(
-      BUFFER_W / 2, BUFFER_H / 2, BUFFER_H * 0.3,
-      BUFFER_W / 2, BUFFER_H / 2, BUFFER_W * 0.75,
+      BUFFER_W / 2, BUFFER_H / 2, BUFFER_H * 0.34,
+      BUFFER_W / 2, BUFFER_H / 2, BUFFER_W * 0.72,
     )
     g.addColorStop(0, 'rgba(0,0,0,0)')
     g.addColorStop(1, `rgba(6,10,26,${strength})`)
@@ -165,6 +393,38 @@ export class PostFx {
     this.vignetteCache = c
     this.vignetteStrength = strength
     return c
+  }
+
+  /**
+   * Film grain as a cached 'overlay' pattern, offset by a whole tile each
+   * frame so it crawls instead of sitting still. One fillRect for the frame.
+   */
+  private grain(target: CanvasRenderingContext2D, amount: number): void {
+    if (!this.grainPattern) {
+      const size = 128
+      const c = canvas(size, size)
+      const ctx = c.getContext('2d')!
+      const img = ctx.createImageData(size, size)
+      for (let i = 0; i < img.data.length; i += 4) {
+        // Mid grey is the no-op value under 'overlay'; the spread is the grain.
+        const v = 128 + (Math.random() - 0.5) * 132
+        img.data[i] = v
+        img.data[i + 1] = v
+        img.data[i + 2] = v
+        img.data[i + 3] = 255
+      }
+      ctx.putImageData(img, 0, 0)
+      this.grainPattern = target.createPattern(c, 'repeat')
+    }
+    if (!this.grainPattern) return
+    target.save()
+    target.globalCompositeOperation = 'overlay'
+    target.globalAlpha = clamp01(amount) * 0.5
+    // Jumping by a random whole-pixel offset re-rolls the visible noise.
+    target.translate(Math.floor(Math.random() * 128), Math.floor(Math.random() * 128))
+    target.fillStyle = this.grainPattern
+    target.fillRect(-128, -128, BUFFER_W + 256, BUFFER_H + 256)
+    target.restore()
   }
 
   private damageVignette(target: CanvasRenderingContext2D, amount: number): void {

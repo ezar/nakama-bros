@@ -469,9 +469,19 @@ function drawFishLord(s: Surface, t: number, mode: BossMode, phase: Phase): void
           scar(cc, [r.sh[0] - 2, r.sh[1] + 4], [r.hip[0] + 5, r.hip[1] - 3], C(PAL.luffyRedDeep).core)
         }
       })
-      // Gi trousers knot at the waist.
-      paint(c, limbPath(r.hip[0] - 8, r.hip[1] - 2, r.hip[0] + 8, r.hip[1] - 0.4, 2.6, 2.6), C(mix(PAL.cream, PAL.sandDeep, 0.35)), {
-        shadow: 0.42, radius: 3, pivot: r.hip, rim: 0.45, line: 0.5,
+      // Gi belt: narrow, with the knot hanging off the near hip so it reads as
+      // cloth rather than as a plate strapped to his waist.
+      const belt = C(mix(PAL.cream, PAL.sandDeep, 0.45))
+      paint(c, limbPath(r.hip[0] - 7.5, r.hip[1] - 2.4, r.hip[0] + 7.5, r.hip[1] - 1, 1.8, 1.8), belt, {
+        shadow: 0.42, radius: 2.2, pivot: r.hip, rim: 0.45, line: 0.5,
+      })
+      paint(c, blob([
+        [r.hip[0] + 2, r.hip[1] - 2.6],
+        [r.hip[0] + 5.4, r.hip[1] - 1.4],
+        [r.hip[0] + 4.4, r.hip[1] + 4.6],
+        [r.hip[0] + 1.4, r.hip[1] + 3],
+      ] as Pt[], 0.6), belt, {
+        shadow: 0.44, radius: 3, pivot: [r.hip[0] + 3, r.hip[1]], rim: 0.4, line: 0.48,
       })
     },
     front: (c, r) => {
