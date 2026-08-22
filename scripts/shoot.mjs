@@ -20,7 +20,7 @@ const argOf = (name, dflt) => {
 }
 
 const OUT = resolve(argOf('out', 'screenshots'))
-const DIST = resolve('dist')
+const DIST = resolve(argOf('dist', 'dist'))
 const PORT = Number(argOf('port', '4319'))
 const ONLY = argOf('shots', '')
   .split(',')
@@ -33,7 +33,7 @@ const MIME = {
 }
 
 if (!existsSync(DIST)) {
-  console.error('dist/ not found — run `npm run build` first.')
+  console.error(`${DIST} not found — run \`npm run build\` first.`)
   process.exit(1)
 }
 
