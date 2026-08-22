@@ -67,6 +67,8 @@ export abstract class Enemy extends Entity {
   points: number = SCORE.enemy
   /** Can the player kill this by landing on it? */
   stompable = true
+  /** Damage one stomp deals. Two-hit enemies survive the first landing. */
+  stompDamage = 1
   /** Does the player's attack hurt it? */
   damageable = true
   /** Does contact hurt the player? */
@@ -128,6 +130,8 @@ export abstract class Enemy extends Entity {
   /** Seconds of squash animation before removal. */
   protected dyingFor = -1
   private cooldownLeft = 0
+  /** One strike per attack: set when `strikeBox` connects, cleared on entry. */
+  protected struck = false
 
   constructor(x: number, y: number, w: number, h: number) {
     super(x, y, w, h)
@@ -183,8 +187,11 @@ export abstract class Enemy extends Entity {
     this.sheet = this.resolveSheet()
 
     if (this.dyingFor >= 0) {
+      // A flattened body stays flattened where it fell: letting gravity keep
+      // running here used to sink the corpse through the floor it died on.
       this.dyingFor += dt
-      this.body.vy = Math.min(this.body.vy + this.gravity * dt, PHYS.maxFall)
+      this.body.vx = 0
+      this.body.vy = 0
       if (this.dyingFor > 0.5) this.dead = true
       return
     }
@@ -274,7 +281,10 @@ export abstract class Enemy extends Entity {
   protected onEnterState(next: EnemyState, _prev: EnemyState, world: World): void {
     if (next === 'alert' && this.alertTime > 0) this.tell(world)
     if (next === 'alert') this.playFirstOnce('windup', 'idle')
-    if (next === 'attack') this.playFirstOnce('attack', 'run', 'walk')
+    if (next === 'attack') {
+      this.struck = false
+      this.playFirstOnce('attack', 'run', 'walk')
+    }
     if (next === 'recover') this.playFirst('idle', 'walk')
     if (next === 'stunned') this.playFirstOnce('hurt', 'idle')
   }
@@ -370,6 +380,35 @@ export abstract class Enemy extends Entity {
     if (Math.abs(dx) > 2) this.facing = dx > 0 ? 1 : -1
   }
 
+  /** Straight-line distance to the player, or Infinity when there is none. */
+  protected distToPlayer(world: World): number {
+    const p = world.player()
+    if (!p) return Infinity
+    return Math.hypot(p.x - this.x, p.y - this.body.h * 0.5 - (this.y - this.body.h * 0.5))
+  }
+
+  /** -1 / 1 toward the player. Falls back to the current facing. */
+  protected dirToPlayer(world: World): 1 | -1 {
+    const p = world.player()
+    if (!p) return this.facing
+    return p.x >= this.x ? 1 : -1
+  }
+
+  /**
+   * Is the player looking at this enemy?
+   *
+   * The ghost is built on this: "observed" is the player's gaze, not the
+   * camera's, so the counter-play is to turn your back on it and keep walking.
+   */
+  protected observedBy(world: World, range = 170): boolean {
+    const p = world.player() as Player | null
+    if (!p || p.dead || p.state === 'clear') return false
+    const dx = this.x - p.x
+    if (Math.abs(dx) > range) return false
+    if (Math.abs(this.y - p.y) > range * 0.7) return false
+    return Math.sign(dx) === p.facing || Math.abs(dx) < 8
+  }
+
   protected turn(): void {
     this.facing = this.facing === 1 ? -1 : 1
     this.body.vx = -this.body.vx
@@ -405,6 +444,24 @@ export abstract class Enemy extends Entity {
   protected checkPlayer(world: World): void {
     const player = world.player() as Player | null
     if (!player || player.dead) return
+
+    // Reach attacks are tested before bodies: a sabre that connects should read
+    // as the sabre, not as walking into the Marine holding it.
+    if (this.state === 'attack' && !this.struck) {
+      const box = this.strikeBox()
+      if (box && rectsOverlap(box, player.rect())) {
+        this.struck = true
+        world.hitstop(4)
+        player.hurt(world, {
+          amount: 1,
+          dirX: this.facing,
+          dirY: -0.4,
+          sourceId: this.id,
+          kind: 'melee',
+        })
+      }
+    }
+
     const a = this.hurtbox()
     if (!rectsOverlap(a, player.rect())) return
 
@@ -418,7 +475,7 @@ export abstract class Enemy extends Entity {
     if (descending && crossed) {
       if (this.stompable) {
         player.bounce(world, world.input.held.jump)
-        this.defeat(world, 'stomp')
+        this.takeStomp(world, player)
         return
       }
       // Landing on something you cannot stomp still has to read as a rebuff,
@@ -435,6 +492,55 @@ export abstract class Enemy extends Entity {
         sourceId: this.id,
         kind: 'melee',
       })
+    }
+  }
+
+  /**
+   * A landed stomp. It goes through the health pool rather than straight to
+   * `defeat` so that a two-hit enemy — the zombie, an armoured Marine — is
+   * knocked flat by the first landing and finished by the second, which is the
+   * whole reason `health` exists on an enemy.
+   */
+  protected takeStomp(world: World, player: Player): void {
+    const lethal = !this.damageable || this.health - this.stompDamage <= 0
+    if (lethal) {
+      this.defeat(world, 'stomp')
+      return
+    }
+    this.health -= this.stompDamage
+    this.flash = 1
+    this.iframes = 0.25
+    world.audio.playSfx('stomp', { volume: 0.8, rate: 0.9 })
+    world.hitstop(4)
+    world.shake(0.1)
+    world.particles.burst(10, this.x, this.y - this.body.h, {
+      speed: 130, speedVar: 70, life: 0.3, size: 2.2, sizeEnd: 0.3, angle: -Math.PI / 2,
+      spread: Math.PI, color: PAL.cream, colorEnd: this.accent, shape: 'spark',
+      additive: true, drag: 0.08,
+    })
+    this.squash(1.45, 0.6)
+    this.knockback(world, 0, 0, 0.5, 0)
+    this.onSurvivedHit(
+      { amount: this.stompDamage, dirX: 0, dirY: 1, sourceId: player.id, kind: 'stomp' },
+      world,
+    )
+  }
+
+  /**
+   * The reach of the current attack, live only during `attack`. Enemies that
+   * only hurt by touching return null and never think about it again.
+   */
+  protected strikeBox(): Rect | null {
+    return null
+  }
+
+  /** A rect `reach` deep in front of the enemy — the common strike shape. */
+  protected reachBox(reach: number, height = this.body.h * 0.7, lift = 0): Rect {
+    return {
+      x: this.facing === 1 ? this.x : this.x - reach,
+      y: this.y - this.body.h * 0.9 + lift,
+      w: reach,
+      h: height,
     }
   }
 

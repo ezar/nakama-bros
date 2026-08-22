@@ -95,21 +95,21 @@ export default function App() {
     audio.stopMusic(0.3)
   }, [audio])
 
-  return (
-    <div className="h-full w-full">
-      <AnimatePresence mode="wait">
-        {screen === 'loading' && <LoadingScreen key="loading" progress={progress} label={loadLabel} />}
-
-        {screen === 'title' && (
+  const renderScreen = () => {
+    switch (screen) {
+      case 'loading':
+        return <LoadingScreen key="loading" progress={progress} label={loadLabel} />
+      case 'title':
+        return (
           <TitleScreen
             key="title"
             onPlay={() => startLevel(ALL_LEVELS[0].id)}
             onCrew={() => setScreen('crew')}
             onOptions={() => setScreen('options')}
           />
-        )}
-
-        {screen === 'crew' && (
+        )
+      case 'crew':
+        return (
           <CrewScreen
             key="crew"
             selected={crew}
@@ -120,10 +120,26 @@ export default function App() {
             onStart={() => startLevel(ALL_LEVELS[0].id)}
             onBack={() => setScreen('title')}
           />
-        )}
+        )
+      case 'options':
+        return <OptionsScreen key="options" onBack={() => setScreen('title')} />
+      default:
+        return null
+    }
+  }
 
-        {screen === 'options' && <OptionsScreen key="options" onBack={() => setScreen('title')} />}
-      </AnimatePresence>
+  return (
+    <div className="h-full w-full">
+      {/*
+        Screens mount and animate themselves in; nothing waits on an exit.
+        AnimatePresence held the incoming screen back until the outgoing one
+        reported its exit finished, and when that report never arrived the app
+        sat on a blank frame with no error to go on. Letting it overlap instead
+        left the old screen mounted at zero opacity, still swallowing clicks.
+        Each screen already has its own entrance, so the fade out is the only
+        thing given up, and it buys a shell that cannot dead-end.
+      */}
+      {renderScreen()}
 
       {screen === 'play' && (
         <div className="relative h-full w-full">

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { CrewId, HudSnapshot, LevelDef, LevelResult } from '../types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { TILE, type CrewId, type HudSnapshot, type LevelDef, type LevelResult } from '../types'
 import { Game } from '../game/Game'
 import { Hud } from './hud/Hud'
 import { TouchControls } from './controls/TouchControls'
@@ -86,10 +86,28 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
   const showTouch =
     settings.touchControls === 'on' || (settings.touchControls === 'auto' && isTouchDevice())
 
+  /** Where the stage ends, in world units — the Log Pose's north. */
+  const goal = useMemo(() => level.spawns.find((s) => s.type === 'goal') ?? null, [level])
+
+  /**
+   * Sampled by the HUD compass once per animation frame. It reads the live
+   * entity rather than the HUD snapshot because a needle that updated at the
+   * snapshot's rate would visibly step.
+   */
+  const compass = useCallback(() => {
+    const game = gameRef.current
+    if (!game || !goal) return null
+    const player = game.playerEntity
+    if (!player) return null
+    const dx = goal.tx * TILE + TILE / 2 - player.body.x
+    const dy = goal.ty * TILE + TILE / 2 - (player.body.y - player.body.h / 2)
+    return { angle: Math.atan2(dy, dx), dist: Math.hypot(dx, dy) }
+  }, [goal])
+
   return (
     <div className="relative flex h-full w-full items-center justify-center bg-[#050a14]">
       <canvas ref={canvasRef} className="shadow-[0_0_80px_-10px_rgba(0,180,216,0.35)]" />
-      {hud && <Hud hud={hud} />}
+      {hud && <Hud hud={hud} compass={compass} compact={showTouch} />}
       {gameRef.current && (
         <TouchControls input={gameRef.current.inputManager} visible={showTouch} />
       )}

@@ -5,6 +5,12 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* Notch and home-indicator insets, resolved once so touch controls and the
+       HUD can both budget for them. */
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
   }
 
   html,
@@ -30,35 +36,325 @@
     image-rendering: auto;
     display: block;
   }
+
+  /* One focus ring for the whole shell: a brass hairline plus a dark halo, so
+     it survives on parchment and on night sky alike. Keyboard and gamepad only
+     — a mouse user who just clicked does not need to be told where they are. */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.op-gold');
+    outline-offset: 3px;
+    border-radius: 4px;
+    box-shadow:
+      0 0 0 5px rgba(5, 10, 20, 0.75),
+      0 0 18px rgba(244, 197, 66, 0.55);
+  }
 }
 
 @layer components {
-  .op-panel {
-    @apply rounded-xl border border-op-gold/25 bg-op-ocean/85 backdrop-blur-sm;
-    box-shadow: 0 18px 48px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 245, 228, 0.08);
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+
+  /* Paper fibre. One tiled noise field, multiplied into the sheet. */
+  .paper-grain {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
+      repeating-linear-gradient(
+        94deg,
+        rgba(120, 84, 40, 0.05) 0px,
+        rgba(120, 84, 40, 0) 2px,
+        rgba(120, 84, 40, 0) 5px,
+        rgba(150, 110, 60, 0.04) 7px
+      );
+    background-size: 160px 160px, auto;
+    mix-blend-mode: multiply;
+    opacity: 0.2;
   }
 
+  /* Oiled oak: planks with a seam, a slow colour drift and a fine grain. */
+  .wood {
+    background-color: #3b2416;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w)' opacity='0.5'/%3E%3C/svg%3E"),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.5) 0px,
+        rgba(0, 0, 0, 0.5) 2px,
+        rgba(255, 226, 180, 0.06) 4px,
+        rgba(255, 255, 255, 0) 8px,
+        rgba(255, 255, 255, 0) 173px,
+        rgba(0, 0, 0, 0.5) 175px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.28) 0px,
+        rgba(0, 0, 0, 0.28) 2px,
+        rgba(255, 255, 255, 0) 5px,
+        rgba(255, 255, 255, 0) 268px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.16) 0px,
+        rgba(0, 0, 0, 0.16) 1px,
+        rgba(255, 255, 255, 0) 3px,
+        rgba(255, 255, 255, 0) 97px
+      ),
+      linear-gradient(178deg, #4E3220 0%, #33200f 55%, #241407 100%);
+    background-size: 220px 220px, auto, auto, auto, auto;
+    background-blend-mode: soft-light, normal, normal, normal, normal;
+  }
+
+  .wood-dark {
+    background-color: #22140c;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='w2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23w2)' opacity='0.5'/%3E%3C/svg%3E"),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.45) 0px,
+        rgba(0, 0, 0, 0.45) 2px,
+        rgba(255, 226, 180, 0.04) 4px,
+        rgba(255, 255, 255, 0) 8px,
+        rgba(255, 255, 255, 0) 211px,
+        rgba(0, 0, 0, 0.45) 213px
+      ),
+      linear-gradient(180deg, #2e1c11 0%, #1b0f08 100%);
+    background-size: 220px 220px, auto, auto;
+    background-blend-mode: soft-light, normal, normal;
+  }
+
+  /* Tarnished brass, lit from the upper left like everything else. */
+  .brass {
+    background-image: linear-gradient(
+      160deg,
+      #f4dc9c 0%,
+      #cfa04a 24%,
+      #8d6524 52%,
+      #c99a46 74%,
+      #6d4a1a 100%
+    );
+  }
+
+  .op-panel {
+    @apply relative rounded-lg border-2 border-op-brass/70;
+    background-image:
+      repeating-linear-gradient(
+        87deg,
+        rgba(255, 226, 180, 0.035) 0px,
+        rgba(255, 226, 180, 0) 4px,
+        rgba(0, 0, 0, 0.09) 8px,
+        rgba(0, 0, 0, 0) 14px
+      ),
+      linear-gradient(172deg, #4a2f1c 0%, #2c1a0e 100%);
+    box-shadow:
+      0 22px 48px -20px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 226, 180, 0.16),
+      inset 0 -18px 30px -18px rgba(0, 0, 0, 0.8);
+  }
+
+  /* ── Controls ─────────────────────────────────────────────────────────── */
+
+  /* A brass plate screwed to the wood. Hover lifts it, press seats it. */
   .op-button {
-    @apply relative rounded-lg px-6 py-3 font-body font-semibold tracking-wide transition;
-    @apply border border-op-gold/40 bg-gradient-to-b from-op-gold/25 to-op-gold/5 text-op-cream;
+    @apply relative rounded-md px-6 py-3 font-body font-semibold tracking-wide text-op-cream;
+    @apply border border-op-brass-dark;
+    background-image: linear-gradient(180deg, rgba(255, 226, 180, 0.16) 0%, rgba(0, 0, 0, 0.3) 100%),
+      linear-gradient(172deg, #54341f 0%, #2c1a0e 100%);
+    background-color: #43291a;
+    box-shadow:
+      0 4px 0 0 #1c0f07,
+      0 10px 18px -8px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 226, 180, 0.22);
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      filter 120ms ease;
   }
 
   .op-button:hover {
-    @apply border-op-gold/80 from-op-gold/40 to-op-gold/10;
-    transform: translateY(-1px);
+    filter: brightness(1.14);
+    transform: translateY(-2px);
+    box-shadow:
+      0 6px 0 0 #1c0f07,
+      0 14px 22px -8px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 226, 180, 0.28);
   }
 
-  .op-button:active {
-    transform: translateY(1px);
+  .op-button:active,
+  .op-button[data-pressed='true'] {
+    transform: translateY(2px);
+    box-shadow:
+      0 1px 0 0 #1c0f07,
+      0 4px 10px -6px rgba(0, 0, 0, 0.9),
+      inset 0 2px 6px rgba(0, 0, 0, 0.55);
   }
 
   .op-button--primary {
-    @apply border-op-gold bg-gradient-to-b from-op-gold to-op-gold-dim font-extrabold text-op-deep;
+    @apply border-op-brass-light/70 font-extrabold text-op-ink;
+    background-image: linear-gradient(
+      168deg,
+      #ffeab2 0%,
+      #f3d489 18%,
+      #e0ae43 46%,
+      #b8842c 78%,
+      #8a5f1c 100%
+    );
+    background-color: #e0ae43;
+    text-shadow: 0 1px 0 rgba(255, 240, 200, 0.55);
+    box-shadow:
+      0 4px 0 0 #5c3d12,
+      0 12px 22px -8px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 250, 230, 0.6);
+  }
+
+  .op-button:disabled {
+    filter: grayscale(0.7) brightness(0.6);
+    transform: none;
+    cursor: not-allowed;
   }
 
   .op-title {
     @apply font-display tracking-wide;
-    text-shadow: 0 3px 0 #b8942e, 0 6px 18px rgba(0, 0, 0, 0.75);
+    text-shadow:
+      0 2px 0 #7c5a21,
+      0 4px 0 rgba(40, 22, 8, 0.9),
+      0 10px 22px rgba(0, 0, 0, 0.8);
+  }
+
+  /* Ink on paper: never pure black, always slightly bled. */
+  .ink {
+    color: theme('colors.op-ink');
+    text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Range: the thumb is a brass rivet, the track is set into the sheet. */
+  .op-range {
+    box-shadow: inset 0 1px 3px rgba(42, 29, 20, 0.55);
+  }
+
+  .op-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #4a3210;
+    background: radial-gradient(circle at 34% 30%, #f7e6b6 0%, #e8c579 24%, #c8973f 58%, #6d4a1a 100%);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55), inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+
+  .op-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #4a3210;
+    background: radial-gradient(circle at 34% 30%, #f7e6b6 0%, #c8973f 58%, #6d4a1a 100%);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+  }
+
+  /* ── Logo ─────────────────────────────────────────────────────────────── */
+
+  .logo-word {
+    @apply font-body font-extrabold uppercase;
+    letter-spacing: -0.012em;
+    background-image: linear-gradient(
+      178deg,
+      #fff3d0 4%,
+      #f6cf6a 26%,
+      #e0a838 44%,
+      #b07c22 58%,
+      #f0c85e 74%,
+      #8a5c18 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .logo-shine {
+    background-image: linear-gradient(
+      104deg,
+      rgba(255, 255, 255, 0) 38%,
+      rgba(255, 255, 255, 0.92) 47%,
+      rgba(255, 255, 255, 0) 56%
+    );
+    background-size: 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: sheen 6.5s ease-in-out infinite;
+  }
+}
+
+@layer utilities {
+  .safe-b {
+    padding-bottom: calc(var(--safe-b) + 0px);
+  }
+
+  .tabnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Layers that tile at half their own width loop by sliding exactly half. */
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes drift-back {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* A gull crosses the frame, rising as it goes and fading at both ends. */
+@keyframes gull-cross {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.85;
+  }
+  88% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(115vw, -9vh, 0);
+    opacity: 0;
+  }
+}
+
+/* The ship makes way across the bay, slowly, and never leaves it. */
+@keyframes ship-cruise {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(22vw);
+  }
+}
+
+@keyframes sheen {
+  0%,
+  62% {
+    background-position: 130% 0;
+  }
+  86%,
+  100% {
+    background-position: -130% 0;
   }
 }
 
