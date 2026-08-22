@@ -121,3 +121,19 @@ La tarjeta de arranque (`#boot` en `index.html`) repite esa misma composición
 en HTML y CSS en línea, para que pinte en el primer frame antes de que cargue
 el bundle; `main.tsx` la retira cuando React ya está en pantalla. Si cambias
 una, cambia la otra: en iOS se ven una detrás de otra.
+
+## Arte promocional
+
+```bash
+npm run promo                     # public/promo/, tres formatos
+node scripts/promo.mjs --frames   # candidatos de fondo, para elegir encuadre
+node scripts/promo.mjs --only og  # una sola tarjeta, para iterar
+```
+
+Nada de esto está maquetado a mano: el fondo es un frame que el motor ha
+renderizado de verdad y los personajes salen del atlas que usa el juego, así
+que el arte no puede desviarse de lo que ve el jugador. La tarjeta ancha
+(`og-1200x630.png`) es también el `og:image` de la página.
+
+Comparte paleta, marca y tipografía con los iconos a través de
+`scripts/lib/brand.mjs`; si tocas una de las dos cosas, regenera ambas.
