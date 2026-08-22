@@ -1,0 +1,15 @@
+{
+  "name": "Nakama Bros",
+  "short_name": "Nakama Bros",
+  "description": "Un plataformas pirata con la tripulación del Sombrero de Paja.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050a14",
+  "theme_color": "#071020",
+  "lang": "es",
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

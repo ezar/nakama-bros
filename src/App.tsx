@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import type { CrewId, LevelResult } from './types'
 import { loadArt } from './art'
@@ -40,7 +40,6 @@ export default function App() {
   const recordResult = useProgress((s) => s.record)
   const settings = useSettings()
   const audio = useMemo(() => new AudioEngine(), [])
-  const audioStarted = useRef(false)
 
   useEffect(() => {
     loadArt((t, label) => {
@@ -49,22 +48,40 @@ export default function App() {
     }).then(() => setScreen('title'))
   }, [])
 
-  // Browsers only allow audio to start inside a user gesture.
+  // Browsers only allow audio to start inside a user gesture — and on iOS a
+  // gesture that looks like it should have unlocked the context often leaves it
+  // suspended anyway. So this does not fire once and hope: it keeps listening
+  // for as long as the app is mounted, and it re-tries whenever the app comes
+  // back to the foreground, because iOS suspends the context every time the
+  // PWA is backgrounded and a resume outside a gesture usually will not revive
+  // it. The handlers cost nothing once the context is running: they return
+  // immediately.
   useEffect(() => {
     const unlock = () => {
-      if (audioStarted.current) return
-      audioStarted.current = true
+      if (audio.isRunning()) return
       void audio.ready().then(() => {
         audio.setMasterVolume(settings.master)
         audio.setMusicVolume(settings.music)
         audio.setSfxVolume(settings.sfx)
       })
     }
-    window.addEventListener('pointerdown', unlock, { once: true })
-    window.addEventListener('keydown', unlock, { once: true })
+
+    // Coming back to the foreground, try without a gesture first — but this
+    // often fails on iOS, and the listeners below are deliberately still
+    // attached to catch the next tap when it does.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') unlock()
+    }
+
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'touchend', 'keydown', 'click']
+    for (const e of events) window.addEventListener(e, unlock)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onVisible)
+
     return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
+      for (const e of events) window.removeEventListener(e, unlock)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onVisible)
     }
   }, [audio, settings.master, settings.music, settings.sfx])
 

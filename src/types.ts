@@ -369,6 +369,12 @@ export type SfxName =
 
 export interface AudioApi {
   ready(): Promise<void>
+  /**
+   * True once the context is genuinely producing sound. iOS can leave a context
+   * suspended after a gesture that looked like it should have unlocked it, so
+   * the caller has to be able to check rather than assume.
+   */
+  isRunning(): boolean
   playSfx(name: SfxName, opts?: { volume?: number; rate?: number; pan?: number }): void
   playMusic(track: string, opts?: { fade?: number; intensity?: number }): void
   stopMusic(fade?: number): void
