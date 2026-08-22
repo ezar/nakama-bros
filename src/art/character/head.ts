@@ -1,7 +1,7 @@
 import { cel, mix, type Cel } from '../color'
 import { blob, curve, ellipsePath, glint, inkStroke, paint, type Pt } from '../ink'
 import type { Expression, Skeleton } from './rig'
-import { SEG, limbForm } from './rig'
+import { limbForm } from './rig'
 
 /**
  * Heads and faces.
@@ -32,6 +32,18 @@ export interface FaceStyle {
   freckles: boolean
   /** Length of the nose tick, in head radii. */
   nose: number
+  /**
+   * A skull instead of a face: hollow sockets with a pinpoint of light in them,
+   * a nasal cavity and a fixed rank of teeth. The expression still has to read,
+   * so it lives in the socket's shape and the tilt of the brow ridge.
+   */
+  skull: boolean
+  /** Tusks rising from the lower jaw, in head radii. 0 is none. */
+  tusk: number
+  /** Gill slits across the cheek — the fishman read. */
+  gills: boolean
+  /** Widens the jaw without widening the cranium: a heavy, blunt head. */
+  jaw: number
 }
 
 export const FACE: FaceStyle = {
@@ -46,6 +58,10 @@ export const FACE: FaceStyle = {
   muzzle: false,
   freckles: false,
   nose: 1,
+  skull: false,
+  tusk: 0,
+  gills: false,
+  jaw: 1,
 }
 
 export interface FaceOptions {
@@ -100,17 +116,17 @@ const EXPRESSIONS: Record<Expression, EyeShape> = {
 }
 
 /** The skull shape: a rounded cranium tapering to a small chin. */
-export function headPath(cx: number, cy: number, r: number, turn: number): Path2D {
-  const jaw = 0.64 + turn * 0.12
+export function headPath(cx: number, cy: number, r: number, turn: number, heft = 1): Path2D {
+  const jaw = (0.64 + turn * 0.12) * heft
   return blob([
     [cx - r * 0.96, cy - r * 0.28],
     [cx - r * 0.72, cy - r * 0.94],
     [cx + r * 0.1, cy - r * 1.08],
     [cx + r * 0.94, cy - r * 0.6],
-    [cx + r * (0.88 + turn * 0.1), cy + r * 0.18],
-    [cx + r * 0.46, cy + r * jaw],
+    [cx + r * (0.88 + turn * 0.1) * heft, cy + r * 0.18],
+    [cx + r * 0.46 * heft, cy + r * jaw],
     [cx - r * 0.1, cy + r * (jaw + 0.16)],
-    [cx - r * 0.74, cy + r * 0.34],
+    [cx - r * 0.74 * heft, cy + r * 0.34],
   ] as Pt[], 0.9)
 }
 
@@ -120,17 +136,19 @@ export function drawHead(
   o: FaceOptions,
 ): { center: Pt; r: number; path: Path2D } {
   const [cx, cy] = s.head
-  const r = SEG.headR
-  const path = headPath(cx, cy, r, o.turn)
+  const r = s.headR
+  const st0: FaceStyle = { ...FACE, ...o.style }
+  const path = headPath(cx, cy, r, o.turn, st0.jaw)
 
   // Neck first, so the head sits on it rather than floating. It is kept in deep
   // shadow: the jaw always occludes the throat, and that one dark wedge is what
   // seats a head on a body.
+  const nw = 1.45 * st0.jaw
   const neckPath = blob([
-    [s.neck[0] - 1.45, s.neck[1] + 1.5],
-    [s.neck[0] + 1.45, s.neck[1] + 1.5],
-    [cx + 1.2, cy + r * 0.52],
-    [cx - 1.2, cy + r * 0.52],
+    [s.neck[0] - nw, s.neck[1] + 1.5],
+    [s.neck[0] + nw, s.neck[1] + 1.5],
+    [cx + nw * 0.83, cy + r * 0.52],
+    [cx - nw * 0.83, cy + r * 0.52],
   ] as Pt[], 0.4)
   paint(ctx, neckPath, o.skin, { shadow: 0.72, radius: 1.5, pivot: s.neck, line: 0.42, occlusion: 0.5 })
 
@@ -168,6 +186,12 @@ function drawFace(
   const nearW = r * 0.38 * st.eye
   const farW = nearW * (1 - o.turn * 0.4)
   const iris = st.iris ?? mix(o.hair.core, '#2E2440', 0.4)
+
+  if (st.skull) {
+    drawSkullFace(ctx, cx + shift, cy, r, o, e, ink)
+    ctx.restore()
+    return
+  }
 
   if (st.muzzle) {
     // The snout is drawn before the eyes so its ink line runs under them.
@@ -428,6 +452,24 @@ function drawFace(
   }
   ctx.restore()
 
+  // Gills: three slits raked back along the cheek, shorter as they go down.
+  if (st.gills) {
+    ctx.save()
+    ctx.strokeStyle = mix(o.skin.deep, ink, 0.5)
+    ctx.lineWidth = 0.4
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 3; i++) {
+      const y = cy + r * (0.1 + i * 0.24)
+      const len = r * (0.46 - i * 0.08)
+      ctx.stroke(curve([
+        [cx + shift - r * 0.92, y - r * 0.06],
+        [cx + shift - r * 0.92 + len * 0.5, y + r * 0.06],
+        [cx + shift - r * 0.92 + len, y + r * 0.04],
+      ] as Pt[]))
+    }
+    ctx.restore()
+  }
+
   // Cheek blush warms the skin and stops the face reading as plastic.
   if (st.blush > 0.01) {
     ctx.save()
@@ -438,6 +480,23 @@ function drawFace(
   }
 
   ctx.restore()
+
+  // Tusks break the jaw line, so they are drawn once the clip is released.
+  if (st.tusk > 0.01) {
+    const bone = cel(mix('#FFF8E8', o.skin.core, 0.18), { lineDarkness: 0.4 })
+    for (const [dx, k] of [[0.62, 1], [-0.24, 0.82]] as Array<[number, number]>) {
+      const bx = cx + shift + r * dx
+      const by = cy + r * 0.5
+      paint(ctx, blob([
+        [bx - r * 0.15 * k, by + r * 0.12],
+        [bx + r * 0.16 * k, by + r * 0.16],
+        [bx + r * 0.1 * k, by - r * st.tusk * k],
+        [bx - r * 0.12 * k, by - r * st.tusk * 0.82 * k],
+      ] as Pt[], 0.6), bone, {
+        shadow: 0.34, radius: r * 0.3, pivot: [bx, by], rim: 0.3, line: 0.42,
+      })
+    }
+  }
 
   // A bead of sweat sells effort at a size where a furrowed brow cannot. It
   // sits proud of the head, so it is drawn after the clip is released.
@@ -453,6 +512,108 @@ function drawFace(
     ] as Pt[], 0.85))
     ctx.restore()
   }
+}
+
+/**
+ * A skull's face.
+ *
+ * Everything the living cast says with lids and lips this one has to say with
+ * bone: the socket's *shape* carries the brow, a pinpoint of light inside it
+ * carries the gaze, and the jaw drops for a shout. Two hollows and a rank of
+ * teeth is a face the moment the light in the sockets moves.
+ */
+function drawSkullFace(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  o: FaceOptions,
+  e: EyeShape,
+  ink: string,
+): void {
+  const hollow = cel(mix(ink, '#0B0714', 0.45))
+  const bone = o.skin
+  const socket = (x: number, k: number, dir: number) => {
+    // The socket is a rounded triangle, tipped by the brow so the same hollow
+    // reads furious or startled without changing size.
+    const tilt = e.brow * dir * 0.5
+    const w = r * 0.44 * k
+    const h = r * 0.42 * (0.85 + e.open * 0.3)
+    const p = blob([
+      [x - w, cy - h * 0.5 + tilt * r * 0.3],
+      [x + w * 0.2, cy - h * (0.9 + e.raise * 0.1) - tilt * r * 0.3],
+      [x + w, cy - h * 0.25 - tilt * r * 0.2],
+      [x + w * 0.72, cy + h * 0.86],
+      [x - w * 0.5, cy + h * 0.92],
+    ] as Pt[], 0.9)
+    paint(ctx, p, hollow, { shadow: 0.2, radius: w, pivot: [x, cy], rim: 0, line: 0.42 })
+    // The pinpoint. It is the whole gaze, so it moves with the expression.
+    ctx.save()
+    ctx.globalAlpha = 0.92
+    ctx.fillStyle = '#F4FBFF'
+    ctx.fill(ellipsePath(x + w * (0.18 + e.look * 0.4), cy + h * (0.05 + e.look * 0.5),
+      w * 0.24 * k, h * 0.26))
+    ctx.restore()
+  }
+  socket(cx + r * 0.42, 1, 1)
+  if (o.turn < 0.94) socket(cx - r * 0.5, 1 - o.turn * 0.35, -1)
+
+  // Brow ridge: one heavy bone line across both sockets, the only thing that
+  // can scowl on a face with no muscles.
+  ctx.save()
+  ctx.strokeStyle = mix(bone.deep, ink, 0.5)
+  ctx.lineWidth = 0.5
+  ctx.stroke(curve([
+    [cx - r * 0.95, cy - r * (0.5 - e.brow * 0.16)],
+    [cx - r * 0.1, cy - r * 0.66],
+    [cx + r * 0.92, cy - r * (0.5 + e.brow * 0.16)],
+  ] as Pt[]))
+  ctx.restore()
+
+  // Nasal cavity — a small inverted heart, off-centre with the head's turn.
+  paint(ctx, blob([
+    [cx + r * 0.06, cy + r * 0.28],
+    [cx + r * 0.3, cy + r * 0.5],
+    [cx + r * 0.04, cy + r * 0.6],
+    [cx - r * 0.2, cy + r * 0.48],
+  ] as Pt[], 0.85), hollow, { shadow: 0, radius: r * 0.2, pivot: [cx, cy + r * 0.45], line: 0.36 })
+
+  // Teeth: an upper rank always, a lower one that drops away on a shout.
+  const drop = r * (0.1 + e.gape * 0.42)
+  const my = cy + r * 0.86
+  const tw = r * 0.78
+  const rank = (y: number, h: number) => {
+    const p = blob([
+      [cx - tw, y - h * 0.5],
+      [cx + tw * 0.92, y - h * 0.55],
+      [cx + tw * 0.8, y + h * 0.5],
+      [cx - tw * 0.9, y + h * 0.55],
+    ] as Pt[], 0.35)
+    ctx.fillStyle = '#FFFDF6'
+    ctx.fill(p)
+    ctx.save()
+    ctx.clip(p)
+    ctx.strokeStyle = mix(bone.shade, ink, 0.45)
+    ctx.lineWidth = 0.3
+    for (let i = -3; i <= 3; i++) {
+      ctx.stroke(curve([[cx + i * tw * 0.28, y - h], [cx + i * tw * 0.28, y + h]] as Pt[]))
+    }
+    ctx.restore()
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 0.42
+    ctx.stroke(p)
+  }
+  if (e.gape > 0.05) {
+    // The dark of the open jaw, behind both ranks.
+    paint(ctx, blob([
+      [cx - tw, my - r * 0.12],
+      [cx + tw * 0.9, my - r * 0.14],
+      [cx + tw * 0.7, my + drop + r * 0.2],
+      [cx - tw * 0.8, my + drop + r * 0.22],
+    ] as Pt[], 0.5), hollow, { shadow: 0, radius: r * 0.5, pivot: [cx, my], line: 0.4 })
+  }
+  rank(my, r * 0.24)
+  rank(my + drop + r * 0.12, r * 0.2)
 }
 
 /** Hair drawn behind the head — the mass that gives the silhouette its weight. */
