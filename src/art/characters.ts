@@ -390,16 +390,29 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
     }), 0.05),
   ], { loop: false })
 
+  // ── Crouch: fold, do not squat ────────────────────────────────────────────
+  //
+  // This was a wide-legged squat with the back straight and the arms out — a
+  // fighting stance, which made the character *wider* than standing and only a
+  // quarter shorter, while its hitbox halved. The renderer then papered over
+  // the gap by squashing the sprite to 45% height and stretching it to 125%
+  // wide to fit under a one-tile ceiling, which is a pancake, not a pose.
+  //
+  // A duck folds. The chest comes down over the thighs, the head tucks in
+  // front of the knees, the trailing leg comes under the body instead of
+  // splaying back, and the arms fold in rather than reaching out. The
+  // silhouette that leaves is compact, which is the whole point of the move.
   b.add('crouch', [
     frame(pose({
-      lean: 0.44, hipY: 6.8, spine: 2.2, legFront: [1.24, -2.0], legBack: [-1.14, -1.9],
-      armFront: [0.9, 0.95], armBack: [-0.95, 0.9], squashX: 1.12, squashY: 0.88,
-      expression: 'focused', footFront: 0.1, drag: 0.3,
+      lean: 0.84, hipY: 10.4, spine: 1.2, legFront: [1.36, -2.3], legBack: [-0.46, -2.38],
+      armFront: [0.5, 1.98], armBack: [-0.86, 1.62], squashX: 1.05, squashY: 0.95,
+      expression: 'focused', footFront: 0.22, footBack: -0.12, headTilt: 0.16, drag: 0.3,
     }), 0.5),
     frame(pose({
-      lean: 0.42, hipY: 6.5, spine: 2.1, legFront: [1.2, -1.94], legBack: [-1.1, -1.86],
-      armFront: [0.86, 0.92], armBack: [-0.92, 0.88], squashX: 1.11, squashY: 0.89,
-      expression: 'focused', footFront: 0.1, drag: 0.2, flutter: 0.5,
+      lean: 0.81, hipY: 10.0, spine: 1.1, legFront: [1.32, -2.24], legBack: [-0.42, -2.32],
+      armFront: [0.46, 1.94], armBack: [-0.82, 1.58], squashX: 1.04, squashY: 0.96,
+      expression: 'focused', footFront: 0.22, footBack: -0.12, headTilt: 0.18,
+      drag: 0.2, flutter: 0.5,
     }), 0.5),
   ])
 
