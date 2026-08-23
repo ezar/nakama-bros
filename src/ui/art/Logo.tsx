@@ -51,16 +51,32 @@ function Letters({
   )
 }
 
-export function GameLogo({ className = '', motion = true }: { className?: string; motion?: boolean }) {
+export function GameLogo({
+  className = '',
+  motion = true,
+  compact = false,
+}: {
+  className?: string
+  motion?: boolean
+  /**
+   * A phone held sideways is 390px tall, and at full size the logo alone takes
+   * a third of that. Scaling with a transform would not help — the layout box
+   * stays the size it was — so the size itself comes down.
+   */
+  compact?: boolean
+}) {
   return (
     <div className={`relative flex flex-col items-center ${className}`} role="img" aria-label="Nakama Bros">
       <div className={motion ? 'animate-bob' : undefined} style={{ marginBottom: '-0.34em' }}>
-        <JollyRoger size={96} className="drop-shadow-[0_10px_18px_rgba(0,0,0,0.75)]" />
+        <JollyRoger size={compact ? 58 : 96} className="drop-shadow-[0_10px_18px_rgba(0,0,0,0.75)]" />
       </div>
 
       <div
         className="relative font-body font-extrabold uppercase leading-[0.94]"
-        style={{ fontSize: 'clamp(2.6rem, 7.6vw, 6rem)', letterSpacing: '-0.012em' }}
+        style={{
+          fontSize: compact ? 'clamp(1.7rem, 4.6vw, 2.9rem)' : 'clamp(2.6rem, 7.6vw, 6rem)',
+          letterSpacing: '-0.012em',
+        }}
       >
         {/* Back: ink contour plus a solid extrusion falling away from the light. */}
         <Letters

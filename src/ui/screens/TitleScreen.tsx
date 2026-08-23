@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion as m } from 'framer-motion'
 import { useT } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
@@ -7,6 +7,7 @@ import { SeaScene } from '../art/SeaScene'
 import { GameLogo } from '../art/Logo'
 import { Anchor, HatLife, JollyRoger, Rope, ShipWheel, StarMark } from '../art/Icons'
 import { UI } from '../theme'
+import { buildLabel } from '../../build'
 
 interface Props {
   onPlay: () => void
@@ -32,9 +33,11 @@ function MenuPlank({
   onClick,
   innerRef,
   motion,
+  compact,
 }: {
   item: Item
   active: boolean
+  compact: boolean
   onHover: () => void
   onClick: () => void
   innerRef: (el: HTMLElement | null) => void
@@ -48,7 +51,7 @@ function MenuPlank({
       onFocus={onHover}
       onClick={onClick}
       aria-current={active || undefined}
-      className="group relative flex w-[min(84vw,340px)] items-center gap-3 rounded-[6px] border-2 py-3 pl-14 pr-5 text-left transition-transform duration-200"
+      className={`group relative flex w-[min(84vw,340px)] items-center gap-3 rounded-[6px] border-2 pl-14 pr-5 text-left transition-transform duration-200 ${compact ? 'py-1.5' : 'py-3'}`}
       style={{
         transform: active ? 'translateX(14px)' : 'translateX(0)',
         borderColor: active ? UI.brassLit : 'rgba(124,90,33,0.75)',
@@ -91,6 +94,24 @@ function MenuPlank({
 export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
   const t = useT()
   const motion = useUiMotion()
+  /**
+   * Below this the menu runs off the bottom and the last plank ends up behind
+   * the gunwale — reachable, since that bar is click-through, but invisible.
+   * A phone held sideways is 390px tall and this game locks to landscape, so
+   * that is not an edge case, it is the phone.
+   */
+  const [viewportH, setViewportH] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight)
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  const compact = viewportH < 560
   const [index, setIndex] = useState(0)
 
   const items = useMemo<Item[]>(() => {
@@ -141,19 +162,23 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
         </div>
       </div>
 
-      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-8 px-6 pb-20 pt-6">
+      <div
+        className={`relative z-10 flex h-full w-full flex-col items-center justify-center px-6 pt-6 ${compact ? 'gap-3 pb-14' : 'gap-8 pb-20'}`}
+      >
         <m.div
           initial={{ y: motion ? -30 : 0, opacity: 0, scale: motion ? 0.96 : 1 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           transition={{ type: 'spring', stiffness: 110, damping: 15, delay: 0.05 }}
         >
-          <GameLogo motion={motion} />
-          <div
-            className="mt-3 text-center font-display text-lg tracking-[0.34em] sm:text-xl"
-            style={{ color: '#F3DEB4', textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}
-          >
-            {t('title.tagline')}
-          </div>
+          <GameLogo motion={motion} compact={compact} />
+          {!compact && (
+            <div
+              className="mt-3 text-center font-display text-lg tracking-[0.34em] sm:text-xl"
+              style={{ color: '#F3DEB4', textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}
+            >
+              {t('title.tagline')}
+            </div>
+          )}
         </m.div>
 
         <m.nav
@@ -161,7 +186,7 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
           initial={{ y: motion ? 24 : 0, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: motion ? 0.22 : 0, duration: 0.35 }}
-          className="flex flex-col items-center gap-2.5"
+          className={`flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2.5'}`}
         >
           {items.map((it, i) => (
             <MenuPlank
@@ -169,6 +194,7 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
               item={it}
               active={i === index}
               motion={motion}
+              compact={compact}
               innerRef={itemRef(i)}
               onHover={() => setIndex(i)}
               onClick={it.action}
@@ -177,8 +203,12 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
         </m.nav>
       </div>
 
-      {/* The gunwale we are standing behind. */}
-      <div className="absolute inset-x-0 bottom-0 z-10">
+      {/* The gunwale we are standing behind. Decoration only, and it sits on
+          z-10 over the menu, which on a short screen reaches down behind it —
+          so the whole thing is click-through. Widening the text row with the
+          build stamp was enough to put it over the OPCIONES plank and make
+          that button unpressable. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
         <div className="relative">
           <div className="absolute -top-3 left-0 w-full overflow-hidden opacity-95">
             <Rope length={1440} thickness={15} className="w-full" />
@@ -187,8 +217,13 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
             <span className="font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/60 sm:text-xs">
               {t('controls.hint')}
             </span>
-            <span className="hidden font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/35 sm:inline">
-              {t('title.fanmade')}
+            <span className="hidden items-center gap-3 font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/35 sm:flex">
+              {/* Three blocks of text in one row wrap into a mess on a phone.
+                  The fan-made note is on the promo art and in the repo; the
+                  build is not written down anywhere else, so it is the one
+                  that stays. */}
+              {!compact && t('title.fanmade')}
+              <span className="tabnum lowercase tracking-[0.14em] text-op-parchment/25">{buildLabel}</span>
             </span>
           </div>
         </div>

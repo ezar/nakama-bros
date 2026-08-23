@@ -6,6 +6,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
+import { buildLabel } from '../../build'
 
 /**
  * Settings, written on the same sheet as everything else.
@@ -116,7 +117,7 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: motion ? 0.28 : 0 }}
-      className="wood relative flex h-full w-full items-center justify-center overflow-hidden p-6"
+      className="wood relative h-full w-full overflow-hidden"
     >
       <div
         className="pointer-events-none absolute inset-0"
@@ -126,6 +127,13 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
         }}
       />
 
+      {/* The sheet is centred while it fits and scrolls once it does not. It
+          used to be centred inside an `overflow-hidden` box, so on a phone held
+          sideways the top and the bottom were simply cut off — which is where
+          the legal notice and the build stamp live. The lantern wash stays put
+          outside the scroller. */}
+      <div className="relative z-10 h-full w-full overflow-y-auto overscroll-contain p-6">
+        <div className="flex min-h-full items-center justify-center">
       <m.div
         initial={{ y: motion ? 18 : 0, rotate: motion ? 0.8 : 0.4 }}
         animate={{ y: 0, rotate: 0.4 }}
@@ -198,8 +206,39 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
           <button className="op-button op-button--primary mt-5 w-full" onClick={onBack}>
             {t('options.back')}
           </button>
+
+          {/* Who made this, whose it is, and whose it is not. A fan project
+              that borrows a cast has to say so somewhere the player can
+              actually reach, and this sheet is that place. */}
+          <div className="mt-5 border-t pt-3" style={{ borderColor: 'rgba(42,29,20,0.25)' }}>
+            <div
+              className="text-center font-body text-[10px] font-bold uppercase tracking-[0.2em]"
+              style={{ color: UI.inkSoft, opacity: 0.75 }}
+            >
+              {t('legal.title')}
+            </div>
+            <div
+              className="mt-1.5 flex flex-col gap-1 text-center font-body text-[10px] leading-snug"
+              style={{ color: UI.inkSoft, opacity: 0.72 }}
+            >
+              <p>{t('legal.oda')}</p>
+              <p>{t('legal.fan')}</p>
+              <p>{t('legal.code')}</p>
+            </div>
+            {/* The build. The title screen hides its copy on a narrow screen,
+                and a phone running this as a cached PWA is exactly where
+                someone needs to check which one they are looking at. */}
+            <div
+              className="mt-2 text-center font-body text-[10px] tabnum tracking-[0.14em]"
+              style={{ color: UI.inkSoft, opacity: 0.55 }}
+            >
+              {buildLabel}
+            </div>
+          </div>
         </Paper>
       </m.div>
+        </div>
+      </div>
     </m.div>
   )
 }

@@ -36,3 +36,19 @@ node scripts/shoot.mjs    # capturas de pantalla en screenshots/
 
 La arquitectura está en [`CLAUDE.md`](./CLAUDE.md) y el diseño en
 [`SPEC.md`](./SPEC.md).
+
+## Licencia y aviso legal
+
+El código, las herramientas y el pipeline de arte de este repositorio son
+© 2026 ezar y se publican bajo licencia [MIT](./LICENSE). Todo el arte que ves
+sale de ese código: no hay ni un solo asset de imagen aquí, así que la licencia
+cubre también los sprites, los tilesets, los cielos y los efectos.
+
+**One Piece es obra de Eiichiro Oda** y es © Eiichiro Oda / Shueisha / Toei
+Animation. Esto es un proyecto de fans **no oficial y sin ánimo de lucro**, sin
+relación con ninguno de ellos ni respaldo por su parte. Los nombres de los
+personajes aparecen como homenaje; los dibujos son originales de este proyecto
+y no están calcados, copiados ni transcritos del manga, del anime ni de ningún
+otro juego.
+
+Reutiliza el código. Los nombres no son nuestros para licenciarlos.
