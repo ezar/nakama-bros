@@ -136,7 +136,7 @@ uno, toca los tres y regenera los PNG.
 arte del repositorio que no sale de un algoritmo, y está ahí a propósito: lo
 dibujó la hija del autor y el juego lo entrega como premio al sacar rango S,
 que exige todos los fragmentos de la fase y una vuelta sin morir. Después vive
-en el panel de Opciones, junto a los créditos.
+en la pantalla de créditos, que se abre desde Opciones.
 
 No lo conviertas en código, no lo regeneres y no lo borres por incoherente con
 la regla de arriba. La regla sigue en pie para todo lo demás.
@@ -144,6 +144,12 @@ la regla de arriba. La regla sigue en pie para todo lo demás.
 Se muestra desde `src/ui/GiftDrawing.tsx`, que también guarda el nombre de la
 autora en un único sitio (`ARTIST`). El desbloqueo es `giftEarned` en
 `progressStore`, y sobrevive a `reset()` a propósito.
+
+Los créditos (`src/ui/screens/CreditsScreen.tsx`) son el rollo final: se
+desplazan solos hasta que los tocas, llevan el reparto con los retratos que
+hornea el propio juego y cierran con el aviso legal. Mientras el dibujo no esté
+ganado, en su sitio hay un marco vacío con la S, para que se vea que hay algo
+que conseguir.
 
 ## Arte promocional
 

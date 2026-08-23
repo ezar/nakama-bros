@@ -14,8 +14,9 @@ import { PauseScreen } from './ui/screens/PauseScreen'
 import { ResultScreen } from './ui/screens/ResultScreen'
 import { GameOverScreen } from './ui/screens/GameOverScreen'
 import { OptionsScreen } from './ui/screens/OptionsScreen'
+import { CreditsScreen } from './ui/screens/CreditsScreen'
 
-type Screen = 'loading' | 'title' | 'crew' | 'options' | 'play'
+type Screen = 'loading' | 'title' | 'crew' | 'options' | 'credits' | 'play'
 
 /**
  * Screen router and session owner.
@@ -139,7 +140,17 @@ export default function App() {
           />
         )
       case 'options':
-        return <OptionsScreen key="options" onBack={() => setScreen('title')} />
+        return (
+          <OptionsScreen
+            key="options"
+            onBack={() => setScreen('title')}
+            onCredits={() => setScreen('credits')}
+          />
+        )
+      // Back to Options, not to the title: you came in through a door and it
+      // should still be behind you when you turn round.
+      case 'credits':
+        return <CreditsScreen key="credits" onBack={() => setScreen('options')} />
       default:
         return null
     }

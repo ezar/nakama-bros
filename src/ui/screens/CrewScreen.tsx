@@ -8,6 +8,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { BerryIcon, JollyRoger, Nail, Rope, WaxSeal } from '../art/Icons'
 import { BOUNTY, formatBerry, UI, tilt } from '../theme'
+import { useCrewPortraits } from '../hooks/useCrewPortraits'
 import type { TranslationKey } from '../../i18n/translations'
 
 interface Props {
@@ -26,36 +27,6 @@ interface Props {
  * it. The selected sheet straightens, lifts off the boards and picks up the
  * lantern; the rest stay pinned at the angle they were hung at.
  */
-
-/** Portraits are built once, lazily: they cost a canvas each. */
-function useCrewPortraits(): Partial<Record<CrewId, string>> {
-  const [urls, setUrls] = useState<Partial<Record<CrewId, string>>>({})
-  const done = useRef(false)
-  useEffect(() => {
-    if (done.current) return
-    done.current = true
-    let cancelled = false
-    void (async () => {
-      try {
-        const mod = (await import('../../art/characters')) as {
-          buildCrewPortraits?: () => Record<CrewId, HTMLCanvasElement>
-        }
-        if (!mod.buildCrewPortraits || cancelled) return
-        const built = mod.buildCrewPortraits()
-        const out: Partial<Record<CrewId, string>> = {}
-        for (const id of CREW_IDS) out[id] = built[id]?.toDataURL()
-        if (!cancelled) setUrls(out)
-      } catch {
-        // No portraits in the art layer: the poster keeps its empty window and
-        // the crew mark, which is a design the wall can live with.
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  return urls
-}
 
 function WantedPoster({
   id,
