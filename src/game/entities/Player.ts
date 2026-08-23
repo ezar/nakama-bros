@@ -1,4 +1,4 @@
-import { TILE, Tile } from '../../types'
+import { FIXED_DT, TILE, Tile } from '../../types'
 import type { CrewId, Facing, Hit, PowerTier, RenderContext, Rect } from '../../types'
 import { Entity } from './Entity'
 import { FloatingText } from './FloatingText'
@@ -24,6 +24,7 @@ import type { SignatureDef } from '../config'
 import { art } from '../../art'
 import { clamp, approach, rectsOverlap } from '../../engine/math'
 import { newLean, resetLean, stepLean } from '../lean'
+import { newBrake, stepBrake } from '../brake'
 import { cel } from '../../art/color'
 import { PAL } from '../../art/palette'
 
@@ -252,15 +253,25 @@ export class Player extends Entity {
     const want = this.wallLock > 0 ? 0 : input.axisX
     if (want !== 0 && control > 0.3 && this.sigTimer <= 0) {
       const next: Facing = want > 0 ? 1 : -1
-      // A change of facing is a whole-body event, not a sprite flip. Hold the
-      // pivot long enough for its three frames to play; above skid speed the
-      // skid already covers it, and in the air there is nothing to pivot on.
+      // A change of facing is a whole-body event, not a sprite flip. From a
+      // standstill the pivot is the whole story; from speed the brake comes
+      // first and the pivot is armed when it ends. In the air there is nothing
+      // to pivot on.
       if (next !== this.facing && grounded && Math.abs(this.body.vx) <= PHYS.skidSpeed) {
         this.turnTimer = TURN_TIME
       }
       this.facing = next
     }
     const turning = want !== 0 && Math.sign(want) !== Math.sign(this.body.vx) && this.body.vx !== 0
+
+    // Braking — see `src/game/brake.ts`.
+    const wasBraking = this.brakeState.active
+    this.braking = stepBrake(this.brakeState, {
+      grounded, standing: this.stance === 'stand', busy: this.sigTimer > 0, want, vx: this.body.vx,
+    })
+    // Coming out of a brake still wanting to move is the moment to pivot: the
+    // heels are down, the body has stopped, and the turn takes it from there.
+    if (wasBraking && !this.braking && grounded && want !== 0) this.turnTimer = TURN_TIME
     if (control > 0) {
       let accel = (turning ? PHYS.turnAccel : PHYS.accel) * control
       if (!grounded) accel *= PHYS.airAccelScale
@@ -413,8 +424,9 @@ export class Player extends Entity {
       this.endSignature(world, true)
     }
 
-    // Skid dust.
-    if (grounded && turning && Math.abs(this.body.vx) > PHYS.skidSpeed) {
+    // Skid dust, on the same condition as the skid pose — dust that stops a
+    // frame into a brake is worse than no dust.
+    if (this.braking) {
       if (world.rng.bool(0.4)) {
         world.particles.emit({
           x: this.x - this.facing * 4, y: this.y - 1,
@@ -464,7 +476,7 @@ export class Player extends Entity {
       this.hurt(world, { amount: 1, dirX: -this.facing, dirY: -1, sourceId: 0, kind: 'hazard' })
     }
 
-    this.updateAnimState(inWater, this.body.grounded, want, turning)
+    this.updateAnimState(inWater, this.body.grounded, want)
   }
 
   // ── Stance ─────────────────────────────────────────────────────────────────
@@ -645,6 +657,10 @@ export class Player extends Entity {
 
   /** Seconds left of the turn-around pivot; the sprite flips instantly, the body does not. */
   private turnTimer = 0
+
+  /** Whether the body is being brought to a stop, either way round. */
+  private braking = false
+  private brakeState = newBrake()
 
   /**
    * Seconds left of the landing recovery.
@@ -1186,7 +1202,7 @@ export class Player extends Entity {
     if (this.body.grounded) this.body.vx = 0
   }
 
-  private updateAnimState(inWater: boolean, grounded: boolean, want: number, turning: boolean): void {
+  private updateAnimState(inWater: boolean, grounded: boolean, want: number): void {
     if (this.state === 'climb' || this.state === 'hurt') return
     if (this.sigTimer > 0) {
       const kind = this.sigKind
@@ -1213,7 +1229,7 @@ export class Player extends Entity {
       this.play(this.body.vy < 0 ? 'jump' : 'fall')
       return
     }
-    if (turning && Math.abs(this.body.vx) > PHYS.skidSpeed) {
+    if (this.braking) {
       this.play('skid')
       return
     }
@@ -1258,9 +1274,21 @@ export class Player extends Entity {
     else if (this.gait === 'walk' && push > 0.66) this.gait = 'run'
     // Animation speed follows actual speed, so the feet never skate. Each gait
     // is authored for its own pace, so each scales against its own nominal.
+    //
+    // Not in proportion, though. Cadence rising linearly with speed means the
+    // cycle crawls through exactly the moments the legs are working hardest:
+    // measured, a body accelerating from a standstill to 87% of top speed held
+    // *one* drawn frame for the whole 117ms, and a full-speed stop spent all
+    // five of its frames on a single pose. Real gait puts roughly half the
+    // speed into stride length and half into cadence, so the square root is
+    // both the truer model and the one that keeps the legs alive; the floor
+    // stops the cycle freezing outright at a crawl. At full speed it is 1,
+    // which is where the player spends most of their time — so nothing that
+    // already read well changes.
     const top = this.stats.runSpeed * this.mods.speed
     const nominal = this.gait === 'walk' ? top * 0.42 : top
-    this.animTime += (Math.abs(this.body.vx) / nominal - 1) * 0.016
+    const rate = Math.max(0.45, Math.sqrt(Math.abs(this.body.vx) / nominal))
+    this.animTime += (rate - 1) * FIXED_DT
     return this.gait
   }
 
