@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { motion as m } from 'framer-motion'
 import { useT } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
+import { useShortViewport } from '../hooks/useShortViewport'
 import { SeaScene } from '../art/SeaScene'
 import { GameLogo } from '../art/Logo'
 import { Anchor, HatLife, JollyRoger, Rope, ShipWheel, StarMark } from '../art/Icons'
@@ -93,24 +94,9 @@ function MenuPlank({
 export function TitleScreen({ onPlay, onCrew, onOptions, onMap }: Props) {
   const t = useT()
   const motion = useUiMotion()
-  /**
-   * Below this the menu runs off the bottom and the last plank ends up behind
-   * the gunwale — reachable, since that bar is click-through, but invisible.
-   * A phone held sideways is 390px tall and this game locks to landscape, so
-   * that is not an edge case, it is the phone.
-   */
-  const [viewportH, setViewportH] = useState(() =>
-    typeof window === 'undefined' ? 800 : window.innerHeight)
-  useEffect(() => {
-    const onResize = () => setViewportH(window.innerHeight)
-    window.addEventListener('resize', onResize)
-    window.addEventListener('orientationchange', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      window.removeEventListener('orientationchange', onResize)
-    }
-  }, [])
-  const compact = viewportH < 560
+  // Below this the menu runs off the bottom and the last plank ends up behind
+  // the gunwale — reachable, since that bar is click-through, but invisible.
+  const compact = useShortViewport(560)
   const [index, setIndex] = useState(0)
 
   const items = useMemo<Item[]>(() => {

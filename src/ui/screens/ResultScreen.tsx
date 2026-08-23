@@ -7,6 +7,7 @@ import { useT } from '../../i18n/useT'
 import { useCountUp } from '../hooks/useCountUp'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
+import { useShortViewport } from '../hooks/useShortViewport'
 import { Paper } from '../art/Paper'
 import { BerryIcon, FragmentIcon, Nail, WaxSeal } from '../art/Icons'
 import { RANK_COLOR, UI, formatBerry, rankFor } from '../theme'
@@ -33,12 +34,12 @@ interface Props {
  * berries, fragments, falls — is the clerk's small print underneath.
  */
 
-function RankStamp({ rank, visible }: { rank: string; visible: boolean }) {
+function RankStamp({ rank, visible, size = 92 }: { rank: string; visible: boolean; size?: number }) {
   const color = RANK_COLOR[rank as keyof typeof RANK_COLOR] ?? UI.wax
   if (!visible) return null
   return (
     <div className="animate-seal-thump" style={{ transformOrigin: 'center' }}>
-      <svg viewBox="0 0 96 96" width={92} height={92} aria-label={`rank ${rank}`} role="img">
+      <svg viewBox="0 0 96 96" width={size} height={size} aria-label={`rank ${rank}`} role="img">
         <g stroke={color} fill="none" opacity={0.85}>
           {/* two rings, deliberately not concentric — a hand-pressed stamp */}
           <circle cx={48} cy={48} r={42} strokeWidth={3.4} strokeDasharray="150 6 90 5" />
@@ -73,14 +74,17 @@ function RankStamp({ rank, visible }: { rank: string; visible: boolean }) {
   )
 }
 
-function Row({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
+function Row({ label, value, icon, short }: { label: string; value: React.ReactNode; icon?: React.ReactNode; short?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-1.5" style={{ borderColor: 'rgba(42,29,20,0.22)' }}>
+    <div
+      className={`flex items-baseline justify-between gap-3 border-b ${short ? 'py-0.5' : 'py-1.5'}`}
+      style={{ borderColor: 'rgba(42,29,20,0.22)' }}
+    >
       <span className="flex items-center gap-1.5 font-body text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: UI.inkSoft }}>
         {icon}
         {label}
       </span>
-      <span className="font-body text-base font-extrabold tabnum ink">{value}</span>
+      <span className={`font-body font-extrabold tabnum ink ${short ? 'text-sm' : 'text-base'}`}>{value}</span>
     </div>
   )
 }
@@ -88,6 +92,7 @@ function Row({ label, value, icon }: { label: string; value: React.ReactNode; ic
 export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp }: Props) {
   const t = useT()
   const motion = useUiMotion()
+  const short = useShortViewport(560)
   const crewId = useProgress((s) => s.crew) as CrewId
   const crew = CREW[crewId] ?? CREW.luffy
   const best = useProgress((s) => s.records[result.levelId]?.bestScore ?? 0)
@@ -159,9 +164,14 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(6,4,2,0.82)] backdrop-blur-[3px]"
+      className="absolute inset-0 z-30 overflow-y-auto overscroll-contain bg-[rgba(6,4,2,0.82)] backdrop-blur-[3px]"
     >
-      <div className="flex flex-col items-center">
+      {/* Centred while it fits and scrolled once it does not. It used to be
+          centred inside a fixed box, so on a phone held sideways the poster's
+          head and the buttons under it were simply cut off — and the buttons
+          are the whole point of this screen. */}
+      <div className={`flex min-h-full flex-col px-4 ${short ? 'py-2' : 'py-4'}`}>
+        <div className="m-auto flex flex-col items-center">
         <m.div
           initial={motion ? { y: -620, rotate: -13 } : false}
           animate={{ y: 0, rotate: -1.4 }}
@@ -169,7 +179,13 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
           className="relative"
           style={{ filter: 'drop-shadow(0 22px 26px rgba(0,0,0,0.75))' }}
         >
-          <Paper seed={21} edges="all" bite={1.9} age={0.4} className="w-[min(430px,92vw)] px-6 pb-5 pt-6">
+          <Paper
+            seed={21}
+            edges="all"
+            bite={1.9}
+            age={0.4}
+            className={`w-[min(430px,92vw)] ${short ? 'px-5 pb-3 pt-4' : 'px-6 pb-5 pt-6'}`}
+          >
             <span className="absolute left-1/2 top-1.5 -translate-x-1/2">
               <Nail size={16} />
             </span>
@@ -178,12 +194,12 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
               <div className="font-body text-[10px] font-extrabold uppercase tracking-[0.34em]" style={{ color: UI.inkSoft }}>
                 {t('clear.poster')}
               </div>
-              <div className="font-display text-4xl leading-none ink">{t('crew.wanted')}</div>
+              <div className={`font-display leading-none ink ${short ? 'text-2xl' : 'text-4xl'}`}>{t('crew.wanted')}</div>
             </div>
 
-            <div className="mt-3 flex gap-4">
+            <div className={`flex gap-4 ${short ? 'mt-2' : 'mt-3'}`}>
               <div
-                className="h-[104px] w-[104px] shrink-0 overflow-hidden border"
+                className={`shrink-0 overflow-hidden border ${short ? 'h-[74px] w-[74px]' : 'h-[104px] w-[104px]'}`}
                 style={{
                   borderColor: 'rgba(42,29,20,0.7)',
                   boxShadow: 'inset 0 0 12px rgba(60,36,14,0.55)',
@@ -220,10 +236,11 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
               </div>
             </div>
 
-            <div className="mt-3">
-              <Row label={t('clear.time')} value={`${Math.floor(result.timeLeft)}s`} />
-              <Row label={t('clear.berries')} value={result.berries} />
+            <div className={short ? 'mt-2' : 'mt-3'}>
+              <Row short={short} label={t('clear.time')} value={`${Math.floor(result.timeLeft)}s`} />
+              <Row short={short} label={t('clear.berries')} value={result.berries} />
               <Row
+                short={short}
                 label={t('clear.fragments')}
                 value={
                   <span className="flex items-center gap-1">
@@ -233,21 +250,21 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
                   </span>
                 }
               />
-              <Row label={t('clear.deaths')} value={result.deaths} />
+              <Row short={short} label={t('clear.deaths')} value={result.deaths} />
             </div>
 
-            <div className="mt-2 flex items-end justify-between">
+            <div className={`flex items-end justify-between ${short ? 'mt-1' : 'mt-2'}`}>
               <div className="font-body text-[9px] uppercase tracking-[0.16em]" style={{ color: UI.inkSoft, opacity: 0.75 }}>
                 {t('clear.signed')}
               </div>
               <span className="opacity-90">
-                <WaxSeal size={54} />
+                <WaxSeal size={short ? 34 : 54} />
               </span>
             </div>
 
             {/* the stamp lands on top of everything, slightly off-square */}
-            <div className="pointer-events-none absolute right-3 top-16">
-              <RankStamp rank={rank} visible={stamped} />
+            <div className={`pointer-events-none absolute right-3 ${short ? 'top-10' : 'top-16'}`}>
+              <RankStamp rank={rank} visible={stamped} size={short ? 66 : 92} />
             </div>
           </Paper>
         </m.div>
@@ -260,7 +277,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
             initial={motion ? { opacity: 0, y: 10 } : false}
             animate={motion ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: motion ? 2.5 : 0 }}
-            className="mt-5 flex flex-col items-center"
+            className={`flex flex-col items-center ${short ? 'mt-3' : 'mt-5'}`}
           >
             <div
               className="mb-2 font-body text-[10px] uppercase tracking-[0.22em]"
@@ -276,7 +293,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: motion ? 2.2 : 0 }}
-          className="mt-5 flex gap-3"
+          className={`flex gap-3 ${short ? 'mt-3' : 'mt-5'}`}
         >
           {actions.map((a, i) => (
             <button
@@ -290,6 +307,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
             </button>
           ))}
         </m.div>
+        </div>
       </div>
     </m.div>
   )
