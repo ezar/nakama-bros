@@ -86,8 +86,12 @@ function buildVillaFuchsia(): LevelDef {
   //    there — you just have to look at the shape of the building.
   b.ledge(89, 91, G - 2)
   b.hline(92, 100, G - 4, C.solid)
-  b.rect(92, G - 3, 93, G - 1, C.solid)
-  b.rect(99, G - 3, 100, G - 1, C.solid)
+  // The legs stop a tile short of the street, which is what makes the pocket a
+  // pocket: at full height they sealed it on all four sides and the fragment
+  // could not be reached at all. A crouch clears a one-tile gap, so you duck
+  // under the terrace and stand up inside.
+  b.rect(92, G - 3, 93, G - 2, C.solid)
+  b.rect(99, G - 3, 100, G - 2, C.solid)
   b.rect(94, G - 3, 98, G - 3, C.decor)
   b.spawn('fragment', 96, G - 1, { index: 0 })
   b.spawn('shielder', 97, G - 5)

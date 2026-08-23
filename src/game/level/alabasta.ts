@@ -58,8 +58,11 @@ function buildDunes(): LevelDef {
   b.ground(115, 132, bed)
   cutaway(b, 118, bed - 3, 126, bed - 1)
   b.hline(117, 127, bed - 4, C.solid)
-  b.vline(117, bed - 3, bed - 1, C.solid)
-  b.vline(127, bed - 3, bed - 1, C.solid)
+  // Open at the bed, or it is not an undercut, it is a sealed box — the walls
+  // ran the full height and the fragment was unreachable. Duck in along the
+  // riverbed the way the water did.
+  b.vline(117, bed - 3, bed - 2, C.solid)
+  b.vline(127, bed - 3, bed - 2, C.solid)
   b.spawn('fragment', 122, bed - 1, { index: 0 })
   b.spawn('urchin', 130, bed - 1)
   b.berryLine(119, 125, bed - 1, 2)
