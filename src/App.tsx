@@ -16,9 +16,10 @@ import { GameOverScreen } from './ui/screens/GameOverScreen'
 import { MapScreen } from './ui/screens/MapScreen'
 import { OptionsScreen } from './ui/screens/OptionsScreen'
 import { CreditsScreen } from './ui/screens/CreditsScreen'
+import { EndingScreen } from './ui/screens/EndingScreen'
 import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
 
-type Screen = 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'intro' | 'play'
+type Screen = 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'ending' | 'intro' | 'play'
 
 /**
  * Screen router and session owner.
@@ -37,6 +38,14 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false)
   /** Bumped to force a fresh Game instance when restarting the same level. */
   const [runKey, setRunKey] = useState(0)
+  /**
+   * Where leaving the credits should land. Opened from Options it is a detour,
+   * so back means Options; reached from the ending it is the last thing in the
+   * game, so back means the title. Storing the origin instead sent you back to
+   * the ending, which drifts into the credits on its own — a loop with no way
+   * out but the pause key.
+   */
+  const [creditsBack, setCreditsBack] = useState<'options' | 'title'>('options')
 
   const crew = useProgress((s) => s.crew)
   const setCrew = useProgress((s) => s.setCrew)
@@ -163,13 +172,29 @@ export default function App() {
           <OptionsScreen
             key="options"
             onBack={() => setScreen('title')}
-            onCredits={() => setScreen('credits')}
+            onCredits={() => {
+              setCreditsBack('options')
+              setScreen('credits')
+            }}
           />
         )
       // Back to Options, not to the title: you came in through a door and it
       // should still be behind you when you turn round.
       case 'credits':
-        return <CreditsScreen key="credits" onBack={() => setScreen('options')} />
+        return <CreditsScreen key="credits" onBack={() => setScreen(creditsBack)} />
+      // Finishing the campaign is an event. Reached from the last stage's
+      // poster, and it hands over to the credits on its own if left alone.
+      case 'ending':
+        return (
+          <EndingScreen
+            key="ending"
+            onCredits={() => {
+              setCreditsBack('title')
+              setScreen('credits')
+            }}
+            onPort={quitToMenu}
+          />
+        )
       case 'intro':
         return <LevelIntroScreen key={`intro:${levelId}:${runKey}`} level={level} onDone={() => setScreen('play')} />
       default:
@@ -215,9 +240,18 @@ export default function App() {
               <ResultScreen
                 key="result"
                 result={result}
-                hasNext={!!nextLevelId(levelId)}
+                hasNext
+                finale={!nextLevelId(levelId)}
                 onRetry={() => startLevel(levelId)}
-                onNext={() => startLevel(nextLevelId(levelId) ?? levelId)}
+                onNext={() => {
+                  const next = nextLevelId(levelId)
+                  if (next) return startLevel(next)
+                  // Last stage cleared: the poster's forward button is the way
+                  // into the ending rather than a dead Repetir-only screen.
+                  setResult(null)
+                  setPaused(false)
+                  setScreen('ending')
+                }}
               />
             )}
             {gameOver && (

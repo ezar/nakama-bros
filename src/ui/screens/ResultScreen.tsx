@@ -19,6 +19,11 @@ interface Props {
   onRetry: () => void
   hasNext: boolean
   /**
+   * This was the last stage. The forward action still exists — it leads to the
+   * ending rather than to another stage — so it is labelled for what it does.
+   */
+  finale?: boolean
+  /**
    * Fired repeatedly while the bounty is being written, and once when a stamp
    * lands. Wire them to the counter and the stamp thump.
    */
@@ -89,7 +94,7 @@ function Row({ label, value, icon, short }: { label: string; value: React.ReactN
   )
 }
 
-export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp }: Props) {
+export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false, onTick, onStamp }: Props) {
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
@@ -142,9 +147,10 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
   }, [motion, onStamp])
 
   const actions = useMemo(
-    () => (hasNext ? [{ label: t('clear.next'), run: onNext }, { label: t('clear.retry'), run: onRetry }]
+    () => (hasNext
+      ? [{ label: finale ? t('clear.finish') : t('clear.next'), run: onNext }, { label: t('clear.retry'), run: onRetry }]
       : [{ label: t('clear.retry'), run: onRetry }]),
-    [hasNext, onNext, onRetry, t],
+    [hasNext, finale, onNext, onRetry, t],
   )
   const [index, setIndex] = useState(0)
   const { itemRef } = useMenuNav({
