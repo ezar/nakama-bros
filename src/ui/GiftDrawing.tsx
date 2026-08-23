@@ -19,7 +19,7 @@ import { useUiMotion } from './hooks/useUiMotion'
  * Empty means unsigned: the caption is simply left off rather than rendered
  * with a placeholder standing in for a real person's name.
  */
-export const ARTIST = ''
+export const ARTIST: string = 'Leyre'
 
 const SRC = `${import.meta.env.BASE_URL}drawings/luffy.jpg`
 
