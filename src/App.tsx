@@ -15,8 +15,9 @@ import { ResultScreen } from './ui/screens/ResultScreen'
 import { GameOverScreen } from './ui/screens/GameOverScreen'
 import { OptionsScreen } from './ui/screens/OptionsScreen'
 import { CreditsScreen } from './ui/screens/CreditsScreen'
+import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
 
-type Screen = 'loading' | 'title' | 'crew' | 'options' | 'credits' | 'play'
+type Screen = 'loading' | 'title' | 'crew' | 'options' | 'credits' | 'intro' | 'play'
 
 /**
  * Screen router and session owner.
@@ -94,7 +95,9 @@ export default function App() {
     setGameOver(false)
     setPaused(false)
     setRunKey((k) => k + 1)
-    setScreen('play')
+    // Through the card, always: it names the island you are going to, and it
+    // gets out of the way on the first touch.
+    setScreen('intro')
   }, [])
 
   const onLevelEnd = useCallback(
@@ -151,6 +154,8 @@ export default function App() {
       // should still be behind you when you turn round.
       case 'credits':
         return <CreditsScreen key="credits" onBack={() => setScreen('options')} />
+      case 'intro':
+        return <LevelIntroScreen key={`intro:${levelId}:${runKey}`} level={level} onDone={() => setScreen('play')} />
       default:
         return null
     }
