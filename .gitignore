@@ -7,6 +7,8 @@ dist-ssr
 .env
 .vite
 /screenshots
+# blind A/B sheets and their key — output of scripts/ab.mjs
+/review
 /playwright-report
 /test-results
 
