@@ -522,12 +522,19 @@ export class Player extends Entity {
     this.roomAbove = this.stance === 'stand' ? this.standH : this.measureRoom(world)
   }
 
-  /** How much clear height there is above the feet, in world units. */
+  /**
+   * How much clear height there is above the feet, in world units.
+   *
+   * Probed a unit at a time. It used to step in twos and report `h - 2`, which
+   * turned a one-tile gap of sixteen units into fourteen — and the tuck divides
+   * by this, so the drawing was being squeezed to fit a hole two units smaller
+   * than the one that is actually there.
+   */
   private measureRoom(world: World): number {
     const w = Math.max(2, this.body.w - 1)
     const x = this.x - w / 2
-    for (let h = 4; h <= this.standH; h += 2) {
-      if (world.map.anyIn(x, this.y - h, w, 2, (f) => f.solid)) return h - 2
+    for (let h = 2; h <= this.standH; h++) {
+      if (world.map.anyIn(x, this.y - h, w, 1, (f) => f.solid)) return h - 1
     }
     return this.standH
   }
@@ -1349,9 +1356,16 @@ export class Player extends Entity {
       ctx.rotate(this.wallDir * this.facing * 0.13)
       ctx.translate(0, this.body.h / scale / 2)
     }
-    // A tucked body must actually fit the hole it claims to fit: measure the
-    // drawn height of the frame and squash it into the stance hitbox, rather
-    // than guessing a constant that clips through a one-tile ceiling.
+    // A tucked body leans into the hole rather than being pressed flat into it.
+    //
+    // Squashing the drawing until it genuinely fits was the old rule, and the
+    // price was visible: a 23.8-unit crouch in a 16-unit gap came out at 59%
+    // of its height and 119% of its width, which reads as roadkill rather than
+    // as crawling. A drawing a third taller than the hole cannot be made to fit
+    // and still look like a body. So it compresses as far as it convincingly
+    // can and then simply overlaps the ceiling, the way the genre has always
+    // done it — the hitbox is what decides where the player can go, and that
+    // still fits exactly.
     if (this.stance !== 'stand') {
       // The pose's own height, not the frame box. `-frame.oy` is the same 48.5
       // for every frame in the sheet, so measuring against it squashed the
@@ -1363,7 +1377,9 @@ export class Player extends Entity {
       // pancake standing in a field.
       const tuck = this.stance === 'crouch' ? 1 : 0.82
       const room = Math.min(drawnH * tuck, this.roomAbove / scale)
-      const k = clamp(room / drawnH, 0.45, 1)
+      // The floor is the whole point: past about this the figure stops reading
+      // as a person and the overlap is the cheaper lie.
+      const k = clamp(room / drawnH, 0.85, 1)
       ctx.scale(1 + (1 - k) * 0.45, k)
       if (this.stance === 'roll') {
         const r = drawnH * 0.5
