@@ -404,14 +404,14 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
   // silhouette that leaves is compact, which is the whole point of the move.
   b.add('crouch', [
     frame(pose({
-      lean: 0.84, hipY: 10.4, spine: 1.2, legFront: [1.36, -2.3], legBack: [-0.46, -2.38],
-      armFront: [0.5, 1.98], armBack: [-0.86, 1.62], squashX: 1.05, squashY: 0.95,
-      expression: 'focused', footFront: 0.22, footBack: -0.12, headTilt: 0.16, drag: 0.3,
+      lean: 0.54, hipY: 10.8, spine: 1.0, legFront: [1.6, -2.52], legBack: [-0.26, -2.46],
+      armFront: [0.62, 1.74], armBack: [-0.72, 1.5], squashX: 1.05, squashY: 0.95,
+      expression: 'focused', footFront: 0.26, footBack: -0.14, headTilt: 0.02, drag: 0.3,
     }), 0.5),
     frame(pose({
-      lean: 0.81, hipY: 10.0, spine: 1.1, legFront: [1.32, -2.24], legBack: [-0.42, -2.32],
-      armFront: [0.46, 1.94], armBack: [-0.82, 1.58], squashX: 1.04, squashY: 0.96,
-      expression: 'focused', footFront: 0.22, footBack: -0.12, headTilt: 0.18,
+      lean: 0.51, hipY: 10.4, spine: 0.9, legFront: [1.55, -2.46], legBack: [-0.22, -2.4],
+      armFront: [0.58, 1.7], armBack: [-0.68, 1.46], squashX: 1.04, squashY: 0.96,
+      expression: 'focused', footFront: 0.26, footBack: -0.14, headTilt: 0.04,
       drag: 0.2, flutter: 0.5,
     }), 0.5),
   ])
