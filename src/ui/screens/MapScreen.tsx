@@ -160,18 +160,39 @@ function Island({ biome, cleared }: { biome: Biome; cleared: boolean }) {
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-interface Flat {
+export interface Flat {
   world: WorldDef
   wi: number
   level: LevelDef
   si: number
 }
 
-function unlockedIndex(flat: Flat[], records: Record<string, LevelRecord>): number {
+export function unlockedIndex(flat: Flat[], records: Record<string, LevelRecord>): number {
   // Everything up to and including the first stage that has not been cleared.
   let i = 0
   while (i < flat.length - 1 && records[flat[i].level.id]?.cleared) i++
   return i
+}
+
+/**
+ * Can this stage be started?
+ *
+ * Two rules, and the second one is the one that was missing: the campaign runs
+ * in order, *and* a stage you have already cleared is never closed to you again
+ * wherever it sits. The chart's pips always honoured the second rule — a
+ * cleared record shortcircuits their state — while the primary button and the
+ * keyboard only asked the first, so the two disagreed the moment a stage was
+ * inserted mid-campaign. Adding the boss stages did exactly that: a finished
+ * save could still click an island on the chart while Poner rumbo and Enter
+ * refused every island past the first new boss.
+ */
+export function stageLocked(
+  i: number,
+  openIndex: number,
+  flat: Flat[],
+  records: Record<string, LevelRecord>,
+): boolean {
+  return i > openIndex && !records[flat[i]?.level.id ?? '']?.cleared
 }
 
 function StagePip({
@@ -260,7 +281,7 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
 
   const current = flat[Math.min(index, flat.length - 1)]
   const rec = current ? records[current.level.id] : undefined
-  const isLocked = (i: number) => i > openIndex
+  const isLocked = (i: number) => stageLocked(i, openIndex, flat, records)
 
   const { itemRef } = useMenuNav({
     count: flat.length,
