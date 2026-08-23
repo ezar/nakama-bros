@@ -111,6 +111,10 @@ export const TRANSLATIONS = {
     'options.touch': 'Controles táctiles',
     'options.effects': 'Efectos visuales',
     'options.crt': 'Filtro CRT',
+    'legal.title': 'Aviso legal',
+    'legal.fan': 'Proyecto de fans no oficial y sin ánimo de lucro. Sin relación con los titulares de los derechos ni respaldo por su parte.',
+    'legal.oda': 'One Piece © Eiichiro Oda · Shueisha · Toei Animation. Los nombres de los personajes aparecen como homenaje.',
+    'legal.code': 'Motor y arte © 2026 ezar · Licencia MIT. Todo el arte es original y se genera por código: no se usa ningún recurso del manga, del anime ni de ningún otro juego.',
     'options.back': 'Volver',
 
     // ── Controls ──
@@ -216,6 +220,10 @@ export const TRANSLATIONS = {
     'options.touch': 'Touch controls',
     'options.effects': 'Visual effects',
     'options.crt': 'CRT filter',
+    'legal.title': 'Legal notice',
+    'legal.fan': 'Unofficial, non-commercial fan project. Not affiliated with, sponsored by, or endorsed by the rights holders.',
+    'legal.oda': 'One Piece © Eiichiro Oda · Shueisha · Toei Animation. Character names appear here as homage.',
+    'legal.code': 'Engine and art © 2026 ezar · MIT licence. All art is original and drawn from code: no assets from the manga, the anime, or any other game are used.',
     'options.back': 'Back',
 
     'controls.hint': 'Move: ← → · Jump: Space · Attack: X · Pause: Esc',

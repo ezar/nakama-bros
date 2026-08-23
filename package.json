@@ -2,6 +2,14 @@
   "name": "nakama-bros",
   "version": "1.0.0",
   "private": true,
+  "description": "Un plataformas 2D con la tripulación del Sombrero de Paja. Proyecto de fans; todo el arte se genera por código.",
+  "license": "MIT",
+  "author": "ezar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ezar/nakama-bros.git"
+  },
+  "homepage": "https://ezar.github.io/nakama-bros/",
   "type": "module",
   "engines": {
     "node": ">=22"
