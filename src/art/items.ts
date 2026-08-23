@@ -835,7 +835,15 @@ function drawGoal(s: Surface, t: number): void {
 }
 
 /** Checkpoint — a marine-blue swallowtail pennant on a short staff. */
-function drawCheckpoint(s: Surface, t: number): void {
+/**
+ * The checkpoint flag, before and after.
+ *
+ * It flies the Marines' colours until you reach it, and your own once you
+ * have: passing one and seeing nothing change is the whole reason this takes
+ * a second palette. The claimed flag also lights its finial, so the change
+ * reads at a glance even where the pennant is half off-screen.
+ */
+function drawCheckpoint(s: Surface, t: number, taken = false): void {
   const ctx = s.ctx
   const base = s.h - 0.6
   const mx = s.w * 0.32
@@ -863,8 +871,18 @@ function drawCheckpoint(s: Surface, t: number): void {
     shadow: 0.36, radius: 2, pivot: [mx, top], rim: 0.65, line: 0.45,
   })
   glint(ctx, mx - 0.6, top - 0.8, 0.6, 0.35, -0.5, PAL.white, 0.85)
+  if (taken) {
+    // A soft halo, breathing on the cloth's own clock so the two agree.
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = 0.3 + Math.sin(t * Math.PI * 2) * 0.1
+    ctx.fillStyle = rgba(PAL.gold, 0.55)
+    ctx.fill(ellipsePath(mx, top, 4.2, 4.4))
+    ctx.restore()
+  }
 
-  const blue = cel(PAL.marineBlue)
+  // Marine blue until it is yours, then the crew's red.
+  const blue = cel(taken ? PAL.luffyRed : PAL.marineBlue)
   const c = cloth(mx + 0.8, top + 3.4, top + 11.4, 17, t, 1.5, 3.4, 1.4)
   // The swallowtail is built INTO the outline rather than punched out of a
   // rectangle: cutting it with destination-out leaves the rectangle's ink line
@@ -888,7 +906,7 @@ function drawCheckpoint(s: Surface, t: number): void {
   ctx.clip(pennant)
   clothFolds(s, c, blue, 12)
   // Two chevrons, the marine mark, riding the cloth.
-  ctx.strokeStyle = rgba(PAL.marineWhite, 0.92)
+  ctx.strokeStyle = rgba(taken ? PAL.gold : PAL.marineWhite, 0.92)
   ctx.lineWidth = 1.5
   ctx.lineCap = 'round'
   for (const u of [0.28, 0.46]) {
@@ -2060,7 +2078,13 @@ export function buildItemSheets(): Record<string, SpriteSheet> {
     'fruit-gear4': mk(fruit(PAL.poison), 10, 0.07, 24, 26),
     fragment: mk(drawFragment, 8, 0.1, 26, 26),
     oneup: mk(drawOneUp, 4, 0.15, 24, 20),
-    checkpoint: mk(drawCheckpoint, 10, 0.085, 34, 42),
+    // Two flags in one sheet: the entity swaps animation when it is claimed.
+    checkpoint: new SheetBuilder({
+      fw: 34, fh: 42, ox: -17, oy: -42, contour: '#1B1024', contourWidth: 0.6,
+    })
+      .add('idle', anim(drawCheckpoint, 10, 0.085))
+      .add('taken', anim((s2, t2) => drawCheckpoint(s2, t2, true), 10, 0.085))
+      .build(),
     goal: mk(drawGoal, 12, 0.075, 52, 78),
 
     // Props. All of these stand on the bottom edge of their frame.

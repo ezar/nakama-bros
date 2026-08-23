@@ -141,6 +141,9 @@ export class Checkpoint extends Entity {
   update(dt: number, world: World): void {
     this.tickAnim(dt)
     this.sheet = art().items.checkpoint ?? null
+    // Marine colours until it is claimed, the crew's afterwards — a flag you
+    // walked past and a flag you took should not look the same.
+    this.play(this.triggered ? 'taken' : 'idle')
     if (this.triggered) return
     const p = world.player()
     if (p && rectsOverlap(this.rect(), p.rect())) {
@@ -150,7 +153,7 @@ export class Checkpoint extends Entity {
       world.events.emit('level:checkpoint', { x: this.x, y: this.y })
       world.particles.burst(24, this.x, this.y - 30, {
         speed: 110, speedVar: 50, life: 0.6, size: 2, sizeEnd: 0.4,
-        color: PAL.marineBlue, colorEnd: PAL.cream, shape: 'spark', additive: true, drag: 0.06,
+        color: PAL.gold, colorEnd: PAL.luffyRed, shape: 'spark', additive: true, drag: 0.06,
       })
     }
   }
