@@ -6,6 +6,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
+import { buildLabel } from '../../build'
 
 /**
  * Settings, written on the same sheet as everything else.
@@ -198,6 +199,16 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
           <button className="op-button op-button--primary mt-5 w-full" onClick={onBack}>
             {t('options.back')}
           </button>
+
+          {/* The build. The title screen hides its copy on a narrow screen, and
+              a phone running this as a cached PWA is exactly where someone
+              needs to check which one they are actually looking at. */}
+          <div
+            className="mt-3 text-center font-body text-[10px] tracking-[0.14em] tabnum"
+            style={{ color: UI.inkSoft, opacity: 0.65 }}
+          >
+            {buildLabel}
+          </div>
         </Paper>
       </m.div>
     </m.div>
