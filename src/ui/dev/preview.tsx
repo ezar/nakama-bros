@@ -11,6 +11,7 @@ import { ResultScreen } from '../screens/ResultScreen'
 import { PauseScreen } from '../screens/PauseScreen'
 import { GameOverScreen } from '../screens/GameOverScreen'
 import { OptionsScreen } from '../screens/OptionsScreen'
+import { CreditsScreen } from '../screens/CreditsScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { Hud } from '../hud/Hud'
 import { TouchControls } from '../controls/TouchControls'
@@ -98,7 +99,9 @@ function Preview() {
         </div>
       )
     case 'options':
-      return <OptionsScreen onBack={noop} />
+      return <OptionsScreen onBack={noop} onCredits={noop} />
+    case 'credits':
+      return <CreditsScreen onBack={noop} />
     case 'loading':
       return <LoadingScreen progress={0.62} label="Desplegando a la Marina" />
     case 'hud':

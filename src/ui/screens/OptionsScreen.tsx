@@ -2,14 +2,12 @@ import { useEffect } from 'react'
 import { motion as m } from 'framer-motion'
 import { useSettings } from '../../store/settingsStore'
 import { DIFFICULTIES } from '../../game/config'
-import { useProgress } from '../../store/progressStore'
 import { useT } from '../../i18n/useT'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
-import { buildLabel, copyrightYears } from '../../build'
-import { GiftDrawing } from '../GiftDrawing'
+import { buildLabel } from '../../build'
 
 /**
  * Settings, written on the same sheet as everything else.
@@ -100,11 +98,10 @@ function Toggle<T extends string>({
   )
 }
 
-export function OptionsScreen({ onBack }: { onBack: () => void }) {
+export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCredits: () => void }) {
   const t = useT()
   const s = useSettings()
   const motion = useUiMotion()
-  const giftEarned = useProgress((p) => p.giftEarned)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -230,46 +227,24 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
             onChange={(v) => s.set({ crt: v === 'on' })}
           />
 
-          <button className="op-button op-button--primary mt-5 w-full" onClick={onBack}>
+          {/* The credits are their own screen, and they carry the legal
+              notice and the drawing with them: this sheet is for knobs. */}
+          <button className="op-button mt-5 w-full" onClick={onCredits}>
+            {t('options.credits')}
+          </button>
+
+          <button className="op-button op-button--primary mt-2 w-full" onClick={onBack}>
             {t('options.back')}
           </button>
 
-          {/* Who made this, whose it is, and whose it is not. A fan project
-              that borrows a cast has to say so somewhere the player can
-              actually reach, and this sheet is that place. */}
-          <div className="mt-5 border-t pt-3" style={{ borderColor: 'rgba(42,29,20,0.25)' }}>
-            <div
-              className="text-center font-body text-[10px] font-bold uppercase tracking-[0.2em]"
-              style={{ color: UI.inkSoft, opacity: 0.75 }}
-            >
-              {t('legal.title')}
-            </div>
-            <div
-              className="mt-1.5 flex flex-col gap-1 text-center font-body text-[10px] leading-snug"
-              style={{ color: UI.inkSoft, opacity: 0.72 }}
-            >
-              <p>{t('legal.oda')}</p>
-              <p>{t('legal.fan')}</p>
-              <p>{t('legal.code', { years: copyrightYears })}</p>
-            </div>
-            {/* The drawing, once it has been won. This is its home: the panel
-                that already carries the credits is where a "drawn by" belongs,
-                and unlike the result poster it is somewhere you can go back to. */}
-            {giftEarned && (
-              <div className="mt-4 flex flex-col items-center">
-                <GiftDrawing width={188} tilt={0} />
-              </div>
-            )}
-
-            {/* The build. The title screen hides its copy on a narrow screen,
-                and a phone running this as a cached PWA is exactly where
-                someone needs to check which one they are looking at. */}
-            <div
-              className="mt-2 text-center font-body text-[10px] tabnum tracking-[0.14em]"
-              style={{ color: UI.inkSoft, opacity: 0.55 }}
-            >
-              {buildLabel}
-            </div>
+          {/* The build. The title screen hides its copy on a narrow screen,
+              and a phone running this as a cached PWA is exactly where
+              someone needs to check which one they are looking at. */}
+          <div
+            className="mt-4 text-center font-body text-[10px] tabnum tracking-[0.14em]"
+            style={{ color: UI.inkSoft, opacity: 0.55 }}
+          >
+            {buildLabel}
           </div>
         </Paper>
       </m.div>
