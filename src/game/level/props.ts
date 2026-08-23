@@ -57,8 +57,12 @@ export function tower(
   floorRow: number,
   topRow: number,
 ): { deck: number; ladder: number } {
-  b.vline(x0, topRow + 1, floorRow - 1, C.solid)
-  b.vline(x1, topRow + 1, floorRow - 1, C.solid)
+  // The legs stop two rows above the floor, which is what lets you in. Run
+  // them all the way down and the shaft is sealed: the ladder is visible from
+  // the ground, reachable only by climbing something else and dropping in from
+  // the deck, and every tower in the campaign had that fault.
+  b.vline(x0, topRow + 1, floorRow - 3, C.solid)
+  b.vline(x1, topRow + 1, floorRow - 3, C.solid)
   // Braces across the shaft, a storey apart: the tower reads as a frame, and
   // they are somewhere to stand if you fall off the ladder.
   for (let y = topRow + 4; y < floorRow - 2; y += 4) b.ledge(x0 + 1, x1 - 1, y)

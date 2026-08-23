@@ -104,6 +104,14 @@ export const TRANSLATIONS = {
 
     // ── Options ──
     'options.title': 'Opciones',
+    'options.difficulty': 'Dificultad',
+    'difficulty.easy': 'Fácil',
+    'difficulty.normal': 'Normal',
+    'difficulty.hard': 'Difícil',
+    'difficulty.note.easy': '5 vidas, empiezas en gear 2 y el reloj va sobrado.',
+    'difficulty.note.normal': '3 vidas. La aventura tal y como está pensada.',
+    'difficulty.note.hard': 'Una sola vida, menos tiempo y casi nada de tregua.',
+    'difficulty.same': 'El salto y la carrera son iguales en las tres.',
     'options.master': 'Volumen general',
     'options.music': 'Música',
     'options.sfx': 'Efectos',
@@ -114,7 +122,10 @@ export const TRANSLATIONS = {
     'legal.title': 'Aviso legal',
     'legal.fan': 'Proyecto de fans no oficial y sin ánimo de lucro. Sin relación con los titulares de los derechos ni respaldo por su parte.',
     'legal.oda': 'One Piece © Eiichiro Oda · Shueisha · Toei Animation. Los nombres de los personajes aparecen como homenaje.',
-    'legal.code': 'Motor y arte © {years} ezar · Licencia MIT. Todo el arte es original y se genera por código: no se usa ningún recurso del manga, del anime ni de ningún otro juego.',
+    'legal.code': 'Motor y arte © {years} ezar · Licencia MIT. Todo el arte es original: el del juego se genera por código y el dibujo del premio está hecho a mano. No se usa ningún recurso del manga, del anime ni de ningún otro juego.',
+    'gift.unlocked': 'Rango S — has ganado un dibujo',
+    'gift.by': 'Dibujo de {name}',
+    'gift.alt': 'Dibujo de Luffy hecho a mano',
     'options.back': 'Volver',
 
     // ── Controls ──
@@ -213,6 +224,14 @@ export const TRANSLATIONS = {
     'over.menu': 'Menu',
 
     'options.title': 'Options',
+    'options.difficulty': 'Difficulty',
+    'difficulty.easy': 'Easy',
+    'difficulty.normal': 'Normal',
+    'difficulty.hard': 'Hard',
+    'difficulty.note.easy': '5 lives, you start in gear 2, and the clock is generous.',
+    'difficulty.note.normal': '3 lives. The adventure as it was built.',
+    'difficulty.note.hard': 'One life, less time, and almost no mercy.',
+    'difficulty.same': 'The jump and the run are identical on all three.',
     'options.master': 'Master volume',
     'options.music': 'Music',
     'options.sfx': 'Sound effects',
@@ -223,7 +242,10 @@ export const TRANSLATIONS = {
     'legal.title': 'Legal notice',
     'legal.fan': 'Unofficial, non-commercial fan project. Not affiliated with, sponsored by, or endorsed by the rights holders.',
     'legal.oda': 'One Piece © Eiichiro Oda · Shueisha · Toei Animation. Character names appear here as homage.',
-    'legal.code': 'Engine and art © {years} ezar · MIT licence. All art is original and drawn from code: no assets from the manga, the anime, or any other game are used.',
+    'legal.code': 'Engine and art © {years} ezar · MIT licence. All art is original: the game\'s is generated from code, the prize drawing is by hand. No assets from the manga, the anime, or any other game are used.',
+    'gift.unlocked': 'Rank S — you have won a drawing',
+    'gift.by': 'Drawn by {name}',
+    'gift.alt': 'A hand-drawn picture of Luffy',
     'options.back': 'Back',
 
     'controls.hint': 'Move: ← → · Jump: Space · Attack: X · Pause: Esc',

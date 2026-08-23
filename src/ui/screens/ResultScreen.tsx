@@ -10,6 +10,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { BerryIcon, FragmentIcon, Nail, WaxSeal } from '../art/Icons'
 import { RANK_COLOR, UI, formatBerry, rankFor } from '../theme'
+import { GiftDrawing } from '../GiftDrawing'
 
 interface Props {
   result: LevelResult
@@ -117,6 +118,13 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
     enabled: motion,
     onTick,
   })
+
+  // Rank S needs every fragment in the stage and a run without dying, so this
+  // fires rarely and means something when it does.
+  const giftEarned = useProgress((s) => s.giftEarned)
+  const earnGift = useProgress((s) => s.earnGift)
+  const firstTime = rank === 'S' && !giftEarned
+  useEffect(() => { if (rank === 'S') earnGift() }, [rank, earnGift])
 
   const [stamped, setStamped] = useState(!motion)
   useEffect(() => {
@@ -243,6 +251,26 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, onTick, onStamp
             </div>
           </Paper>
         </m.div>
+
+        {/* The drawing lands after the stamp, so the beat is: bounty, rank,
+            reward. Only on an S, and only the first time — after that it lives
+            in the options panel and this screen stays about the run. */}
+        {firstTime && (
+          <m.div
+            initial={motion ? { opacity: 0, y: 10 } : false}
+            animate={motion ? { opacity: 1, y: 0 } : {}}
+            transition={{ delay: motion ? 2.5 : 0 }}
+            className="mt-5 flex flex-col items-center"
+          >
+            <div
+              className="mb-2 font-body text-[10px] uppercase tracking-[0.22em]"
+              style={{ color: UI.brassLit }}
+            >
+              {t('gift.unlocked')}
+            </div>
+            <GiftDrawing width={176} tilt={-2.2} />
+          </m.div>
+        )}
 
         <m.div
           initial={{ opacity: 0, y: 12 }}

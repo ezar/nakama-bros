@@ -1,6 +1,6 @@
 import { FIXED_DT, GAME_H, GAME_W, TILE } from '../types'
 import type {
-  AudioApi, CrewId, HudSnapshot, InputState, LevelDef, LevelResult, RunState, Vec2,
+  AudioApi, CrewId, Difficulty, HudSnapshot, InputState, LevelDef, LevelResult, RunState, Vec2,
 } from '../types'
 import { Camera } from '../engine/camera'
 import { EventBus, type GameEvents } from '../engine/events'
@@ -15,7 +15,7 @@ import { ParticleSystem } from '../render/particles'
 import { Renderer } from '../render/Renderer'
 import { backgroundFor, foregroundFor, tilesetFor } from '../art'
 import type { World } from './world'
-import { BERRIES_PER_LIFE, SCORE } from './config'
+import { BERRIES_PER_LIFE, DIFFICULTY, SCORE } from './config'
 import { PAL } from '../art/palette'
 import { rectsOverlap } from '../engine/math'
 import './entities/enemies'
@@ -44,6 +44,8 @@ export class Game implements World {
   readonly rng: Rng
 
   entities: Entity[] = []
+  /** What this run's difficulty hands the player. Read by entities via `World`. */
+  readonly difficulty: (typeof DIFFICULTY)[Difficulty]
   level: LevelDef
   run: RunState
   time = 0
@@ -69,6 +71,7 @@ export class Game implements World {
     readonly audio: AudioApi,
     private callbacks: GameCallbacks = {},
     startingRun?: Partial<RunState>,
+    difficulty: Difficulty = 'normal',
   ) {
     this.level = levelDef
     this.rng = new Rng(seedFrom(levelDef.id))
@@ -77,13 +80,14 @@ export class Game implements World {
     this.inputMgr = new Input()
     this.inputMgr.attach(window)
 
+    this.difficulty = DIFFICULTY[difficulty] ?? DIFFICULTY.normal
     this.run = {
       crew,
-      tier: 'base',
-      lives: 3,
+      tier: this.difficulty.startTier,
+      lives: this.difficulty.lives,
       berries: 0,
       score: 0,
-      time: levelDef.timeLimit,
+      time: levelDef.timeLimit * this.difficulty.time,
       levelId: levelDef.id,
       checkpoint: null,
       ...startingRun,
@@ -154,7 +158,7 @@ export class Game implements World {
     this.ended = false
     this.endTimer = -1
     if (!fromCheckpoint) {
-      this.run.time = this.level.timeLimit
+      this.run.time = this.level.timeLimit * this.difficulty.time
       this.fragments = [false, false, false]
     }
   }
@@ -309,7 +313,7 @@ export class Game implements World {
     this.deaths++
     this.run.lives--
     this.respawnTimer = -1
-    this.run.tier = 'base'
+    this.run.tier = this.difficulty.startTier
     if (this.run.lives <= 0) {
       this.callbacks.onGameOver?.()
       this.loop.stop()

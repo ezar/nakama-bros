@@ -5,6 +5,10 @@ import type { TileMap } from '../physics/TileMap'
 import type { AudioApi, InputState, LevelDef, RunState, Vec2 } from '../types'
 import type { Entity } from './entities/Entity'
 import type { ParticleSystem } from '../render/particles'
+import type { DIFFICULTY } from './config'
+
+/** The row of `DIFFICULTY` in force for this run. */
+export type DifficultyMods = (typeof DIFFICULTY)[keyof typeof DIFFICULTY]
 
 /**
  * The service locator handed to every entity each step. Entities never import
@@ -22,6 +26,8 @@ export interface World {
   readonly input: InputState
   readonly level: LevelDef
   readonly run: RunState
+  /** What the chosen difficulty hands the player — see `DIFFICULTY` in config. */
+  readonly difficulty: DifficultyMods
   /** Seconds since the level started. */
   readonly time: number
 

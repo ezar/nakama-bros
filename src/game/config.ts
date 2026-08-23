@@ -1,4 +1,4 @@
-import type { CrewId, CrewStats, PowerTier } from '../types'
+import type { CrewId, CrewStats, Difficulty, PowerTier } from '../types'
 import { PAL } from '../art/palette'
 import { FIXED_DT, TILE } from '../types'
 
@@ -94,6 +94,32 @@ export const TIER_MODS: Record<PowerTier, {
   gear3: { speed: 0.92, jump: 1.18, scale: 1.55, armor: 1, aura: PAL.magic },
   gear4: { speed: 1.18, jump: 1.34, scale: 1.12, armor: 1, aura: PAL.poison },
 }
+
+/**
+ * What each difficulty hands the player.
+ *
+ * Deliberately **nothing from `PHYS`**: speeds, gravity and jump heights are the
+ * same on all three, so a jump learned on Fácil is the same jump on Difícil and
+ * a child and a parent can hand each other the controller mid-stage. What
+ * changes is how much rope you get — lives, clock, the mercy window after a hit
+ * — and, on Fácil, that you start in gear 2, which is worth one free mistake
+ * because a hit drops a tier before it kills.
+ */
+export const DIFFICULTY: Record<Difficulty, {
+  lives: number
+  /** Tier the run starts and respawns at. */
+  startTier: PowerTier
+  /** Multiplier on the invulnerability window after a hit. */
+  invuln: number
+  /** Multiplier on every level's clock. */
+  time: number
+}> = {
+  easy: { lives: 5, startTier: 'gear2', invuln: 1.6, time: 1.5 },
+  normal: { lives: 3, startTier: 'base', invuln: 1, time: 1 },
+  hard: { lives: 1, startTier: 'base', invuln: 0.7, time: 0.85 },
+}
+
+export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
 
 export const TIER_ORDER: PowerTier[] = ['base', 'gear2', 'gear3', 'gear4']
 

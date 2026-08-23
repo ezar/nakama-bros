@@ -256,6 +256,14 @@ export type CrewId =
  */
 export type PowerTier = 'base' | 'gear2' | 'gear3' | 'gear4'
 
+/**
+ * How forgiving the run is. It changes what the player is given — lives, clock,
+ * mercy after a hit — and never how the character handles: the same jump has to
+ * clear the same gap on all three, or practice on one setting is worthless on
+ * the next.
+ */
+export type Difficulty = 'easy' | 'normal' | 'hard'
+
 export interface CrewStats {
   id: CrewId
   /** Display name. */
