@@ -99,3 +99,41 @@ choquen los builds:
 npx vite build --outDir dist-mio
 node scripts/sheets.mjs --dist dist-mio --port 4331 --sheet crew:zoro --zoom 5
 ```
+
+## Iconos y pantalla de arranque
+
+Todo el arte se genera por código, pero iOS no acepta un SVG como icono de
+inicio ni acepta nada que no sea un PNG del tamaño exacto del dispositivo como
+imagen de arranque. Así que los PNG también salen de código, sólo que
+rasterizados de antemano:
+
+```bash
+node scripts/icons.mjs              # public/icons/ + public/icons/splash/
+node scripts/icons.mjs --preview    # un solo tamaño, para iterar el diseño
+```
+
+El script imprime en `scripts/.startup-links.html` el bloque de
+`<link rel="apple-touch-startup-image">` que va en `index.html`; pégalo si
+cambias la tabla de dispositivos. Vuelve a ejecutarlo si tocas la marca o la
+paleta.
+
+La tarjeta de arranque (`#boot` en `index.html`) repite esa misma composición
+en HTML y CSS en línea, para que pinte en el primer frame antes de que cargue
+el bundle; `main.tsx` la retira cuando React ya está en pantalla. Si cambias
+una, cambia la otra: en iOS se ven una detrás de otra.
+
+## Arte promocional
+
+```bash
+npm run promo                     # public/promo/, tres formatos
+node scripts/promo.mjs --frames   # candidatos de fondo, para elegir encuadre
+node scripts/promo.mjs --only og  # una sola tarjeta, para iterar
+```
+
+Nada de esto está maquetado a mano: el fondo es un frame que el motor ha
+renderizado de verdad y los personajes salen del atlas que usa el juego, así
+que el arte no puede desviarse de lo que ve el jugador. La tarjeta ancha
+(`og-1200x630.png`) es también el `og:image` de la página.
+
+Comparte paleta, marca y tipografía con los iconos a través de
+`scripts/lib/brand.mjs`; si tocas una de las dos cosas, regenera ambas.

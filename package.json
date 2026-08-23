@@ -13,7 +13,9 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "capture": "npm run build && node scripts/shoot.mjs"
+    "capture": "npm run build && node scripts/shoot.mjs",
+    "promo": "npm run build && node scripts/promo.mjs",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "framer-motion": "^13.1.1",
