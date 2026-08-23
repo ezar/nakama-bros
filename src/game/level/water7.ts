@@ -318,7 +318,7 @@ function buildDryDock(): LevelDef {
   b.water(157, 162, G + 1, H - 2)
   b.pit(157, 162, 0)
   b.ledge(157, 162, G - 1)
-  b.spawn('boss-fishman', 178, G - 1)
+  b.spawn('boss-lucci', 178, G - 1)
   b.rect(190, G - 6, 191, G - 1, C.solid)
   b.berryLine(164, 186, G - 6, 4)
 

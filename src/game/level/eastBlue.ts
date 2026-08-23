@@ -305,7 +305,7 @@ function buildBaratie(): LevelDef {
   b.berryLine(222, 234, DECK - 1, 3)
 
   return {
-    id: 'east-blue-2',
+    id: 'east-blue-3',
     name: 'El Baratie',
     biome: 'east-blue',
     w: W,
@@ -399,7 +399,7 @@ function buildCircus(): LevelDef {
   b.spawn('goal', 194, G - 4)
 
   return {
-    id: 'east-blue-3',
+    id: 'east-blue-2',
     name: 'Carpa del Payaso',
     biome: 'east-blue',
     w: W,
@@ -415,6 +415,100 @@ function buildCircus(): LevelDef {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 1-4 · Arlong Park — boss stage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildArlongPark(): LevelDef {
+  const W = 210
+  const H = 24
+  const G = 16
+  const b = new LevelBuilder(W, H)
+
+  b.ground(0, W - 1, G)
+
+  // ── The approach. The sea comes back for the end of East Blue: everything
+  //    here is either water or something built out over it.
+  b.berryLine(2, 12, G - 1, 3)
+  b.onGround('grunt', 16)
+  b.pit(20, 36, 0)
+  b.water(20, 36, G + 1, H - 2)
+  b.spawn('urchin', 26, H - 3)
+  b.spawn('fishman', 31, G + 1)
+  b.ledge(21, 27, G - 3)
+  b.ledge(30, 35, G - 5)
+  b.berryLine(22, 34, G - 6, 3)
+  b.ground(37, 74, G)
+  b.onGround('checkpoint', 41)
+  b.onGround('crab', 47)
+  crates(b, 53, G, 3)
+  crates(b, 54, G, 2)
+  b.onGround('shielder', 61)
+  b.spawn('bat', 66, G - 7)
+  b.spawn('meat', 70, G - 4)
+
+  // ── The pool. A tank cut into the pier with the first fragment on the far
+  //    lip, and the water full of things that are faster than you in it.
+  b.pit(75, 104, 0)
+  b.water(75, 104, G - 1, H - 2)
+  b.spawn('fishman', 84, G - 2)
+  b.spawn('fishman', 96, G - 2)
+  b.spawn('urchin', 90, H - 3)
+  b.ledge(78, 84, G - 3)
+  b.ledge(89, 96, G - 6)
+  b.spawn('fragment', 93, G - 7, { index: 0 })
+  b.berryLine(79, 101, G - 11, 4)
+  b.spawn('bat', 88, G - 13)
+  b.ground(105, 146, G)
+
+  // ── The saw-tooth roofs. Three pitched roofs of the park itself, and the
+  //    second fragment behind the tallest.
+  // Roof tops three, five and seven above the street: each hop is a step up,
+  // never a climb.
+  for (const [i, x] of [110, 122, 134].entries()) {
+    b.rect(x, G - 3 - i * 2, x + 7, G - 1, C.brick)
+  }
+  b.spawn('fragment', 138, G - 9, { index: 1 })
+  b.berryLine(111, 141, G - 12, 4)
+  b.onGround('grunt', 144)
+  b.onGround('checkpoint', 149)
+  b.spawn('bat', 128, G - 14)
+
+  // ── The park. Stone, flat, walled at the back, with the sea let in at the
+  //    near end so there is one corner of the ring you do not want.
+  b.ground(147, W - 1, G)
+  b.water(155, 160, G + 1, H - 2)
+  b.pit(155, 160, 0)
+  b.ledge(155, 160, G - 1)
+  b.spawn('boss-fishman', 180, G - 1)
+  b.spawn('meat', 152, G - 4)
+  b.berryLine(163, 188, G - 6, 4)
+
+  // ── Past the park: over the wall and out along the jetty.
+  b.rect(192, G - 6, 193, G - 1, C.solid)
+  b.ledge(189, 196, G - 6)
+  b.spawn('fragment', 195, G - 7, { index: 2 })
+  b.ground(194, W - 1, G - 3)
+  b.spawn('goal', 201, G - 4)
+
+  return {
+    id: 'east-blue-4',
+    name: 'Arlong Park',
+    biome: 'east-blue',
+    w: W,
+    h: H,
+    startX: 3,
+    startY: G - 1,
+    timeLimit: 340,
+    music: 'boss',
+    weather: 'clear',
+    timeOfDay: 0.78,
+    rows: b.rows(),
+    spawns: b.spawns(),
+  }
+}
+
 export const eastBlue1 = buildVillaFuchsia()
-export const eastBlue2 = buildBaratie()
-export const eastBlue3 = buildCircus()
+export const eastBlue2 = buildCircus()
+export const eastBlue3 = buildBaratie()
+export const eastBlue4 = buildArlongPark()

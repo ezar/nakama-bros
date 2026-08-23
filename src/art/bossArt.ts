@@ -1301,6 +1301,184 @@ function drawShadowMaster(s: Surface, t: number, mode: BossMode, phase: Phase): 
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Boss 7 — the government agent of Water 7
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lean where the others are broad: this one is built like a knife. */
+const AGENT_BUILD: Build = {
+  hip: 30, thigh: 14.4, shin: 14, torso: 19, upper: 12.6, fore: 11.6,
+  headR: 6.8, hipW: 6.4, shW: 10.4, legR: 3.4, armR: 3.2, z: 2.6,
+}
+
+/**
+ * The beast under the suit.
+ *
+ * Phase one is a man in a tailcoat with his hands in his pockets; phase two is
+ * what was inside it. Rather than a second costume, the change is four things
+ * laid over the same rig — ears, a muzzle, a tail, and fur breaking the line of
+ * the shoulders — so it reads as the same person coming apart, which is the
+ * rule every boss in this game follows.
+ */
+function beastMarks(
+  ctx: CanvasRenderingContext2D,
+  r: Rig,
+  b: Build,
+  fur: Cel,
+  t: number,
+): void {
+  // Tail, heavy and low, swinging on its own beat.
+  const sway = Math.sin(t * Math.PI * 2)
+  paint(ctx, curveRibbon(
+    [r.hip[0] - 4, r.hip[1] + 2],
+    [r.hip[0] - 16, r.hip[1] + 6 + sway * 3],
+    [r.hip[0] - 27, r.hip[1] - 2 + sway * 7],
+    3.2,
+  ), fur, { shadow: 0.42, radius: 8, pivot: r.hip, rim: 0.5, line: 0.55 })
+  // Fur at the shoulders, breaking the tailored line.
+  for (const [dx, dy, w] of [[-7, 1, 4], [-2, -1, 5], [4, 0, 4.4]] as Array<[number, number, number]>) {
+    paint(ctx, blob([
+      [r.sh[0] + dx - w * 0.5, r.sh[1] + dy + 2],
+      [r.sh[0] + dx, r.sh[1] + dy - w * 0.7],
+      [r.sh[0] + dx + w * 0.5, r.sh[1] + dy + 2],
+    ] as Pt[], 0.4), fur, {
+      shadow: 0.36, radius: w, pivot: [r.sh[0] + dx, r.sh[1] + dy], rim: 0.5, line: 0.5,
+    })
+  }
+  void b
+}
+
+function drawAgent(s: Surface, t: number, mode: BossMode, phase: Phase): void {
+  const ctx = s.ctx
+  const cx = s.w * 0.5
+  const gy = s.h - 1.5
+  const b = AGENT_BUILD
+  const suit = phase === 1 ? TONE.samuraiCloth : mix(TONE.samuraiCloth, PAL.night, 0.3)
+  const fur = C(mix(PAL.sanjiGold, PAL.dirt, 0.4))
+  const look: Look = {
+    cloth: suit, legs: mix(suit, PAL.ink, 0.25), skin: PAL.skin,
+    boot: mix(PAL.ink, PAL.night, 0.2), sleeve: 1, glove: mix(PAL.ink, PAL.slate, 0.2), bulk: 0.98,
+  }
+  let pose = bossPose(mode, t, 1.05)
+  if (mode === 'windup') {
+    // A single arm cocked, everything else still: the calm is the tell.
+    pose = P({ hip: 1.4, lean: -0.22, legN: [0.4, -0.5], legF: [-0.5, 0.6], armN: [-2.4, 0.9], armF: [-0.4, 0.4], footN: 0.2, footF: -0.2, drag: -3 })
+  } else if (mode === 'attack') {
+    pose = P({ hip: -1.2, lean: 0.42, legN: [1.05, -0.25], legF: [-0.95, 0.45], armN: [1.65, 0.05], armF: [0.3, 0.7], footN: 0.5, footF: -0.5, drag: 6 })
+  }
+  const rig = solveRig(cx, gy, b, pose)
+  if (mode === 'defeat') dust(ctx, cx, gy, 22, mix(PAL.slate, PAL.night, 0.4))
+
+  drawFigure(ctx, rig, b, look, pose, {
+    back: (c, r) => {
+      if (phase === 2) beastMarks(c, r, b, fur, t)
+      // Tailcoat: two long tails behind the legs, and they are the read at
+      // distance — a boss in a suit has to be a suit first.
+      const hem = tornEdge(
+        [r.hip[0] + 5, r.hip[1] + 20],
+        [r.hip[0] - 8 - pose.drag * 0.5, r.hip[1] + 18],
+        phase === 2 ? 7 : 2,
+        phase === 2 ? 3 : 0.8,
+      )
+      paint(c, blob([
+        [r.sh[0] - 6, r.sh[1] + 2],
+        [r.sh[0] + 5, r.sh[1] + 3],
+        [r.hip[0] + 5, r.hip[1] + 6],
+        ...hem,
+        [r.hip[0] - 8 - pose.drag * 0.5, r.hip[1] + 4],
+      ] as Pt[], 0.62), C(mix(suit, PAL.night, 0.25)), {
+        shadow: 0.44, radius: 11, pivot: [r.hip[0], r.hip[1] + 6], rim: 0.45, line: 0.55, occlusion: 0.24,
+      })
+    },
+    overTorso: (c, r) => {
+      // Shirt front and a tie: the white wedge is what separates him from
+      // every other dark silhouette in the game.
+      const { px, py } = spine(r)
+      paint(c, blob([
+        [r.sh[0] - 3.4, r.sh[1] + 1],
+        [r.sh[0] + 3.4, r.sh[1] + 1.6],
+        [r.hip[0] + 1.6, r.hip[1] + 1],
+        [r.hip[0] - 2.2, r.hip[1] + 0.6],
+      ] as Pt[], 0.5), C(PAL.cream), {
+        shadow: 0.3, radius: 8, pivot: [r.sh[0], r.sh[1] + 6], rim: 0.5, line: 0.45,
+      })
+      paint(c, limbPath(
+        r.sh[0] - px * 2, r.sh[1] - py * 2 + 3,
+        r.hip[0] + px * 2, r.hip[1] + py * 2 - 4, 1.6, 1.1,
+      ), C(phase === 1 ? PAL.luffyRedDeep : PAL.danger), {
+        shadow: 0.34, radius: 3, pivot: r.sh, rim: 0.4, line: 0.45,
+      })
+    },
+    front: (c, r) => {
+      if (mode === 'attack' || mode === 'windup') {
+        // The strike itself is the weapon: a finger, then the air behind it.
+        const a = Math.atan2(r.handN[1] - r.elbowN[1], r.handN[0] - r.elbowN[0])
+        c.save()
+        c.translate(r.handN[0], r.handN[1])
+        c.rotate(a)
+        paint(c, roundRectPath(0, -1.1, 7, 2.2, 1), C(PAL.skin), {
+          shadow: 0.3, radius: 4, pivot: [3, 0], rim: 0.5, line: 0.45,
+        })
+        if (mode === 'attack') {
+          c.strokeStyle = rgba(PAL.mist, 0.85)
+          c.lineWidth = 1.1
+          for (const dy of [-3.5, 0, 3.5]) {
+            c.beginPath()
+            c.moveTo(9, dy * 0.4)
+            c.lineTo(26, dy)
+            c.stroke()
+          }
+        }
+        c.restore()
+      }
+    },
+    head: (c, r) => {
+      const rr = b.headR
+      const hx = r.head[0]
+      const hy = r.head[1] + (mode === 'defeat' ? 2.5 : 0)
+      paint(c, headPath(hx, hy, rr, phase === 1 ? 0.98 : 1.06), C(phase === 1 ? PAL.skin : mix(PAL.skin, fur.core, 0.5), 0.3), {
+        shadow: FACE_SHADOW, radius: rr * 1.3, pivot: [hx, hy], rim: 0.45, line: 0.5,
+      })
+      earAndNeck(c, hx, hy, rr, C(PAL.skin, 0.3))
+      if (phase === 2) {
+        // Ears up top and a muzzle pushed forward: the same head, changed.
+        for (const dx of [-rr * 0.7, rr * 0.55]) {
+          paint(c, blob([
+            [hx + dx - 2, hy - rr * 0.7],
+            [hx + dx + 2, hy - rr * 0.75],
+            [hx + dx + (dx < 0 ? -0.6 : 0.8), hy - rr * 1.55],
+          ] as Pt[], 0.4), fur, {
+            shadow: 0.34, radius: rr * 0.8, pivot: [hx + dx, hy - rr], rim: 0.55, line: 0.5,
+          })
+        }
+        paint(c, ellipsePath(hx + rr * 0.62, hy + rr * 0.34, rr * 0.46, rr * 0.34), fur, {
+          shadow: 0.34, radius: rr * 0.5, pivot: [hx + rr * 0.6, hy + rr * 0.3], rim: 0.5, line: 0.45,
+        })
+        // Spots, few and irregular — a pattern, not a texture.
+        c.fillStyle = rgba(INK, 0.5)
+        for (const [ox, oy, rad] of [[-0.5, -0.5, 1.1], [0.6, 0.1, 0.9], [-0.1, 0.7, 0.8]] as Array<[number, number, number]>) {
+          c.beginPath()
+          c.ellipse(hx + ox * rr, hy + oy * rr - rr * 0.3, rad, rad * 0.85, 0, 0, Math.PI * 2)
+          c.fill()
+        }
+      } else {
+        // A flat cap and a level stare. He is the only boss who looks bored.
+        paint(c, blob([
+          [hx - rr * 1.25, hy - rr * 0.5],
+          [hx + rr * 1.05, hy - rr * 0.62],
+          [hx + rr * 0.95, hy - rr * 1.0],
+          [hx - rr * 0.9, hy - rr * 1.05],
+        ] as Pt[], 0.6), C(mix(suit, PAL.ink, 0.25)), {
+          shadow: 0.4, radius: rr, pivot: [hx, hy - rr * 0.8], rim: 0.5, line: 0.5,
+        })
+      }
+      eyes3q(c, hx, hy + rr * 0.05, rr, { angry: phase === 2, color: phase === 1 ? PAL.slate : PAL.gold })
+      nose(c, hx, hy + rr * 0.3, rr, C(PAL.skin, 0.3))
+      mouth(c, hx, hy + rr * 0.66, rr, phase === 1 ? 'grim' : 'fang')
+    },
+  })
+}
+
 /**
  * The state set every boss ships, in both phases. Phase two is prefixed `p2-`,
  * so a boss entity swaps prefix when its health crosses the threshold and keeps
@@ -1337,6 +1515,7 @@ const BOSSES: Record<string, [BossPainter, number, number]> = {
   'sky-tyrant': [drawSkyTyrant, 120, 108],
   'oni-lord': [drawOniLord, 152, 110],
   'shadow-master': [drawShadowMaster, 140, 104],
+  agent: [drawAgent, 136, 102],
 }
 
 export type BossKey = keyof typeof BOSSES

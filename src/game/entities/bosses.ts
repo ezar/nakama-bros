@@ -2458,6 +2458,147 @@ export class Shade extends Entity {
 
 registerEntity('boss-moria', (x, y) => new ShadowMaster(x, y))
 
+/**
+ * The government agent of Water 7.
+ *
+ * The fight is about distance, which is the one axis the other bosses leave
+ * alone: he hits you from across the arena with a strike that travels, and he
+ * closes the gap faster than you can open it. Every other boss is something to
+ * get away from; this one has to be kept at exactly the range where his tells
+ * are still readable.
+ *
+ * Act one is the finger pistol, aimed. Act two adds the run. Act three is both
+ * at once, from a man who no longer bothers looking like a man.
+ */
+export class Agent extends Boss {
+  displayName = 'Rob Lucci'
+  sheetKey = 'agent'
+  private rushing = false
+  private rushDir: 1 | -1 = 1
+  private shotsLeft = 0
+
+  constructor(x: number, y: number) {
+    super(x, y, 26, 56)
+    this.maxHealth = 11
+    this.health = 11
+    this.accent = PAL.mist
+    this.phases = [
+      { at: 1, interval: 1.45, speed: 1, intensity: 0.82, moves: ['pistol', 'sweep'] },
+      { at: 0.66, interval: 1.2, speed: 1.25, intensity: 0.92, moves: ['rush', 'pistol'] },
+      { at: 0.33, interval: 1, speed: 1.45, intensity: 1, moves: ['volley', 'rush', 'sweep'] },
+    ]
+
+    this.moves = {
+      // One shot, aimed where you are standing when the arm comes up. The tell
+      // is long and the shot is fast: it is a question about where you will be.
+      pistol: {
+        name: 'pistol', tell: 0.7, active: 0.35, recover: 1.3, color: PAL.mist,
+        fire: (world) => {
+          this.facePlayer(world)
+          world.audio.playSfx('slash', { volume: 0.55, rate: 1.4 })
+          world.spawn(new Knife(this.x + this.facing * 16, this.y - 30, this.facing * 320, 0))
+        },
+      },
+
+      // A low kick that throws the floor at you, both ways.
+      sweep: {
+        name: 'sweep', tell: 0.55, active: 0.5, recover: 1.25, color: PAL.steel,
+        fire: (world) => {
+          world.audio.playSfx('slash', { volume: 0.6, rate: 0.9 })
+          const gy = groundYAt(world, this.x, this.y - 8)
+          for (const dir of [1, -1] as const) {
+            world.spawn(new Shockwave(this.x + dir * 18, gy, dir, 210, PAL.mist))
+          }
+        },
+      },
+
+      // He closes. Faster than you can back away, so the answer is over him.
+      rush: {
+        name: 'rush', tell: 0.6, active: 0.75, recover: 1.5, color: PAL.danger,
+        start: (world) => {
+          this.facePlayer(world)
+          this.rushDir = this.dirToPlayer(world)
+          world.audio.playSfx('warn', { volume: 0.45, rate: 1.2 })
+        },
+        fire: () => {
+          this.rushing = true
+        },
+        during: (_t, _dt, world) => {
+          this.body.vx = this.rushDir * 300
+          this.facing = this.rushDir
+          if (this.x <= this.arenaL + this.body.w || this.x >= this.arenaR - this.body.w) {
+            this.rushing = false
+            this.body.vx = 0
+            world.shake(0.3)
+          }
+          if (world.rng.bool(0.4)) {
+            world.particles.emit({
+              x: this.x - this.rushDir * 12, y: this.y - world.rng.range(4, this.body.h * 0.7),
+              vx: -this.rushDir * world.rng.range(30, 70), vy: world.rng.range(-20, 10),
+              life: 0.35, lifeVar: 0.15, size: 2.2, sizeEnd: 0.3,
+              color: PAL.mist, colorEnd: rgba(PAL.slate, 0), shape: 'puff', drag: 0.06,
+            } as never)
+          }
+        },
+        end: () => {
+          this.rushing = false
+          this.body.vx = 0
+        },
+      },
+
+      // Act three: four shots on a fan, so there is no single safe height.
+      volley: {
+        name: 'volley', tell: 0.8, active: 1.1, recover: 1.4, color: PAL.mist,
+        start: () => {
+          this.shotsLeft = 4
+        },
+        during: (t, _dt, world) => {
+          const want = 4 - Math.floor(t * 4)
+          if (this.shotsLeft <= want || this.shotsLeft <= 0) return
+          this.shotsLeft--
+          const i = 3 - this.shotsLeft
+          world.audio.playSfx('slash', { volume: 0.45, rate: 1.5 })
+          world.spawn(new Knife(
+            this.x + this.facing * 16,
+            this.y - 12 - i * 12,
+            this.facing * 300,
+            0,
+          ))
+        },
+      },
+    }
+  }
+
+  /** Contact is only dangerous while he is committed to the run. */
+  get vulnerable(): boolean {
+    return !this.rushing && super.vulnerable
+  }
+
+  protected move(dt: number, world: World): void {
+    if (!this.rushing) this.facePlayer(world)
+    this.body.vy = Math.min(this.body.vy + PHYS.gravity * dt, PHYS.maxFall)
+    if (this.rushing) return
+    if (this.state === 'wait') {
+      const p = world.player()
+      if (p) {
+        // He holds a shooting distance rather than closing: the fight is about
+        // the gap, and he is the one who decides how wide it is.
+        const gap = Math.abs(p.x - this.x)
+        const want = 92
+        const dir = gap < want ? -this.facing : this.facing
+        this.body.vx = dir * 52 * this.phases[this.phase].speed
+        this.playState('walk')
+      }
+    } else if (this.state === 'open' || this.state === 'stagger') {
+      this.body.vx *= 0.8
+    } else {
+      this.body.vx *= 0.88
+    }
+  }
+}
+
+registerEntity('boss-lucci', (x, y) => new Agent(x, y))
+
 registerEntity('boss-buggy', (x, y) => new BuggyBoss(x, y))
 registerEntity('boss-fishman', (x, y) => new FishmanWarlord(x, y))
 registerEntity('boss-desert', (x, y) => new DesertWarlord(x, y))
