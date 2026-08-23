@@ -35,7 +35,7 @@ export const KNOWN_TYPES = new Set([
   'grunt', 'shielder', 'crab', 'fishman', 'bat', 'urchin', 'barrel',
   'berry', 'meat', 'fruit', 'fragment', 'oneup',
   'checkpoint', 'goal', 'platform', 'crumble',
-  'boss-buggy',
+  'boss-buggy', 'boss-desert', 'boss-sky', 'boss-fishman', 'boss-kaido',
 ])
 
 /**
@@ -43,14 +43,15 @@ export const KNOWN_TYPES = new Set([
  *
  * A stage that needs one is built so it is still completable without it — the
  * spawn simply does not appear — and says so here rather than silently. Move a
- * name from this set to `KNOWN_TYPES` the day it registers.
+ * name from this set to `KNOWN_TYPES` the day it registers. Empty right now,
+ * and the day it stops being empty is the day a stage is quietly incomplete.
  */
-export const REQUESTED_TYPES = new Set(['boss-kaido'])
+export const REQUESTED_TYPES = new Set<string>([])
 
 /** Types that must be standing on something when the level starts. */
 const GROUNDED_TYPES = new Set([
   'grunt', 'shielder', 'crab', 'urchin', 'barrel', 'checkpoint', 'goal',
-  'boss-buggy', 'boss-kaido',
+  'boss-buggy', 'boss-desert', 'boss-sky', 'boss-fishman', 'boss-kaido',
 ])
 
 const SOLIDISH = new Set<string>([C.solid, C.brick, C.question, C.used, C.ice, C.bouncy, C.crumble])

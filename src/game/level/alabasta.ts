@@ -283,5 +283,97 @@ function buildRuins(): LevelDef {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 2-3 · El Foso de Arena — boss stage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildSandPit(): LevelDef {
+  const W = 204
+  const H = 22
+  const G = 16
+  const b = new LevelBuilder(W, H)
+
+  b.ground(0, W - 1, G)
+
+  // ── The approach. A boss stage is still a stage, and this one is made of
+  //    the two things Alabasta taught: ground that gives way, and shade that
+  //    turns out to be a drop.
+  stones(b, 7, 14, G, 7)
+  b.berryLine(2, 14, G - 2, 3)
+  b.onGround('grunt', 16)
+  b.pit(20, 26)
+  b.ground(27, 58, G)
+  bridge(b, 20, 26, G, true)
+  b.berryArc(20, G - 2, 6, 3)
+  b.onGround('crab', 32)
+  ruinColumn(b, 37, G, 4)
+  ruinColumn(b, 42, G, 6)
+  b.ledge(38, 46, G - 7)
+  b.berryLine(39, 45, G - 8, 2)
+  b.spawn('bat', 44, G - 10)
+  b.onGround('checkpoint', 50)
+  b.onGround('shielder', 55)
+
+  // ── The collapsed colonnade. Four columns of falling height with sand
+  //    shelves strung between them, and the first fragment above the last one.
+  b.pit(59, 64)
+  b.ground(65, 118, G)
+  bridge(b, 59, 64, G, true)
+  for (const [i, x] of [70, 80, 90, 100].entries()) {
+    ruinColumn(b, x, G, 7 - i)
+    b.ledge(x - 2, x + 2, G - 8 + i)
+  }
+  b.berryLine(71, 99, G - 10, 4)
+  b.spawn('fragment', 100, G - 6, { index: 0 })
+  b.spawn('bat', 76, G - 12)
+  b.spawn('bat', 95, G - 11)
+  b.onGround('grunt', 108)
+  b.spawn('meat', 112, G - 4)
+
+  // ── The spiked cistern. The last thing before the ring, and the only place
+  //    on the stage where standing still is worse than moving.
+  b.spikes(122, 125, G - 1)
+  b.spikes(131, 134, G - 1)
+  b.ledge(120, 128, G - 4)
+  b.ledge(130, 137, G - 6)
+  b.ground(119, 148, G)
+  b.berryLine(121, 127, G - 5, 2)
+  b.spawn('fragment', 136, G - 7, { index: 1 })
+  b.spawn('urchin', 128, G - 1)
+  b.onGround('shielder', 143)
+  b.onGround('checkpoint', 147)
+
+  // ── The pit itself. Flat, walled at the far end, and wide enough to run a
+  //    sandstorm pattern in without the fight leaving the screen.
+  b.ground(149, W - 1, G)
+  b.rect(188, G - 6, 189, G - 1, C.solid)
+  b.spawn('boss-desert', 172, G - 1)
+  b.spawn('meat', 154, G - 4)
+  b.berryLine(152, 184, G - 6, 4)
+
+  // ── Past the pit: the stair out of the ruin, over the wall.
+  b.ledge(185, 192, G - 6)
+  b.spawn('fragment', 191, G - 7, { index: 2 })
+  b.ground(190, W - 1, G - 3)
+  b.spawn('goal', 196, G - 4)
+
+  return {
+    id: 'alabasta-3',
+    name: 'El Foso de Arena',
+    biome: 'alabasta',
+    w: W,
+    h: H,
+    startX: 3,
+    startY: G - 1,
+    timeLimit: 320,
+    music: 'boss',
+    weather: 'sand',
+    timeOfDay: 0.52,
+    rows: b.rows(),
+    spawns: b.spawns(),
+  }
+}
+
 export const alabasta1 = buildDunes()
 export const alabasta2 = buildRuins()
+export const alabasta3 = buildSandPit()

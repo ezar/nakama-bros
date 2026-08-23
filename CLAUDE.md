@@ -151,6 +151,13 @@ hornea el propio juego y cierran con el aviso legal. Mientras el dibujo no esté
 ganado, en su sitio hay un marco vacío con la S, para que se vea que hay algo
 que conseguir.
 
+Se llega a ellos por dos puertas: desde Opciones, y al terminar la campaña. La
+última fase no encadena con otra, así que su cartel de recompensa lleva «Ver el
+final» en vez de «Siguiente» y abre `EndingScreen`, que hace recuento del viaje
+y cede el paso al rollo. `creditsBack` en `App.tsx` guarda **a dónde** se
+vuelve, no de dónde se viene: guardar el origen mandaba de vuelta al final, que
+a los catorce segundos se va solo a los créditos — un bucle.
+
 ## Arte promocional
 
 ```bash

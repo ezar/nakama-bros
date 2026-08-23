@@ -13,6 +13,7 @@ import { GameOverScreen } from '../screens/GameOverScreen'
 import { OptionsScreen } from '../screens/OptionsScreen'
 import { CreditsScreen } from '../screens/CreditsScreen'
 import { LevelIntroScreen } from '../screens/LevelIntroScreen'
+import { EndingScreen } from '../screens/EndingScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { Hud } from '../hud/Hud'
 import { TouchControls } from '../controls/TouchControls'
@@ -103,6 +104,8 @@ function Preview() {
       return <OptionsScreen onBack={noop} onCredits={noop} />
     case 'credits':
       return <CreditsScreen onBack={noop} />
+    case 'ending':
+      return <EndingScreen onCredits={noop} onPort={noop} />
     // `#intro`, `#intro:alabasta-1`, … — any stage id, to look at each card.
     case hash.startsWith('intro') ? hash : '\u0000': {
       const id = hash.split(':')[1]

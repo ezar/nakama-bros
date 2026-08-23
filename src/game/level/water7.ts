@@ -255,5 +255,96 @@ function buildSeaTrain(): LevelDef {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 4-3 · El Dique Seco — boss stage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildDryDock(): LevelDef {
+  const W = 206
+  const H = 24
+  const G = 16
+  const b = new LevelBuilder(W, H)
+
+  b.ground(0, W - 1, G)
+
+  // ── The approach. The island's two habits in order: water with something
+  //    in it, and a walkway over the water that is narrower than it looks.
+  b.berryLine(2, 12, G - 1, 3)
+  b.onGround('grunt', 15)
+  b.pit(19, 34, 0)
+  b.water(19, 34, G + 1, H - 2)
+  b.spawn('urchin', 24, H - 3)
+  b.spawn('fishman', 29, G + 1)
+  b.ledge(20, 25, G - 3)
+  b.ledge(28, 33, G - 4)
+  b.berryLine(21, 32, G - 5, 3)
+  b.ground(35, 66, G)
+  b.onGround('checkpoint', 39)
+  b.onGround('shielder', 45)
+  b.spawn('bat', 52, G - 6)
+  b.spawn('meat', 58, G - 4)
+
+  // ── The gantry. A crane over the dock with the first fragment on its arm,
+  //    reached by the ladder rather than by jumping at it.
+  const crane = tower(b, 70, 76, G, G - 9)
+  b.ledge(77, 84, crane.deck)
+  b.spawn('fragment', 82, crane.deck - 1, { index: 0 })
+  b.berryLine(71, 75, crane.deck - 2, 2)
+  b.ground(67, 104, G)
+  b.onGround('grunt', 90)
+  b.spawn('bat', 96, crane.deck - 2)
+  b.onGround('shielder', 100)
+
+  // ── The flooded dock. Three barges on a long swing, and the second fragment
+  //    on the far one — the crossing is a matter of waiting, not of speed.
+  b.pit(105, 146, 0)
+  b.water(105, 146, G + 1, H - 2)
+  b.spawn('platform', 112, G - 1, { spanX: 80, spanY: 0, period: 4, width: 60 })
+  b.spawn('platform', 126, G - 4, { spanX: 80, spanY: 0, period: 4.6, width: 60 })
+  b.spawn('platform', 140, G - 1, { spanX: 80, spanY: 0, period: 3.6, width: 60 })
+  b.berryLine(108, 144, G - 6, 5)
+  b.spawn('fragment', 132, G - 8, { index: 1 })
+  b.spawn('urchin', 120, H - 3)
+  b.spawn('fishman', 136, G + 1)
+  b.spawn('bat', 128, G - 10)
+
+  // ── The dock gate, and the last dry ground before the water is the floor.
+  b.ground(147, W - 1, G)
+  b.onGround('checkpoint', 151)
+  b.spawn('meat', 155, G - 4)
+
+  // ── The dry dock itself: the ring, with the sea let back in at the near end
+  //    so the fight has a wet corner you do not want to be backed into.
+  b.water(157, 162, G + 1, H - 2)
+  b.pit(157, 162, 0)
+  b.ledge(157, 162, G - 1)
+  b.spawn('boss-fishman', 178, G - 1)
+  b.rect(190, G - 6, 191, G - 1, C.solid)
+  b.berryLine(164, 186, G - 6, 4)
+
+  // ── Past the ring: up the dock wall and out along the rail.
+  b.ledge(187, 194, G - 6)
+  b.spawn('fragment', 193, G - 7, { index: 2 })
+  b.ground(192, W - 1, G - 3)
+  b.spawn('goal', 198, G - 4)
+
+  return {
+    id: 'water7-3',
+    name: 'El Dique Seco',
+    biome: 'water7',
+    w: W,
+    h: H,
+    startX: 3,
+    startY: G - 1,
+    timeLimit: 340,
+    music: 'boss',
+    weather: 'rain',
+    timeOfDay: 0.7,
+    rows: b.rows(),
+    spawns: b.spawns(),
+  }
+}
+
 export const water71 = buildCanals()
 export const water72 = buildSeaTrain()
+export const water73 = buildDryDock()
