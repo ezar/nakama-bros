@@ -14,9 +14,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
  *
  * It is painted by the document itself so the first frame is the game's night
  * sea instead of a white flash; nothing in the bundle can remove it, so this
- * does. Two frames of grace let React actually put the shell on screen, and a
- * short floor keeps the card from blinking past on a warm cache — it should
- * read as an opening title, not as a glitch.
+ * does. Two frames of grace let React actually put the shell on screen.
+ *
+ * The floor is only long enough to rule out a single-frame flash. It used to
+ * be twice this, to stop the card blinking past on a warm cache — but the
+ * loading screen behind it now opens on the same sea, so there is nothing to
+ * blink past to. Holding the card longer would only delay the game.
  */
 {
   const boot = document.getElementById('boot')
@@ -31,7 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     }
     requestAnimationFrame(() =>
       requestAnimationFrame(() =>
-        window.setTimeout(dismiss, Math.max(0, 520 - (performance.now() - shown))),
+        window.setTimeout(dismiss, Math.max(0, 240 - (performance.now() - shown))),
       ),
     )
   }

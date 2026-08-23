@@ -119,8 +119,15 @@ paleta.
 
 La tarjeta de arranque (`#boot` en `index.html`) repite esa misma composición
 en HTML y CSS en línea, para que pinte en el primer frame antes de que cargue
-el bundle; `main.tsx` la retira cuando React ya está en pantalla. Si cambias
-una, cambia la otra: en iOS se ven una detrás de otra.
+el bundle; `main.tsx` la retira cuando React ya está en pantalla.
+
+El arranque es **una sola toma**: imagen de arranque de iOS → tarjeta `#boot` →
+`LoadingScreen` → `TitleScreen`. Las cuatro pintan el mismo atardecer, con el
+horizonte al 64% y el sol en el mismo sitio; lo único que cambia entre ellas es
+que el agua empieza a moverse. Los valores viven por triplicado —
+`scripts/icons.mjs`, el `<style>` de `index.html` y `src/ui/art/SeaScene.tsx` —
+porque la tarjeta tiene que pintar sin bundle y el PNG sin navegador. Si tocas
+uno, toca los tres y regenera los PNG.
 
 ## Arte promocional
 
