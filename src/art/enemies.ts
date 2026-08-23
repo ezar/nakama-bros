@@ -4,8 +4,22 @@ import { cel, mix, type Cel } from './color'
 import { PAL } from './palette'
 import {
   blob, contactShadow, crescentPath, curve, ellipsePath, glint, inkStroke, inside, limbPath,
-  paint, roundRectPath, type Pt, type Surface,
+  paint as inkPaint, roundRectPath, SPRITE_LIGHT, type CelOptions, type Pt, type Surface,
 } from './ink'
+
+/**
+ * Every enemy in this file is drawn once facing right and mirrored when it
+ * turns, so all of it takes the sprite light rather than the world's raking
+ * key — see `SPRITE_LIGHT`. Injecting it here rather than at each of the
+ * hundred-odd call sites keeps the painters reading as painters, and an
+ * explicit `light` in the options still wins.
+ */
+const paint = (
+  ctx: CanvasRenderingContext2D,
+  path: Path2D,
+  colors: Parameters<typeof inkPaint>[2],
+  opts: CelOptions = {},
+): void => inkPaint(ctx, path, colors, { light: SPRITE_LIGHT, ...opts })
 
 /**
  * Enemy art.

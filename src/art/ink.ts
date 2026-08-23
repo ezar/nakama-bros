@@ -47,6 +47,24 @@ export interface Light {
 
 export const KEY_LIGHT: Light = { x: -0.6, y: -0.8 }
 
+/**
+ * The light for anything the renderer mirrors when it turns around.
+ *
+ * A sprite that faces left is the same bitmap drawn through `scale(-1, 1)`,
+ * which flips its lighting with it: the crew and the enemies were lit from the
+ * upper left walking right and from the upper right walking left, while the
+ * terrain they stand on never moves its light at all. With a terminator this
+ * hard the disagreement is loud — it is the "estética rara" you notice the
+ * moment a character turns.
+ *
+ * Baking a second, unmirrored set of frames is the textbook answer and costs a
+ * second copy of a ten-character atlas, which is not a trade worth making in a
+ * browser. So the horizontal component comes down instead: at 14° off vertical
+ * the modelling is still there — it is mostly the vertical component doing that
+ * work anyway — and it is the vertical component that does not flip.
+ */
+export const SPRITE_LIGHT: Light = { x: -0.25, y: -0.968 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Paths
 // ─────────────────────────────────────────────────────────────────────────────
