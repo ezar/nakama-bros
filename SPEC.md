@@ -54,10 +54,13 @@ partida, así que cambiarlo a mitad de fase quedaría a medio aplicar. El rango 
 East Blue, Alabasta, Skypiea, Water 7, Thriller Bark, Wano. Cada uno con su
 paleta, su tileset, su parallax y su clima.
 
-Diecisiete fases. Cinco de las seis islas terminan en una fase de jefe, que es
+Dieciocho fases. Todas las islas terminan en una fase de jefe, que es
 siempre la última de la isla: la meta que hay pasada la arena no se activa
 mientras el jefe siga vivo, así que un jefe en mitad de una isla dejaría la
-campaña cortada ahí. Thriller Bark es la que falta.
+campaña cortada ahí.
+
+Moria es el único que no te quita vida: te quita la sombra, y sin ella pegas la
+mitad hasta que rompes la sombra que se la ha llevado.
 
 Los jefes llevan nombre propio, como la tripulación: son homenaje, y el diseño
 es de cosecha propia. El de Alabasta se llamaba «Señor de la Arena» teniendo
@@ -70,7 +73,7 @@ vez de nombrarlo.
 | Alabasta | 3 | Crocodile |
 | Skypiea | 3 | Enel |
 | Water 7 | 3 | Arlong |
-| Thriller Bark | 2 | — |
+| Thriller Bark | 3 | Moria |
 | Wano | 3 | Kaido |
 
 ## Enemigos

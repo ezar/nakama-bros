@@ -303,7 +303,7 @@ export class Game implements World {
       if (!e.tags.has('enemy') && !e.tags.has('boss')) continue
       if (!rectsOverlap(box, e.hurtbox())) continue
       e.damage(
-        { amount: 1, dirX: p.facing, dirY: 0, sourceId: p.id, kind: 'melee' },
+        { amount: p.attackPower, dirX: p.facing, dirY: 0, sourceId: p.id, kind: 'melee' },
         this,
       )
     }

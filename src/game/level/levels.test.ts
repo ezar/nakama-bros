@@ -16,9 +16,9 @@ import { Tile } from '../../types'
  */
 
 describe('campaign', () => {
-  it('has seventeen stages across six islands', () => {
+  it('has eighteen stages across six islands', () => {
     expect(WORLDS).toHaveLength(6)
-    expect(ALL_LEVELS).toHaveLength(17)
+    expect(ALL_LEVELS).toHaveLength(18)
     expect(WORLDS.flatMap((w) => w.levels)).toHaveLength(ALL_LEVELS.length)
   })
 

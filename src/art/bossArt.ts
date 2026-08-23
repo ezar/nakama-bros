@@ -1,6 +1,6 @@
 import type { SpriteSheet } from '../types'
 import { SheetBuilder, type FrameSpec } from './atlas'
-import { mix, type Cel } from './color'
+import { mix, rgba, type Cel } from './color'
 import { PAL } from './palette'
 import {
   blob, crescentPath, curve, ellipsePath, glint, inkStroke, inside, limbPath, paint,
@@ -1105,6 +1105,202 @@ function drawOniLord(s: Surface, t: number, mode: BossMode, phase: Phase): void 
   if (mode === 'windup') sparks(ctx, rig.handN[0] - 10, rig.handN[1] - 8, 10, 6, PAL.ember, t * 6)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Boss 6 — the shadow master of Thriller Bark
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Wide and top-heavy: the shoulders are the read, and they are enormous. */
+const SHADOW_BUILD: Build = {
+  hip: 30, thigh: 14, shin: 13.4, torso: 21, upper: 13.4, fore: 12,
+  headR: 8.2, hipW: 8, shW: 15, legR: 4.4, armR: 4.2, z: 3,
+}
+
+/**
+ * The stitched shears he fights with — two blades on a pivot, oversized.
+ *
+ * Phase two snaps one blade off at the rivet, which is how the silhouette says
+ * he has lost half of what he was doing without changing what he is.
+ */
+function shears(
+  ctx: CanvasRenderingContext2D,
+  at: Pt,
+  angle: number,
+  len: number,
+  open: number,
+  phase: Phase,
+): void {
+  ctx.save()
+  ctx.translate(at[0], at[1])
+  ctx.rotate(angle)
+  const steel = C(TONE.steel)
+  const grip = C(TONE.rotCloth)
+  for (const [i, side] of [-1, 1].entries()) {
+    if (phase === 2 && i === 1) continue
+    ctx.save()
+    ctx.rotate(side * open)
+    paint(ctx, blob([
+      [2, side * 1.6], [len * 0.75, side * 2.6], [len, side * 0.4], [len * 0.7, -side * 0.6], [2, -side * 0.8],
+    ] as Pt[], 0.4), steel, {
+      shadow: 0.3, radius: len * 0.6, pivot: [len * 0.5, 0], rim: 0.7, line: 0.55,
+    })
+    glint(ctx, len * 0.68, side * 1.2, 3.4, 0.6, side * 0.2, PAL.white, 0.55)
+    ctx.restore()
+  }
+  if (phase === 2) {
+    // The stub of the lost blade, left rough at the rivet.
+    ctx.fillStyle = steel.line
+    ctx.fill(blob([[2, 2], [7, 3.4], [4.5, 0.6]] as Pt[], 0.3))
+  }
+  // The rivet and the bound grip.
+  paint(ctx, ellipsePath(1, 0, 2.6, 2.6), C(TONE.ironDark), {
+    shadow: 0.3, radius: 3, pivot: [1, 0], rim: 0.6, line: 0.5,
+  })
+  paint(ctx, roundRectPath(-13, -2.2, 13, 4.4, 2), grip, {
+    shadow: 0.34, radius: 7, pivot: [-6, 0], rim: 0.4, line: 0.5,
+  })
+  ctx.restore()
+}
+
+/** A detached shadow, cast on the ground and moving on its own. */
+function loose(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  gy: number,
+  w: number,
+  t: number,
+  seed: number,
+): void {
+  ctx.save()
+  ctx.globalAlpha = 0.5
+  ctx.fillStyle = rgba(INK, 0.85)
+  for (let i = 0; i < 3; i++) {
+    const ph = t * Math.PI * 2 + i * 2.1 + seed
+    const x = cx + Math.sin(ph) * w * 0.5
+    ctx.fill(ellipsePath(x, gy - 0.5 - i * 0.6, w * (0.36 - i * 0.06), 1.5 - i * 0.3))
+  }
+  ctx.restore()
+}
+
+function drawShadowMaster(s: Surface, t: number, mode: BossMode, phase: Phase): void {
+  const ctx = s.ctx
+  const cx = s.w * 0.5
+  const gy = s.h - 1.5
+  const b = SHADOW_BUILD
+  const cloth = phase === 1 ? TONE.rotCloth : mix(TONE.rotCloth, PAL.night, 0.35)
+  const skin = phase === 1 ? mix(TONE.rot, PAL.mist, 0.25) : mix(TONE.rot, PAL.night, 0.3)
+  const look: Look = {
+    cloth, legs: mix(cloth, PAL.night, 0.3), skin,
+    boot: mix(PAL.night, PAL.ink, 0.2), sleeve: 1, bulk: 1.2,
+  }
+  let pose = bossPose(mode, t, 0.85)
+  if (mode === 'windup') {
+    pose = P({ hip: 2.2, lean: -0.32, legN: [0.45, -0.6], legF: [-0.55, 0.75], armN: [-2.8, 0.6], armF: [-2.1, 0.7], footN: 0.28, footF: -0.28, drag: -5 })
+  } else if (mode === 'attack') {
+    pose = P({ hip: -1.4, lean: 0.44, legN: [0.9, -0.3], legF: [-0.85, 0.5], armN: [1.45, 0.1], armF: [0.6, 0.85], footN: 0.45, footF: -0.45, drag: 6 })
+  }
+  const rig = solveRig(cx, gy, b, pose)
+  const sway = Math.sin(t * Math.PI * 2)
+
+  // Shadows of his own, pooled at his feet and never quite still.
+  if (mode !== 'defeat') {
+    loose(ctx, cx - 14, gy, 22, t, 0)
+    loose(ctx, cx + 16, gy, 18, t, 2.4)
+  } else {
+    dust(ctx, cx, gy, 28, mix(PAL.dusk, PAL.night, 0.5))
+  }
+
+  drawFigure(ctx, rig, b, look, pose, {
+    back: (c, r) => {
+      // A high collar that frames the head — the one shape you see first.
+      const collar = blob([
+        [r.sh[0] - b.shW - 3, r.sh[1] + 4],
+        [r.sh[0] - b.shW * 0.6, r.sh[1] - 13],
+        [r.sh[0], r.sh[1] - 16],
+        [r.sh[0] + b.shW * 0.6, r.sh[1] - 13],
+        [r.sh[0] + b.shW + 3, r.sh[1] + 4],
+        [r.sh[0], r.sh[1] + 2],
+      ] as Pt[], 0.7)
+      paint(c, collar, C(mix(cloth, PAL.magic, phase === 1 ? 0.16 : 0.06)), {
+        shadow: 0.46, radius: b.shW * 1.4, pivot: [r.sh[0], r.sh[1] - 6], rim: 0.5, line: 0.6, occlusion: 0.3,
+      })
+      // Coat tails, torn in phase two.
+      const hem = tornEdge(
+        [r.hip[0] + 8, r.hip[1] + 15],
+        [r.hip[0] - 12 - pose.drag * 0.7, r.hip[1] + 13],
+        phase === 2 ? 8 : 3,
+        phase === 2 ? 3.2 : 1,
+      )
+      paint(c, blob([
+        [r.sh[0] - 8, r.sh[1] + 1],
+        [r.sh[0] + 7, r.sh[1] + 2],
+        [r.hip[0] + 8, r.hip[1] + 5],
+        ...hem,
+        [r.hip[0] - 12 - pose.drag * 0.7, r.hip[1] + 3],
+      ] as Pt[], 0.66), C(cloth), {
+        shadow: 0.46, radius: 12, pivot: [r.hip[0], r.hip[1] + 5], rim: 0.45, line: 0.58, occlusion: 0.28,
+      })
+    },
+    overTorso: (c, r) => {
+      // Stitches down the sternum: everything on this island is sewn together.
+      const { px, py } = spine(r)
+      c.strokeStyle = C(TONE.spectre).line
+      c.lineWidth = 0.55
+      for (let i = 1; i <= 5; i++) {
+        const u = i / 6
+        const x = r.sh[0] + (r.hip[0] - r.sh[0]) * u + px * 2
+        const y = r.sh[1] + (r.hip[1] - r.sh[1]) * u + py * 2
+        c.beginPath()
+        c.moveTo(x - 2.6, y - 0.9)
+        c.lineTo(x + 2.6, y + 0.9)
+        c.stroke()
+      }
+    },
+    front: (c, r) => {
+      const a = Math.atan2(r.handN[1] - r.elbowN[1], r.handN[0] - r.elbowN[0])
+      const open = mode === 'attack' ? 0.1 : 0.42 + Math.abs(sway) * 0.1
+      shears(c, r.handN, a, 26, open, phase)
+    },
+    head: (c, r) => {
+      const rr = b.headR
+      const hx = r.head[0]
+      const hy = r.head[1] + (mode === 'defeat' ? 3 : 0)
+      paint(c, headPath(hx, hy, rr, 1.05), C(skin, 0.3), {
+        shadow: FACE_SHADOW, radius: rr * 1.3, pivot: [hx, hy], rim: 0.4, line: 0.5,
+      })
+      // Two horns of hair swept straight up, and a widow's peak between them.
+      for (const dx of [-rr * 0.66, rr * 0.66]) {
+        paint(c, blob([
+          [hx + dx - 2.6, hy - rr * 0.5],
+          [hx + dx + 2.6, hy - rr * 0.55],
+          [hx + dx + (dx < 0 ? -1.4 : 1.4), hy - rr * 1.9],
+        ] as Pt[], 0.4), C(mix(PAL.night, PAL.magic, 0.22)), {
+          shadow: 0.36, radius: rr, pivot: [hx + dx, hy - rr], rim: 0.5, line: 0.5,
+        })
+      }
+      eyes3q(c, hx, hy + rr * 0.02, rr, { angry: true, color: phase === 1 ? PAL.magic : PAL.poison })
+      nose(c, hx, hy + rr * 0.3, rr, C(skin, 0.3))
+      mouth(c, hx, hy + rr * 0.62, rr, 'grin')
+      // The stitch across the cheek: his own face is borrowed.
+      c.strokeStyle = C(TONE.spectre).line
+      c.lineWidth = 0.5
+      c.beginPath()
+      c.moveTo(hx - rr * 0.1, hy + rr * 0.15)
+      c.lineTo(hx + rr * 0.85, hy - rr * 0.15)
+      c.stroke()
+      for (let i = 0; i < 4; i++) {
+        const u = 0.15 + i * 0.22
+        const x = hx - rr * 0.1 + (rr * 0.95) * u
+        const y = hy + rr * 0.15 - (rr * 0.3) * u
+        c.beginPath()
+        c.moveTo(x, y - 1.2)
+        c.lineTo(x, y + 1.2)
+        c.stroke()
+      }
+      if (phase === 2) scar(c, [hx - rr * 0.5, hy - rr * 0.7], [hx + rr * 0.5, hy + rr * 0.5], C(PAL.poison).core)
+    },
+  })
+}
+
 /**
  * The state set every boss ships, in both phases. Phase two is prefixed `p2-`,
  * so a boss entity swaps prefix when its health crosses the threshold and keeps
@@ -1140,6 +1336,7 @@ const BOSSES: Record<string, [BossPainter, number, number]> = {
   'desert-lord': [drawSandLord, 116, 86],
   'sky-tyrant': [drawSkyTyrant, 120, 108],
   'oni-lord': [drawOniLord, 152, 110],
+  'shadow-master': [drawShadowMaster, 140, 104],
 }
 
 export type BossKey = keyof typeof BOSSES
