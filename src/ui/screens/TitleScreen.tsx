@@ -51,9 +51,8 @@ function MenuPlank({
       onFocus={onHover}
       onClick={onClick}
       aria-current={active || undefined}
-      className={`group relative flex w-[min(84vw,340px)] items-center gap-3 rounded-[6px] border-2 pl-14 pr-5 text-left transition-transform duration-200 ${compact ? 'py-1.5' : 'py-3'}`}
+      className={`group relative flex w-[min(84vw,340px)] items-center gap-3 rounded-[6px] border-2 pl-14 pr-5 text-left ${compact ? 'py-1.5' : 'py-3'}`}
       style={{
-        transform: active ? 'translateX(14px)' : 'translateX(0)',
         borderColor: active ? UI.brassLit : 'rgba(124,90,33,0.75)',
         backgroundImage: active
           ? `linear-gradient(180deg, rgba(255,226,180,0.22), rgba(0,0,0,0.34)), linear-gradient(172deg, #6B4527, #34200F)`
