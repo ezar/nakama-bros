@@ -1134,7 +1134,7 @@ export class Player extends Entity {
     const idx = TIER_ORDER.indexOf(this.tier)
     if (idx > 0) {
       this.setTier(TIER_ORDER[idx - 1], world)
-      this.iframes = PHYS.hurtInvuln
+      this.iframes = PHYS.hurtInvuln * world.difficulty.invuln
       this.state = 'hurt'
       this.stateTimer = 0.3
       this.cancelMoves()

@@ -31,6 +31,24 @@ Chopper (salto alto).
 `base → gear2 → gear3 → gear4`. Subir da velocidad, tamaño o armadura; recibir
 un golpe baja una marcha; en `base`, cuesta una vida.
 
+## Dificultad
+
+Tres ajustes, y **ninguno toca la tabla de arriba**: el salto y la carrera son
+idénticos en los tres, para que lo aprendido en uno sirva en otro y un padre y
+un hijo puedan pasarse el mando a mitad de nivel. Lo que cambia es la cuerda
+que te dan.
+
+| | Fácil | Normal | Difícil |
+|---|---|---|---|
+| Vidas | 5 | 3 | 1 |
+| Empiezas en | gear 2 (un golpe de margen) | base | base |
+| Invulnerabilidad tras el golpe | ×1,6 | ×1 | ×0,7 |
+| Reloj del nivel | ×1,5 | ×1 | ×0,85 |
+
+Se lee una sola vez, al arrancar el nivel: decide vidas y reloj al construir la
+partida, así que cambiarlo a mitad de fase quedaría a medio aplicar. El rango S
+—y con él el dibujo— se puede conseguir en cualquiera de los tres.
+
 ## Mundos
 
 East Blue, Alabasta, Skypiea, Water 7, Thriller Bark, Wano. Cada uno con su

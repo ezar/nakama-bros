@@ -38,7 +38,10 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
       onLevelEnd,
       onGameOver,
       onPause,
-    })
+    // Read once, here: the difficulty decides lives and the clock at
+    // construction, so changing it mid-stage would be half-applied. The next
+    // level picks up the new setting.
+    }, undefined, useSettings.getState().difficulty)
     gameRef.current = game
     game.start()
     // A stable handle for automated screenshots and visual review runs.

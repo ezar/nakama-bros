@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { motion as m } from 'framer-motion'
 import { useSettings } from '../../store/settingsStore'
+import { DIFFICULTIES } from '../../game/config'
 import { useProgress } from '../../store/progressStore'
 import { useT } from '../../i18n/useT'
 import { useUiMotion } from '../hooks/useUiMotion'
@@ -158,6 +159,29 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
           </h2>
           <div className="mx-auto mb-2 mt-2 flex justify-center opacity-70">
             <Rope length={240} thickness={7} />
+          </div>
+
+          {/* First, and above the volumes: it is the only setting here that
+              changes the game rather than the box it comes in. The note under
+              it says what you get, because a child choosing "Fácil" should not
+              have to find out by dying. */}
+          <Toggle
+            label={t('options.difficulty')}
+            value={s.difficulty}
+            options={DIFFICULTIES.map((d) => ({ value: d, label: t(`difficulty.${d}`) }))}
+            onChange={(v) => s.set({ difficulty: v })}
+          />
+          <p
+            className="-mt-1 mb-1 text-right font-body text-[10px] leading-snug"
+            style={{ color: UI.inkSoft, opacity: 0.7 }}
+          >
+            {t(`difficulty.note.${s.difficulty}`)}
+            <br />
+            <span style={{ opacity: 0.75 }}>{t('difficulty.same')}</span>
+          </p>
+
+          <div className="my-2 flex justify-center opacity-50">
+            <Rope length={200} thickness={6} />
           </div>
 
           <Slider label={t('options.master')} value={s.master} onChange={(v) => s.set({ master: v })} />
