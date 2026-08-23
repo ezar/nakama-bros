@@ -60,58 +60,68 @@ function useCrewPortraits(): Partial<Record<CrewId, string>> {
 function WantedPoster({
   id,
   index,
-  active,
+  chosen,
+  previewing,
   portrait,
   width,
   t,
-  onSelect,
-  onConfirm,
+  onPreview,
+  onChoose,
   innerRef,
   motion,
 }: {
   id: CrewId
   index: number
-  active: boolean
+  /** The pick that will actually be played. */
+  chosen: boolean
+  /** Pointed at right now — reading it, not picking it. */
+  previewing: boolean
   portrait?: string
   width: number
   t: TFunction
-  onSelect: () => void
-  onConfirm: () => void
+  onPreview: () => void
+  onChoose: () => void
   innerRef: (el: HTMLElement | null) => void
   motion: boolean
 }) {
   const crew = CREW[id]
   const angle = tilt(index, 3.4)
+  // Three states, and the gap between them has to be legible at a glance:
+  // pinned to the boards, lifted to be read, and straightened and sealed.
+  const lift = chosen ? (motion ? -22 : -14) : previewing ? -10 : 0
+  const scale = chosen ? (motion ? 1.16 : 1.12) : previewing ? 1.06 : 1
   return (
     <m.button
       ref={innerRef as (el: HTMLButtonElement | null) => void}
       type="button"
       role="radio"
-      aria-checked={active}
+      aria-checked={chosen}
       aria-label={`${crew.name} — ${t('crew.bounty')} ${formatBerry(BOUNTY[id])}`}
-      onMouseEnter={onSelect}
-      onFocus={onSelect}
-      onClick={onConfirm}
-      animate={
-        motion
-          ? { rotate: active ? 0 : angle, y: active ? -22 : 0, scale: active ? 1.16 : 1 }
-          : { rotate: active ? 0 : angle, y: active ? -14 : 0, scale: active ? 1.12 : 1 }
-      }
+      onMouseEnter={onPreview}
+      onFocus={onPreview}
+      onClick={onChoose}
+      animate={{ rotate: chosen ? 0 : angle * (previewing ? 0.4 : 1), y: lift, scale }}
       transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-      style={{ width, zIndex: active ? 20 : 10 - Math.abs(index % 3) }}
+      style={{ width, zIndex: chosen ? 20 : previewing ? 15 : 10 - Math.abs(index % 3) }}
       className="relative shrink-0 origin-bottom"
     >
       <span
         className="pointer-events-none absolute inset-x-1 -bottom-2 h-6 rounded-[50%] blur-md"
-        style={{ background: 'rgba(0,0,0,0.7)', opacity: active ? 0.85 : 0.5 }}
+        style={{ background: 'rgba(0,0,0,0.7)', opacity: chosen ? 0.85 : previewing ? 0.68 : 0.5 }}
       />
       <Paper
         seed={index + 3}
         edges="all"
         bite={2.1}
-        age={active ? 0.4 : 0.62}
+        age={chosen ? 0.4 : previewing ? 0.5 : 0.62}
         className="px-2 pb-2 pt-3"
-        style={{ filter: active ? 'brightness(1.08)' : 'brightness(0.9) saturate(0.92)' }}
+        style={{
+          filter: chosen
+            ? 'brightness(1.08)'
+            : previewing
+              ? 'brightness(1)'
+              : 'brightness(0.9) saturate(0.92)',
+        }}
       >
         <span className="absolute left-1/2 top-1 -translate-x-1/2">
           <Nail size={width * 0.1} />
@@ -134,7 +144,7 @@ function WantedPoster({
             background: 'linear-gradient(160deg,#C7AC80,#9C825C)',
           }}
         >
-          {active && (
+          {chosen && (
             <span className="pointer-events-none absolute bottom-0.5 right-0.5 z-10 rotate-[9deg]">
               <WaxSeal size={width * 0.34} />
             </span>
@@ -172,30 +182,47 @@ function WantedPoster({
           <span className="font-body font-bold tabnum">{formatBerry(BOUNTY[id])}</span>
         </div>
 
-        <div
-          className="mt-1 border-t pt-0.5 text-center font-body uppercase ink"
-          style={{ borderColor: 'rgba(42,29,20,0.35)', fontSize: width * 0.05, opacity: 0.6, letterSpacing: '0.08em' }}
-        >
-          {t('crew.marine')}
-        </div>
+        {/* The printer's imprint is flavour; below this width it can only be
+            shown as an ellipsis, which is worse than leaving it off. */}
+        {width >= 96 && (
+          <div
+            className="mt-1 truncate border-t pt-0.5 text-center font-body uppercase ink"
+            style={{ borderColor: 'rgba(42,29,20,0.35)', fontSize: width * 0.05, opacity: 0.6, letterSpacing: '0.08em' }}
+          >
+            {t('crew.marine')}
+          </div>
+        )}
 
       </Paper>
     </m.button>
   )
 }
 
-function StatBar({ label, value, accent }: { label: string; value: number; accent: string }) {
+function StatBar({
+  label,
+  value,
+  accent,
+  compact,
+}: {
+  label: string
+  value: number
+  accent: string
+  compact: boolean
+}) {
   const v = Math.max(1, Math.min(5, value))
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-24 font-body text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: UI.inkSoft }}>
+    <div className={`flex items-center ${compact ? 'gap-2' : 'gap-3'}`}>
+      <span
+        className={`font-body text-[10px] font-semibold uppercase tracking-[0.16em] ${compact ? 'w-20' : 'w-24'}`}
+        style={{ color: UI.inkSoft }}
+      >
         {label}
       </span>
       <span className="flex gap-1">
         {Array.from({ length: 5 }, (_, i) => (
           <span
             key={i}
-            className="h-2.5 w-6 rounded-[2px]"
+            className={`rounded-[2px] ${compact ? 'h-1.5 w-5' : 'h-2.5 w-6'}`}
             style={{
               background: i < v ? accent : 'rgba(42,29,20,0.16)',
               // Print, not neon: the accent is knocked back to what a press could hold.
@@ -214,11 +241,82 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
   const motion = useUiMotion()
   const portraits = useCrewPortraits()
   const [index, setIndex] = useState(() => Math.max(0, CREW_IDS.indexOf(selected)))
+  /**
+   * The sheet being read, which is not the sheet being played.
+   *
+   * Hovering used to commit the pick outright, and clicking a committed pick
+   * set sail — so the pointer chose a nakama the moment it crossed a poster and
+   * the very next click left the screen. There was no way to walk the wall and
+   * look. Pointing now only lifts a sheet down to read; the pick changes on a
+   * click, and only the button, Enter or the pad's A button sets sail.
+   */
+  const [preview, setPreview] = useState<number | null>(null)
+
+  /**
+   * Ten sheets fit the wall whenever there is room for them.
+   *
+   * A fixed poster width overflowed a laptop screen, which put two of the crew
+   * off the edge and made the wall look truncated rather than scrollable. The
+   * sheets shrink to fit instead, down to a floor — below that the faces stop
+   * being readable, so the wall scrolls rather than shrinking further.
+   */
+  const wallRef = useRef<HTMLDivElement | null>(null)
+  const [wallWidth, setWallWidth] = useState(0)
+  useEffect(() => {
+    const el = wallRef.current
+    if (!el) return
+    setWallWidth(el.clientWidth)
+    const ro = new ResizeObserver(([entry]) => setWallWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  /**
+   * A phone held sideways is 390px tall, and the wall, the dossier and the
+   * button do not fit in that at full size — the header used to scroll off the
+   * top and take the button with it. Below a threshold the whole screen packs
+   * down, and the sheets are capped by the height left over rather than only by
+   * the width.
+   */
+  const [viewportH, setViewportH] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight)
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  const compact = viewportH < 560
+
+  const GAP = compact ? 8 : 12
+  // A sheet runs about 1.45× as tall as it is wide.
+  const roomForWall = viewportH - (compact ? 270 : 330)
+  const posterWidth = wallWidth
+    ? Math.floor(
+        Math.max(
+          compact ? 74 : 104,
+          Math.min(
+            140,
+            (wallWidth - GAP * (CREW_IDS.length - 1)) / CREW_IDS.length,
+            roomForWall / 1.45,
+          ),
+        ),
+      )
+    : 130
 
   useEffect(() => {
     const i = CREW_IDS.indexOf(selected)
     if (i >= 0) setIndex(i)
   }, [selected])
+
+  const choose = (i: number) => {
+    setPreview(i)
+    if (i === index) return
+    setIndex(i)
+    onSelect(CREW_IDS[i])
+  }
 
   const { itemRef } = useMenuNav({
     count: CREW_IDS.length,
@@ -233,7 +331,9 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
     armMs: 320,
   })
 
-  const id = CREW_IDS[index] ?? selected
+  const shownIndex = preview ?? index
+  const id = CREW_IDS[shownIndex] ?? selected
+  const isChosen = shownIndex === index
   const crew = CREW[id]
   const blurb = t(`crew.blurb.${id}` as TranslationKey)
   const speed = useMemo(() => Math.round((crew.runSpeed - 130) / 11), [crew.runSpeed])
@@ -259,72 +359,109 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
       />
 
       <header className="relative z-10 flex flex-col items-center">
-        <h2 className="op-title text-3xl text-op-gold sm:text-4xl">{t('crew.title')}</h2>
-        <div className="mt-1 flex items-center gap-3 opacity-80">
-          <Rope length={90} thickness={11} />
-          <span className="font-body text-[10px] uppercase tracking-[0.34em] text-op-parchment/70">
-            {t('crew.subtitle')}
-          </span>
-          <Rope length={90} thickness={11} />
-        </div>
+        <h2 className={`op-title text-op-gold ${compact ? 'text-2xl' : 'text-3xl sm:text-4xl'}`}>
+          {t('crew.title')}
+        </h2>
+        {!compact && (
+          <div className="mt-1 flex items-center gap-3 opacity-80">
+            <Rope length={90} thickness={11} />
+            <span className="font-body text-[10px] uppercase tracking-[0.34em] text-op-parchment/70">
+              {t('crew.subtitle')}
+            </span>
+            <Rope length={90} thickness={11} />
+          </div>
+        )}
       </header>
 
       {/* The wall. The rope the posters hang from runs behind them. */}
-      <div className="relative z-10 mt-6 w-full">
-        <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center opacity-70">
+      <div className={`relative z-10 w-full ${compact ? 'mt-1' : 'mt-6'}`}>
+        <div
+          className="pointer-events-none absolute inset-x-0 flex justify-center opacity-70"
+          style={{ top: compact ? 14 : 24 }}
+        >
           <Rope length={1400} thickness={13} className="w-[96%]" />
         </div>
+        {/*
+          The scroller and the row are separate boxes on purpose. A centred flex
+          row that overflows its scroller spills past both edges, and the left
+          spill is unreachable — scrollLeft has no negative side — so on a phone
+          the first posters simply could not be got to. Sizing the row to its
+          own content and centring it with auto margins keeps it centred while
+          it fits and scrollable from the first poster once it does not.
+        */}
         <div
-          role="radiogroup"
-          aria-label={t('crew.title')}
-          className="flex w-full items-start justify-center gap-2 overflow-x-auto px-4 pb-6 pt-12 sm:gap-3"
+          ref={wallRef}
+          className={`w-full overflow-x-auto px-6 ${compact ? 'pb-1 pt-5' : 'pb-6 pt-12'}`}
         >
-          {CREW_IDS.map((cid, i) => (
-            <WantedPoster
-              key={cid}
-              id={cid}
-              index={i}
-              active={i === index}
-              portrait={portraits[cid]}
-              width={130}
-              t={t}
-              motion={motion}
-              innerRef={itemRef(i)}
-              onSelect={() => {
-                if (i === index) return
-                setIndex(i)
-                onSelect(cid)
-              }}
-              onConfirm={() => {
-                if (i === index) onStart()
-                else {
-                  setIndex(i)
-                  onSelect(cid)
-                }
-              }}
-            />
-          ))}
+          <div
+            role="radiogroup"
+            aria-label={t('crew.title')}
+            // Leaving the wall drops the sheet back: the dossier returns to the
+            // pick, so crossing the row on the way to the button cannot quietly
+            // leave a different nakama showing.
+            onMouseLeave={() => setPreview(null)}
+            style={{ gap: GAP }}
+            className="mx-auto flex w-max items-start"
+          >
+            {CREW_IDS.map((cid, i) => (
+              <WantedPoster
+                key={cid}
+                id={cid}
+                index={i}
+                chosen={i === index}
+                previewing={preview === i && i !== index}
+                portrait={portraits[cid]}
+                width={posterWidth}
+                t={t}
+                motion={motion}
+                innerRef={itemRef(i)}
+                onPreview={() => setPreview(i)}
+                onChoose={() => choose(i)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Dossier for the selected sheet. */}
-      <div className="relative z-10 mt-1 w-[min(680px,94vw)]">
-        <Paper seed={99} edges="sides" bite={1.1} age={0.45} className="px-6 py-4">
+      <div className={`relative z-10 w-[min(680px,94vw)] ${compact ? 'mt-0' : 'mt-1'}`}>
+        <Paper
+          seed={99}
+          edges="sides"
+          bite={1.1}
+          age={0.45}
+          className={compact ? 'px-4 py-1.5' : 'px-6 py-4'}
+        >
           <span className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.07]">
             <JollyRoger size={150} bone={UI.ink} ink={UI.ink} band={UI.ink} straw={UI.ink} />
           </span>
           <div className="relative flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-baseline gap-3">
-                <span className="font-display text-3xl leading-none ink">{crew.name}</span>
+                <span className={`font-display leading-none ink ${compact ? 'text-2xl' : 'text-3xl'}`}>
+                  {crew.name}
+                </span>
                 <span
                   className="rounded-xs px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-[0.18em]"
                   style={{ background: crew.accent, color: '#1A1008' }}
                 >
                   {t('crew.special')}
                 </span>
+                <span
+                  className="rounded-xs border px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={
+                    isChosen
+                      ? { borderColor: UI.wax, background: 'rgba(142,43,34,0.14)', color: UI.wax }
+                      : { borderColor: 'rgba(42,29,20,0.35)', color: UI.inkSoft }
+                  }
+                >
+                  {t(isChosen ? 'crew.chosen' : 'crew.choosePrompt')}
+                </span>
               </div>
-              <p className="mt-1.5 max-w-104 font-body text-sm leading-snug" style={{ color: UI.inkSoft }}>
+              <p
+                className={`max-w-104 font-body leading-snug ${compact ? 'mt-1 text-xs' : 'mt-1.5 text-sm'}`}
+                style={{ color: UI.inkSoft }}
+              >
                 {blurb}
               </p>
             </div>
@@ -339,25 +476,37 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-col gap-1.5 border-t pt-3" style={{ borderColor: 'rgba(42,29,20,0.25)' }}>
-            <StatBar label={t('crew.speed')} value={speed} accent={crew.accent} />
-            <StatBar label={t('crew.jump')} value={jump} accent={crew.accent} />
-            <StatBar label={t('crew.special')} value={special} accent={crew.accent} />
+          <div
+            className={`flex flex-col border-t ${compact ? 'mt-1.5 gap-1 pt-1.5' : 'mt-3 gap-1.5 pt-3'}`}
+            style={{ borderColor: 'rgba(42,29,20,0.25)' }}
+          >
+            <StatBar label={t('crew.speed')} value={speed} accent={crew.accent} compact={compact} />
+            <StatBar label={t('crew.jump')} value={jump} accent={crew.accent} compact={compact} />
+            <StatBar label={t('crew.special')} value={special} accent={crew.accent} compact={compact} />
           </div>
         </Paper>
       </div>
 
-      <div className="relative z-10 mb-4 mt-4 flex items-center gap-3">
-        <button className="op-button" onClick={onBack} aria-label={t('crew.back')}>
+      <div className={`relative z-10 flex items-center gap-3 ${compact ? 'mb-1.5 mt-2' : 'mb-4 mt-4'}`}>
+        <button
+          className={`op-button ${compact ? 'py-1.5' : ''}`}
+          onClick={onBack}
+          aria-label={t('crew.back')}
+        >
           ←
         </button>
-        <button className="op-button op-button--primary text-lg" onClick={onStart}>
+        <button
+          className={`op-button op-button--primary ${compact ? 'py-1.5' : 'text-lg'}`}
+          onClick={onStart}
+        >
           {t('crew.start')}
         </button>
       </div>
-      <div className="relative z-10 mb-3 font-body text-[10px] uppercase tracking-[0.22em] text-op-parchment/45">
-        {t('crew.hint')}
-      </div>
+      {!compact && (
+        <div className="relative z-10 mb-3 font-body text-[10px] uppercase tracking-[0.22em] text-op-parchment/45">
+          {t('crew.hint')}
+        </div>
+      )}
     </m.div>
   )
 }
