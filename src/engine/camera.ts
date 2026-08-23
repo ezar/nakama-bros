@@ -1,5 +1,5 @@
 import type { CameraState, Rect } from '../types'
-import { GAME_H, GAME_W } from '../types'
+import { GAME_H, GAME_W, RENDER_SCALE } from '../types'
 import { clamp, damp } from './math'
 
 /**
@@ -77,15 +77,28 @@ export class Camera implements CameraState {
     this.clampToBounds()
   }
 
-  /** Sub-pixel-free draw origin, so the pixel grid never shimmers. */
+  /**
+   * Draw origin snapped to the device pixel grid, so the art stays crisp
+   * without the scroll stepping.
+   *
+   * This used to round to a whole *world* unit, which is `RENDER_SCALE` device
+   * pixels — three. Running at 168 px/s the camera wants to move 2.8 units a
+   * frame, and rounding forced 3, 3, 3, 2, 3, 3, 3, 2: measured, the whole view
+   * scrolled in alternating 3-and-4 unit steps and the player oscillated 1 unit
+   * — 3 device pixels — back and forth every other frame at 60Hz. Snapping to
+   * the device grid instead keeps the same guarantee (art rasterised at
+   * ART_SCALE lands one texel on one device pixel, so nothing shimmers) with a
+   * third of the step, which is the finest the display can express.
+   */
   renderOrigin(): { x: number; y: number } {
     const s = this.shake
     const t = this.shakeTime * 47
     const ox = s === 0 ? 0 : Math.sin(t) * s
     const oy = s === 0 ? 0 : Math.cos(t * 1.31) * s
+    const snap = (v: number): number => Math.round(v * RENDER_SCALE) / RENDER_SCALE
     return {
-      x: Math.round(this.x + this.lookOffset + ox),
-      y: Math.round(this.y + oy),
+      x: snap(this.x + this.lookOffset + ox),
+      y: snap(this.y + oy),
     }
   }
 
