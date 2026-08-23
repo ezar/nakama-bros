@@ -35,7 +35,7 @@ export const KNOWN_TYPES = new Set([
   'grunt', 'shielder', 'crab', 'fishman', 'bat', 'urchin', 'barrel',
   'berry', 'meat', 'fruit', 'fragment', 'oneup',
   'checkpoint', 'goal', 'platform', 'crumble',
-  'boss-buggy',
+  'boss-buggy', 'boss-desert', 'boss-sky', 'boss-fishman',
 ])
 
 /**
@@ -50,7 +50,7 @@ export const REQUESTED_TYPES = new Set(['boss-kaido'])
 /** Types that must be standing on something when the level starts. */
 const GROUNDED_TYPES = new Set([
   'grunt', 'shielder', 'crab', 'urchin', 'barrel', 'checkpoint', 'goal',
-  'boss-buggy', 'boss-kaido',
+  'boss-buggy', 'boss-desert', 'boss-sky', 'boss-fishman', 'boss-kaido',
 ])
 
 const SOLIDISH = new Set<string>([C.solid, C.brick, C.question, C.used, C.ice, C.bouncy, C.crumble])

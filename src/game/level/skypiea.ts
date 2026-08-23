@@ -236,5 +236,88 @@ function buildGoldenBell(): LevelDef {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 3-3 · El Trono de las Nubes — boss stage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildCloudThrone(): LevelDef {
+  const W = 208
+  const H = 26
+  const G = 17
+  const b = new LevelBuilder(W, H)
+
+  // ── The approach. Solid ground under the first few steps and nothing under
+  //    anything after it: the island's own rule, said once more before the
+  //    fight rather than taught again.
+  b.ground(0, 24, G)
+  b.berryLine(2, 10, G - 1, 2)
+  b.onGround('grunt', 14)
+  ruinColumn(b, 19, G, 4)
+  b.spawn('bat', 22, G - 7)
+
+  b.ledge(29, 38, G - 2)
+  b.bouncy(31, 37, G - 2)
+  b.ledge(44, 52, G - 6)
+  b.berryArc(44, G - 8, 8, 3)
+  // A spring here, because the shelf after it is five tiles up: on this island
+  // the way up is always the bounce, never the jump.
+  b.ledge(58, 66, G - 3)
+  b.bouncy(59, 65, G - 3)
+  b.spawn('shielder', 62, G - 4)
+  b.ledge(72, 82, G - 8)
+  b.spawn('fragment', 78, G - 9, { index: 0 })
+  b.spawn('bat', 68, G - 12)
+  b.spawn('bat', 86, G - 10)
+
+  // ── The stair of clouds. Bouncy shelves at rising heights: the only way up
+  //    is to stop fighting the bounce and let it carry.
+  for (const [i, x] of [88, 98, 108, 118].entries()) {
+    b.ledge(x, x + 6, G - 4 - i * 2)
+    b.bouncy(x + 1, x + 5, G - 4 - i * 2)
+    b.spawn('berry', x + 3, G - 6 - i * 2)
+  }
+  b.ledge(130, 140, G - 12)
+  b.spawn('meat', 134, G - 13)
+  b.spawn('fragment', 138, G - 13, { index: 1 })
+  b.spawn('bat', 126, G - 16)
+
+  // ── The landing before the throne, and the last solid thing on the stage.
+  b.ledge(146, 160, G - 10)
+  b.spawn('checkpoint', 152, G - 11)
+  b.spawn('shielder', 157, G - 11)
+
+  // ── The throne. A floating slab with a lip at the back, hung over open sky
+  //    — the ring is the whole floor there is, which is the fight.
+  b.rect(163, G - 9, 194, G - 8, C.solid)
+  b.spawn('boss-sky', 180, G - 10)
+  b.spawn('meat', 167, G - 12)
+  b.berryLine(165, 190, G - 13, 4)
+
+  // ── Past the throne: over the back lip, which is three tiles — a jump from
+  //    the slab, not a climb — and down onto the last island.
+  b.rect(192, G - 12, 193, G - 10, C.solid)
+  b.spawn('fragment', 193, G - 13, { index: 2 })
+  b.ground(196, W - 1, G - 10)
+  b.spawn('goal', 202, G - 11)
+  b.berryLine(197, 205, G - 12, 2)
+
+  return {
+    id: 'skypiea-3',
+    name: 'El Trono de las Nubes',
+    biome: 'skypiea',
+    w: W,
+    h: H,
+    startX: 3,
+    startY: G - 1,
+    timeLimit: 340,
+    music: 'boss',
+    weather: 'clear',
+    timeOfDay: 0.44,
+    rows: b.rows(),
+    spawns: b.spawns(),
+  }
+}
+
 export const skypiea1 = buildAngelIsland()
 export const skypiea2 = buildGoldenBell()
+export const skypiea3 = buildCloudThrone()

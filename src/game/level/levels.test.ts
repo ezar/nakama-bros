@@ -16,9 +16,24 @@ import { Tile } from '../../types'
  */
 
 describe('campaign', () => {
-  it('has fourteen stages across six islands', () => {
+  it('has seventeen stages across six islands', () => {
     expect(WORLDS).toHaveLength(6)
-    expect(ALL_LEVELS).toHaveLength(14)
+    expect(ALL_LEVELS).toHaveLength(17)
+    expect(WORLDS.flatMap((w) => w.levels)).toHaveLength(ALL_LEVELS.length)
+  })
+
+  it('puts every boss at the end of its island', () => {
+    // A boss stage is the last thing on an island, and the goal past its ring
+    // is barred until the boss falls — so a boss authored into the middle of a
+    // run would wall the campaign off at that point.
+    for (const w of WORLDS) {
+      w.levels.forEach((l, i) => {
+        const hasBoss = l.spawns.some((s) => s.type.startsWith('boss-'))
+        if (!hasBoss) return
+        expect(i, `${l.id} is a boss stage but not the last of ${w.id}`).toBe(w.levels.length - 1)
+        expect(l.spawns.some((s) => s.type === 'goal'), `${l.id} has no goal`).toBe(true)
+      })
+    }
   })
 
   it('gives every stage a unique id and a Spanish name', () => {
