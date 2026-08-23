@@ -14,10 +14,12 @@ Lee `SPEC.md` antes de tocar el motor.
 ```bash
 npm install
 npm run dev          # http://localhost:5173
+npm run lint
 npm run type-check
 npm run test
-npm run build
-node scripts/shoot.mjs   # capturas en screenshots/ (requiere build previo)
+npm run build            # el que se despliega
+npm run build:capture    # igual, pero deja los mandos de captura puestos
+node scripts/shoot.mjs   # capturas en screenshots/ (requiere build de captura)
 ```
 
 ## Stack
@@ -78,7 +80,37 @@ Render interno de 480×270, escalado entero al viewport. `TILE = 16`.
 
 ## Despliegue
 
-GitHub Pages con `base: '/nakama-bros/'`. CI corre type-check, tests y build.
+GitHub Pages con `base: '/nakama-bros/'`. CI corre type-check, tests y build, y
+el workflow de deploy repite los cuatro antes de publicar, así que un `main`
+roto no llega a producción.
+
+El linter es **oxlint**, no ESLint, y no por gusto: `typescript-eslint` no tiene
+ninguna versión que acepte TypeScript 7, ni en alfa, así que el montaje habitual
+sólo instala con `--legacy-peer-deps` sobre una combinación que nadie soporta.
+oxlint parsea TypeScript él mismo. `.oxlintrc.json` admite comentarios y cada
+regla apagada lleva escrito al lado por qué — si vas a encender una, lee el
+motivo antes.
+
+### Sin conexión
+
+`public/sw.js` es un service worker escrito a mano —ochenta líneas, sin plugin—
+porque el juego no tiene servidor ni assets: el arte lo dibuja el bundle al
+arrancar, así que con el bundle en el dispositivo no queda nada que esperar.
+La portada se sirve de red primero con 3 s de paciencia y copia local detrás;
+los ficheros con hash en el nombre, de caché directa; las tipografías de Google
+se guardan aparte y **nunca** pueden bloquear la instalación. Un despliegue
+nuevo se recoge en el siguiente arranque y limpia los bundles que ya nadie pide.
+Un worker nuevo espera en vez de tomar el mando: cambiar el bundle debajo de una
+partida en curso es peor que jugar un rato más con el de ayer.
+
+### Partidas guardadas
+
+Los dos stores persistidos llevan `version` y `migrate` (`src/store/`). El
+`migrate` no es sólo para migrar: valida campo por campo, porque `localStorage`
+sobrevive a todas las versiones del juego, se puede editar a mano y se puede
+quedar a medio escribir. Un save corrupto tiene que degradar a los valores por
+defecto, nunca dejar el juego sin poder dibujarse — de eso un jugador sólo sale
+borrando los datos del sitio, y eso también se lleva el dibujo.
 
 ## Ver el arte que escribes
 
@@ -86,7 +118,7 @@ Una captura del juego es demasiado pequeña para revisar sprites. Para verlos de
 verdad:
 
 ```bash
-npm run build
+npm run build:capture
 node scripts/sheets.mjs --sheet crew:luffy --zoom 5
 # también: enemies:grunt, items:berry, effects:flash
 # contact sheet en screenshots/sheets/, cada animación en una fila,
@@ -97,9 +129,22 @@ Con varios agentes a la vez, dale a cada uno su propio destino para que no
 choquen los builds:
 
 ```bash
-npx vite build --outDir dist-mio
+npx vite build --mode capture --outDir dist-mio
 node scripts/sheets.mjs --dist dist-mio --port 4331 --sheet crew:zoro --zoom 5
 ```
+
+### Por qué `--mode capture`
+
+`window.__NAKAMA__`, `__LEVELS__` y `__ART__` son los mandos con los que los
+arneses conducen el juego. Un jugador no debería descargarse un mando a
+distancia del juego, así que **la build normal los tira** — la comparación de
+`src/debug.ts` se pliega a `false` y el minificador se lleva los bloques
+enteros. `--mode capture` los deja. Si un script se queda esperando un handle,
+te lo dice y te recuerda cómo construir.
+
+Ojo: `npm run promo` y `npm run capture` dejan en `dist/` una build **de
+captura**. CI construye de cero, así que Pages no se ve afectado, pero no
+subas ese `dist/` a mano.
 
 ## Iconos y pantalla de arranque
 

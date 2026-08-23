@@ -1,0 +1,69 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // oxlint rather than ESLint, and not by preference: typescript-eslint has no
+  // release that accepts TypeScript 7, not even an alpha, so the usual setup
+  // installs only under --legacy-peer-deps on a combination nobody supports.
+  // oxlint parses TypeScript itself, so there is no peer to conflict with.
+
+  "plugins": ["react", "typescript", "unicorn", "oxc", "promise"],
+  "env": { "browser": true, "es2024": true },
+  "categories": { "correctness": "error", "suspicious": "warn", "perf": "warn" },
+
+  "rules": {
+    // The reason this exists at all: nothing else in the toolchain notices a
+    // hook called conditionally or an effect closing over a stale value.
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+
+    // ── Wrong for this codebase ──────────────────────────────────────────
+    // The automatic JSX runtime has not needed React in scope since 17.
+    "react/react-in-jsx-scope": "off",
+    // `k.fill(shape, colour, ...)` is this project's own canvas painter. The
+    // rule matches the method name without types and reads all 53 of them as
+    // `Array.prototype.fill`.
+    "unicorn/no-array-fill-with-reference-type": "off",
+    // Both uses are deliberate preallocation in the art pipeline, which runs
+    // per pixel row. `Array.from({ length: n })` allocates and iterates.
+    "unicorn/no-new-array": "off",
+    // `__NAKAMA__`, `__LEVELS__` and `__ART__` are named that on purpose: the
+    // dangle is the signal that they are not part of the game.
+    "eslint/no-underscore-dangle": "off",
+    // Index keys are used for fixed-length decorative rows — three fragment
+    // pips, seven sparks — where there is no identity to key on.
+    "react/no-array-index-key": "off",
+
+    // ── Style opinions this project does not hold ────────────────────────
+    // The capture scripts sequence deliberately: one page at a time.
+    "eslint/no-await-in-loop": "off",
+    "eslint/no-shadow": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "unicorn/consistent-function-scoping": "off",
+
+    // ── Real, but not today ──────────────────────────────────────────────
+    // These three flag the latest-value-in-a-ref pattern and measure-then-set
+    // layout effects. Both work, both are used in several screens, and both
+    // would need those screens restructured to satisfy — which is a change to
+    // make on purpose with tests around it, not as a drive-by while shipping.
+    // Left visible as warnings so the count cannot quietly grow.
+    "react/refs": "warn",
+    "react/set-state-in-effect": "warn",
+    "react/exhaustive-effect-dependencies": "warn",
+
+    "eslint/no-console": ["warn", { "allow": ["warn", "error"] }]
+  },
+
+  // sw.js is a service worker: its globals are neither browser nor node.
+  "ignorePatterns": ["dist", "dist-*", "screenshots", "public/sw.js"],
+
+  "overrides": [
+    {
+      "files": ["scripts/**/*.mjs"],
+      "env": { "node": true },
+      // The capture harnesses report progress to whoever ran them.
+      "rules": { "eslint/no-console": "off" }
+    },
+    { "files": ["tests/**/*.ts"], "rules": { "eslint/no-console": "off" } }
+  ]
+}

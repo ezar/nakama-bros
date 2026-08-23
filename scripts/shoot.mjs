@@ -12,6 +12,7 @@ import { createServer } from 'node:http'
 import { readFile, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { waitForHandle } from './lib/handles.mjs'
 
 const args = process.argv.slice(2)
 const argOf = (name, dflt) => {
@@ -110,7 +111,7 @@ await page.goto(url, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => !!document.querySelector('button'), { timeout: 30000 })
 await page.waitForTimeout(400)
 await page.getByRole('button', { name: /zarpar|set sail|jugar|play/i }).first().click()
-await page.waitForFunction(() => !!window.__NAKAMA__, { timeout: 30000 })
+await waitForHandle(page, '__NAKAMA__')
 await page.waitForTimeout(800)
 
 /** Frame the level at a tile column and capture. */

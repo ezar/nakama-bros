@@ -12,6 +12,7 @@ import { createServer } from 'node:http'
 import { readFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { waitForHandle } from './lib/handles.mjs'
 
 const args = process.argv.slice(2)
 const argOf = (n, d) => {
@@ -56,7 +57,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
 page.on('pageerror', (e) => console.error('[pageerror]', e.message))
 
 await page.goto(`http://127.0.0.1:${PORT}${BASE}`, { waitUntil: 'networkidle' })
-await page.waitForFunction(() => !!window.__ART__, { timeout: 60000 })
+await waitForHandle(page, '__ART__')
 
 for (const spec of SHEETS) {
   const [group, key] = spec.split(':')

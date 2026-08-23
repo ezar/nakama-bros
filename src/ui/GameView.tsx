@@ -3,6 +3,7 @@ import { TILE, type CrewId, type HudSnapshot, type LevelDef, type LevelResult } 
 import { Game } from '../game/Game'
 import { Hud } from './hud/Hud'
 import { TouchControls } from './controls/TouchControls'
+import { EXPOSE_DEBUG } from '../debug'
 import { useSettings } from '../store/settingsStore'
 import type { AudioApi } from '../types'
 
@@ -45,7 +46,8 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
     gameRef.current = game
     game.start()
     // A stable handle for automated screenshots and visual review runs.
-    ;(window as unknown as { __NAKAMA__?: Game }).__NAKAMA__ = game
+    // Absent from the shipped build — see `EXPOSE_DEBUG`.
+    if (EXPOSE_DEBUG) (window as unknown as { __NAKAMA__?: Game }).__NAKAMA__ = game
 
     const onResize = () => game.resize()
     window.addEventListener('resize', onResize)
@@ -59,7 +61,7 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
       document.removeEventListener('visibilitychange', onVisibility)
       game.stop()
       gameRef.current = null
-      delete (window as unknown as { __NAKAMA__?: Game }).__NAKAMA__
+      if (EXPOSE_DEBUG) delete (window as unknown as { __NAKAMA__?: Game }).__NAKAMA__
     }
     // The game owns its own lifetime; re-creating it on every prop change would
     // restart the level, so only the level and crew may re-mount it.
