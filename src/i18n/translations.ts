@@ -119,6 +119,16 @@ export const TRANSLATIONS = {
     'options.touch': 'Controles táctiles',
     'options.effects': 'Efectos visuales',
     'options.crt': 'Filtro CRT',
+    // ── Level intro ──
+    'intro.stage': 'Fase {n}',
+    'intro.skip': 'Toca para empezar',
+    'world.east-blue': 'El mar más tranquilo de los cuatro. Aquí empieza todo: un pueblo, un molino y las ganas de zarpar.',
+    'world.alabasta': 'Un reino de arena bajo un sol que no perdona. Hay agua, pero está muy abajo.',
+    'world.skypiea': 'Una isla hecha de nubes, a diez mil metros del mar. Si te caes, caes de verdad.',
+    'world.water7': 'La ciudad del agua: canales, astilleros y un tren que pasa aunque tú no llegues.',
+    'world.thriller-bark': 'Niebla, un bosque de sombras y una risa que no sabes de dónde viene.',
+    'world.wano': 'Tejados de teja, cerezos y acero. La tierra de los samuráis no recibe a cualquiera.',
+
     'options.credits': 'Créditos',
 
     // ── Credits ──
@@ -254,6 +264,15 @@ export const TRANSLATIONS = {
     'options.touch': 'Touch controls',
     'options.effects': 'Visual effects',
     'options.crt': 'CRT filter',
+    'intro.stage': 'Stage {n}',
+    'intro.skip': 'Tap to begin',
+    'world.east-blue': 'The calmest of the four seas. It all starts here: a village, a windmill, and the itch to set sail.',
+    'world.alabasta': 'A kingdom of sand under a sun that forgives nothing. There is water, but it is a long way down.',
+    'world.skypiea': 'An island made of cloud, ten thousand metres above the sea. Fall here and you really fall.',
+    'world.water7': 'The city of water: canals, shipyards, and a train that leaves whether you make it or not.',
+    'world.thriller-bark': 'Fog, a forest of shadows, and a laugh you cannot place.',
+    'world.wano': 'Tiled roofs, cherry trees and steel. The land of samurai does not take just anyone.',
+
     'options.credits': 'Credits',
 
     'credits.title': 'Credits',

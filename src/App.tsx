@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import type { CrewId, LevelResult } from './types'
 import { loadArt } from './art'
 import { AudioEngine } from './audio/AudioEngine'
-import { ALL_LEVELS, levelById, nextLevelId } from './game/level'
+import { ALL_LEVELS, WORLDS, levelById, nextLevelId } from './game/level'
 import { useProgress } from './store/progressStore'
 import { useSettings } from './store/settingsStore'
 import { GameView } from './ui/GameView'
@@ -13,10 +13,12 @@ import { CrewScreen } from './ui/screens/CrewScreen'
 import { PauseScreen } from './ui/screens/PauseScreen'
 import { ResultScreen } from './ui/screens/ResultScreen'
 import { GameOverScreen } from './ui/screens/GameOverScreen'
+import { MapScreen } from './ui/screens/MapScreen'
 import { OptionsScreen } from './ui/screens/OptionsScreen'
 import { CreditsScreen } from './ui/screens/CreditsScreen'
+import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
 
-type Screen = 'loading' | 'title' | 'crew' | 'options' | 'credits' | 'play'
+type Screen = 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'intro' | 'play'
 
 /**
  * Screen router and session owner.
@@ -39,6 +41,7 @@ export default function App() {
   const crew = useProgress((s) => s.crew)
   const setCrew = useProgress((s) => s.setCrew)
   const recordResult = useProgress((s) => s.record)
+  const records = useProgress((s) => s.records)
   const settings = useSettings()
   const audio = useMemo(() => new AudioEngine(), [])
 
@@ -94,7 +97,9 @@ export default function App() {
     setGameOver(false)
     setPaused(false)
     setRunKey((k) => k + 1)
-    setScreen('play')
+    // Through the card, always: it names the island you are going to, and it
+    // gets out of the way on the first touch.
+    setScreen('intro')
   }, [])
 
   const onLevelEnd = useCallback(
@@ -123,6 +128,7 @@ export default function App() {
             key="title"
             onPlay={() => startLevel(ALL_LEVELS[0].id)}
             onCrew={() => setScreen('crew')}
+            onMap={() => setScreen('map')}
             onOptions={() => setScreen('options')}
           />
         )
@@ -139,6 +145,19 @@ export default function App() {
             onBack={() => setScreen('title')}
           />
         )
+      // The chart was built and never hung on a wall: `onMap` is optional on
+      // the title screen and nothing ever passed it, so the only way back to a
+      // finished stage was to replay the campaign from the first one.
+      case 'map':
+        return (
+          <MapScreen
+            key="map"
+            worlds={WORLDS}
+            records={records}
+            onSelect={startLevel}
+            onBack={() => setScreen('title')}
+          />
+        )
       case 'options':
         return (
           <OptionsScreen
@@ -151,6 +170,8 @@ export default function App() {
       // should still be behind you when you turn round.
       case 'credits':
         return <CreditsScreen key="credits" onBack={() => setScreen('options')} />
+      case 'intro':
+        return <LevelIntroScreen key={`intro:${levelId}:${runKey}`} level={level} onDone={() => setScreen('play')} />
       default:
         return null
     }

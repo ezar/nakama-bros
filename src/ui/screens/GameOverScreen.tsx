@@ -3,6 +3,7 @@ import { motion as m } from 'framer-motion'
 import { useT } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
+import { useShortViewport } from '../hooks/useShortViewport'
 import { Paper } from '../art/Paper'
 import { JollyRoger, WaxSeal } from '../art/Icons'
 import { UI } from '../theme'
@@ -15,6 +16,7 @@ import { UI } from '../theme'
 export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMenu: () => void }) {
   const t = useT()
   const motion = useUiMotion()
+  const short = useShortViewport(560)
   const items = useMemo(
     () => [
       { label: t('over.retry'), run: onRetry, primary: true },
@@ -38,26 +40,33 @@ export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMen
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-7 bg-[rgba(3,2,1,0.9)]"
+      className="absolute inset-0 z-30 overflow-y-auto overscroll-contain bg-[rgba(3,2,1,0.9)]"
       role="dialog"
       aria-modal="true"
       aria-label={t('over.title')}
     >
+      {/* Centred while it fits, scrolled once it does not: on a phone held
+          sideways both buttons used to sit just past the bottom edge, which on
+          a Game Over screen means no way to carry on at all. */}
+      <div
+        className="flex min-h-full flex-col px-4 py-4"
+      >
+        <div className={`m-auto flex flex-col items-center ${short ? 'gap-4' : 'gap-7'}`}>
       <m.div
         initial={{ scale: motion ? 1.35 : 1, opacity: 0, rotate: motion ? -9 : -3 }}
         animate={{ scale: 1, opacity: 1, rotate: -3 }}
         transition={{ type: 'spring', stiffness: 120, damping: 14 }}
         style={{ filter: 'drop-shadow(0 20px 26px rgba(0,0,0,0.8))' }}
       >
-        <Paper seed={44} edges="all" bite={3.4} age={0.92} className="w-[min(470px,92vw)] px-8 pb-9 pt-8">
+        <Paper seed={44} edges="all" bite={3.4} age={0.92} className={`w-[min(470px,92vw)] ${short ? 'px-6 pb-4 pt-4' : 'px-8 pb-9 pt-8'}`}>
           <div className="relative flex flex-col items-center text-center">
             <div className="font-body text-[10px] font-extrabold uppercase tracking-[0.34em]" style={{ color: UI.inkSoft }}>
               {t('crew.wanted')}
             </div>
             {/* The mark, printed rather than watermarked: this is the sheet the
                 Marines file when the bounty stops running. */}
-            <div className="my-3 opacity-80">
-              <JollyRoger size={124} bone="#C9AE83" ink={UI.ink} band="#8E5A4C" straw="#B49A6A" />
+            <div className={`opacity-80 ${short ? 'my-1' : 'my-3'}`}>
+              <JollyRoger size={short ? 76 : 124} bone="#C9AE83" ink={UI.ink} band="#8E5A4C" straw="#B49A6A" />
             </div>
             <div
               className="mt-1 font-display text-[3.4rem] leading-[0.95]"
@@ -97,6 +106,8 @@ export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMen
             {it.label}
           </button>
         ))}
+        </div>
+        </div>
       </div>
     </m.div>
   )

@@ -669,7 +669,14 @@ function jollyRoger(s: Surface, r: number, ink: string, mono?: string): void {
  * yard with rigging, a masthead truck, and the biggest piece of cloth in the
  * game with the wave running out along it.
  */
-function drawGoal(s: Surface, t: number): void {
+/**
+ * The mast at the end of the stage, with the colours up or still furled.
+ *
+ * On a boss stage the mast stands bare until the boss is down: you strike the
+ * colours when you have won, not when you have walked far enough. A bare mast
+ * says "not yet" without a word of UI, and the flag running up is the reward.
+ */
+function drawGoal(s: Surface, t: number, flag = true): void {
   const ctx = s.ctx
   const base = s.h - 0.6
   const mx = s.w * 0.3
@@ -793,7 +800,26 @@ function drawGoal(s: Surface, t: number): void {
   })
   glint(ctx, mx - 0.7, top - 2, 0.7, 0.4, -0.5, PAL.white, 0.85)
 
-  // The colours.
+  // The colours — furled on a mast that has not been earned yet.
+  if (!flag) {
+    const bundle = cel(PAL.luffyRed)
+    // A tied roll of cloth at the hoist, sagging a little on its lashing.
+    const sway = Math.sin(t * Math.PI * 2) * 0.35
+    paint(ctx, roundRectPath(mx + 0.6, top + 4.4, 3.4, 13, 1.6), bundle, {
+      shadow: 0.34, radius: 3, pivot: [mx + 2.3, top + 11], rim: 0.5, line: 0.5,
+    })
+    ctx.save()
+    ctx.strokeStyle = rgba('#B8A47E', 0.85)
+    ctx.lineWidth = 0.5
+    for (const y of [top + 7, top + 11.6]) {
+      ctx.beginPath()
+      ctx.moveTo(mx + 0.2, y + sway * 0.4)
+      ctx.lineTo(mx + 4.4, y + sway * 0.4)
+      ctx.stroke()
+    }
+    ctx.restore()
+    return
+  }
   const red = cel(PAL.luffyRed)
   const c = cloth(mx + 1, top + 4, top + 20, 25, t, 2.1, 3.6, 1.45)
   paint(ctx, c.path, red, {
@@ -2085,7 +2111,14 @@ export function buildItemSheets(): Record<string, SpriteSheet> {
       .add('idle', anim(drawCheckpoint, 10, 0.085))
       .add('taken', anim((s2, t2) => drawCheckpoint(s2, t2, true), 10, 0.085))
       .build(),
-    goal: mk(drawGoal, 12, 0.075, 52, 78),
+    // Two masts in one sheet: bare while a boss is still standing, colours up
+    // once it is not. Same trick as the checkpoint.
+    goal: new SheetBuilder({
+      fw: 52, fh: 78, ox: -26, oy: -78, contour: '#1B1024', contourWidth: 0.6,
+    })
+      .add('idle', anim(drawGoal, 12, 0.075))
+      .add('locked', anim((s2, t2) => drawGoal(s2, t2, false), 12, 0.075))
+      .build(),
 
     // Props. All of these stand on the bottom edge of their frame.
     'log-pose': mk(drawLogPose, 8, 0.1, 20, 20),

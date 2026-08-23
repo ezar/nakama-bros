@@ -134,7 +134,10 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           the legal notice and the build stamp live. The lantern wash stays put
           outside the scroller. */}
       <div className="relative z-10 h-full w-full overflow-y-auto overscroll-contain p-6">
-        <div className="flex min-h-full items-center justify-center">
+        {/* `m-auto`, not `justify-center`: a centred flex child that overflows
+            spills past the top of the scroll box and cannot be scrolled back to. */}
+        <div className="flex min-h-full flex-col">
+          <div className="m-auto">
       <m.div
         initial={{ y: motion ? 18 : 0, rotate: motion ? 0.8 : 0.4 }}
         animate={{ y: 0, rotate: 0.4 }}
@@ -248,6 +251,7 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           </div>
         </Paper>
       </m.div>
+          </div>
         </div>
       </div>
     </m.div>

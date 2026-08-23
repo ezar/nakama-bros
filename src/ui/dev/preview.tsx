@@ -12,6 +12,7 @@ import { PauseScreen } from '../screens/PauseScreen'
 import { GameOverScreen } from '../screens/GameOverScreen'
 import { OptionsScreen } from '../screens/OptionsScreen'
 import { CreditsScreen } from '../screens/CreditsScreen'
+import { LevelIntroScreen } from '../screens/LevelIntroScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { Hud } from '../hud/Hud'
 import { TouchControls } from '../controls/TouchControls'
@@ -102,6 +103,12 @@ function Preview() {
       return <OptionsScreen onBack={noop} onCredits={noop} />
     case 'credits':
       return <CreditsScreen onBack={noop} />
+    // `#intro`, `#intro:alabasta-1`, … — any stage id, to look at each card.
+    case hash.startsWith('intro') ? hash : '\u0000': {
+      const id = hash.split(':')[1]
+      const lvl = WORLDS.flatMap((w) => w.levels).find((l) => l.id === id) ?? WORLDS[0].levels[0]
+      return <LevelIntroScreen level={lvl} onDone={noop} />
+    }
     case 'loading':
       return <LoadingScreen progress={0.62} label="Desplegando a la Marina" />
     case 'hud':
