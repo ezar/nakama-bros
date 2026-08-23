@@ -352,6 +352,44 @@ function buildCrewSheet(id: CrewId): SpriteSheet {
     }), 0.09, { smear: { dx: 4.5, alpha: 0.24 }, streaks: skidDust(look.pal.boots.light) }),
   ], { ...wide(70), loop: true })
 
+  // ── Turn: the pivot the run cycles never had ──────────────────────────────
+  //
+  // The renderer draws a left-facing character by mirroring the right-facing
+  // bitmap, so before this the only thing a change of direction did was flip
+  // the sprite between one frame and the next — no weight shift, no plant, no
+  // pivot. What Prince of Persia actually solved was not a rendering problem:
+  // it was that a character which only has cycles reads as a machine, and the
+  // transitions between them are where the weight lives.
+  //
+  // The frames play in the *new* facing, so they run backwards through the
+  // turn: square to the camera first, then settling into the new direction.
+  // `headTurn` near zero is the head looking at the viewer, which is the one
+  // moment in the whole cycle where that is correct.
+  b.add('turn', [
+    // Plant. The old momentum is still in the trailing arm and the hips have
+    // not come round yet, so the shoulders square up before anything else.
+    frame(pose({
+      lean: -0.2, hipY: 1.9, spine: 0.55, legFront: [0.5, -0.34], legBack: [-0.62, 0.5],
+      armFront: [0.9, 0.62], armBack: [-1.15, 0.5], squashX: 1.05, squashY: 0.95,
+      expression: 'focused', headTurn: 0.14, headTilt: 0.05, drag: -1.4, flutter: 0.5,
+      footFront: 0.28,
+    }), 0.05),
+    // Pivot. The hips lead, the head is already looking where it is going, and
+    // the trailing arm is the last thing to catch up.
+    frame(pose({
+      lean: 0.12, hipY: 0.9, spine: 0.2, legFront: [-0.1, -0.1], legBack: [0.24, 0.7],
+      armFront: [-0.5, 0.5], armBack: [0.7, 0.42], squashX: 0.98, squashY: 1.03,
+      expression: 'determined', headTurn: 0.48, headTilt: -0.03, drag: 0.8, lift: 0.6,
+      footBack: 0.3, flutter: 0.7,
+    }), 0.05),
+    // Settle into the new direction, ready for the run cycle to take over.
+    frame(pose({
+      lean: 0.26, hipY: 0.1, legFront: [0.42, -0.24], legBack: [-0.34, 0.44],
+      armFront: [-0.7, 0.5], armBack: [0.62, 0.4], squashX: 1.01, squashY: 0.99,
+      expression: 'determined', headTurn: 0.66, drag: 0.9, flutter: 0.4,
+    }), 0.05),
+  ], { loop: false })
+
   b.add('crouch', [
     frame(pose({
       lean: 0.44, hipY: 6.8, spine: 2.2, legFront: [1.24, -2.0], legBack: [-1.14, -1.9],

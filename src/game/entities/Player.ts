@@ -1,5 +1,5 @@
 import { TILE, Tile } from '../../types'
-import type { CrewId, Hit, PowerTier, RenderContext, Rect } from '../../types'
+import type { CrewId, Facing, Hit, PowerTier, RenderContext, Rect } from '../../types'
 import { Entity } from './Entity'
 import { FloatingText } from './FloatingText'
 import type { World } from '../world'
@@ -50,6 +50,9 @@ const STAND_H = 30
  * simulation must be able to run without art loaded, which is what lets the
  * physics be tested headless.
  */
+/** How long the pivot holds: the three turn frames at 0.05s each. */
+const TURN_TIME = 0.15
+
 export class Player extends Entity {
   readonly kind = 'player'
   crew: CrewId
@@ -231,12 +234,22 @@ export class Player extends Entity {
     this.updateStance(dt, world, grounded, inWater, maxSpeed)
 
     // ── Signature move ───────────────────────────────────────────────────────
+    if (this.turnTimer > 0) this.turnTimer = Math.max(0, this.turnTimer - dt)
     this.updateSignature(dt, world, grounded, inWater)
 
     // ── Horizontal ───────────────────────────────────────────────────────────
     const control = this.moveControl()
     const want = this.wallLock > 0 ? 0 : input.axisX
-    if (want !== 0 && control > 0.3 && this.sigTimer <= 0) this.facing = want > 0 ? 1 : -1
+    if (want !== 0 && control > 0.3 && this.sigTimer <= 0) {
+      const next: Facing = want > 0 ? 1 : -1
+      // A change of facing is a whole-body event, not a sprite flip. Hold the
+      // pivot long enough for its three frames to play; above skid speed the
+      // skid already covers it, and in the air there is nothing to pivot on.
+      if (next !== this.facing && grounded && Math.abs(this.body.vx) <= PHYS.skidSpeed) {
+        this.turnTimer = TURN_TIME
+      }
+      this.facing = next
+    }
     const turning = want !== 0 && Math.sign(want) !== Math.sign(this.body.vx) && this.body.vx !== 0
     if (control > 0) {
       let accel = (turning ? PHYS.turnAccel : PHYS.accel) * control
@@ -616,6 +629,9 @@ export class Player extends Entity {
   private breaksTerrain(): boolean {
     return this.sigTimer > 0 && this.signature.breaksBricks
   }
+
+  /** Seconds left of the turn-around pivot; the sprite flips instantly, the body does not. */
+  private turnTimer = 0
 
   private updateSignature(dt: number, world: World, grounded: boolean, inWater: boolean): void {
     this.sigCooldown = Math.max(0, this.sigCooldown - dt)
@@ -1161,6 +1177,10 @@ export class Player extends Entity {
     }
     if (turning && Math.abs(this.body.vx) > PHYS.skidSpeed) {
       this.play('skid')
+      return
+    }
+    if (this.turnTimer > 0) {
+      this.play('turn')
       return
     }
     if (Math.abs(this.body.vx) > PHYS.idleSpeed) {
