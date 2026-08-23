@@ -212,8 +212,17 @@ export function useMenuNav({
       const vert = s.orientation !== 'horizontal'
       if (dir === 'left' && horiz) move(-1)
       else if (dir === 'right' && horiz) move(1)
-      else if (dir === 'up') vert ? move(s.orientation === 'grid' ? -cols : -1) : s.onVertical?.(-1)
-      else if (dir === 'down') vert ? move(s.orientation === 'grid' ? cols : 1) : s.onVertical?.(1)
+      // Up and down either walk the list or hand over to the caller, which is
+      // how the chart hops whole islands. Written out rather than as a ternary
+      // evaluated for its side effects: both branches *do* something, and a
+      // ternary reads as if one of them returns a value.
+      else if (dir === 'up') {
+        if (vert) move(s.orientation === 'grid' ? -cols : -1)
+        else s.onVertical?.(-1)
+      } else if (dir === 'down') {
+        if (vert) move(s.orientation === 'grid' ? cols : 1)
+        else s.onVertical?.(1)
+      }
     }
 
     raf = requestAnimationFrame(tick)

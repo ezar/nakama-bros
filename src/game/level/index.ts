@@ -1,3 +1,4 @@
+import { EXPOSE_DEBUG } from '../../debug'
 import type { LevelDef, WorldDef } from '../../types'
 import { eastBlue1, eastBlue2, eastBlue3, eastBlue4 } from './eastBlue'
 import { alabasta1, alabasta2, alabasta3 } from './alabasta'
@@ -69,7 +70,7 @@ export const worldOf = (id: string): WorldDef | undefined =>
 // A handle for the capture harness, alongside `__ART__` and `__NAKAMA__`.
 // `scripts/levelshots.mjs` rotates this array before the title screen starts a
 // run, which is the only way to frame a stage other than the first one.
-if (typeof window !== 'undefined') {
+if (EXPOSE_DEBUG && typeof window !== 'undefined') {
   ;(window as unknown as { __LEVELS__?: LevelDef[] }).__LEVELS__ = ALL_LEVELS
 }
 

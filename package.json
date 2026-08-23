@@ -21,9 +21,11 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "capture": "npm run build && node scripts/shoot.mjs",
-    "promo": "npm run build && node scripts/promo.mjs",
-    "icons": "node scripts/icons.mjs"
+    "capture": "npm run build:capture && node scripts/shoot.mjs",
+    "promo": "npm run build:capture && node scripts/promo.mjs",
+    "icons": "node scripts/icons.mjs",
+    "build:capture": "tsc && vite build --mode capture",
+    "lint": "oxlint"
   },
   "dependencies": {
     "framer-motion": "^13.1.1",
@@ -36,6 +38,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
     "playwright": "^1.62.1",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",

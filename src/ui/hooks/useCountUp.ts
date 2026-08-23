@@ -54,7 +54,7 @@ export function useCountUp(
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [target, duration, delay, enabled])
+  }, [target, duration, delay, enabled, tickMs])
 
   return value
 }

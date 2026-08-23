@@ -39,3 +39,26 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     )
   }
 }
+
+/**
+ * Register the offline worker.
+ *
+ * Production only: in development the worker would serve a stale bundle back
+ * over Vite's hot reload, which looks exactly like the edit not having saved.
+ *
+ * After load, never before — registration competes with the bundle for the
+ * connection, and the first paint matters more than the second visit does.
+ *
+ * A new worker is deliberately left to wait rather than taking over: swapping
+ * the bundle under a game that is mid-level is a worse outcome than running
+ * yesterday's build for one more session. It takes charge on the next launch.
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
+      scope: import.meta.env.BASE_URL,
+    }).catch(() => {
+      // No offline play, but the game runs. Not worth a word to the player.
+    })
+  })
+}

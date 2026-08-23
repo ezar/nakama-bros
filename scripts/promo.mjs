@@ -19,6 +19,7 @@ import { readFile, writeFile, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { PINNED, UI, fontFace, mark } from './lib/brand.mjs'
+import { waitForHandle } from './lib/handles.mjs'
 
 const args = process.argv.slice(2)
 const argOf = (name, dflt) => {
@@ -85,7 +86,7 @@ game.on('pageerror', (e) => console.error('[pageerror]', e.message))
 await game.goto(`http://127.0.0.1:${PORT}${BASE}`, { waitUntil: 'networkidle' })
 await game.waitForFunction(() => !!document.querySelector('button'), { timeout: 30000 })
 await game.getByRole('button', { name: /zarpar|set sail|jugar|play/i }).first().click()
-await game.waitForFunction(() => !!window.__NAKAMA__, { timeout: 30000 })
+await waitForHandle(game, '__NAKAMA__')
 await game.waitForTimeout(800)
 
 const FRAME = argOf('frame', '124,14').split(',').map(Number)
@@ -204,7 +205,6 @@ function cardHtml({ w, h, crew, markPx, titlePx }) {
   const room = w * 0.92
   if (spanAt(unit) > room) unit *= room / spanAt(unit)
 
-  const widths = chosen.map((s) => s.w * unit)
   const span = spanAt(unit)
   const ground = h * (w > h ? 0.92 : 0.9)
 

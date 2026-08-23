@@ -1,3 +1,4 @@
+import { EXPOSE_DEBUG } from '../debug'
 import type { Biome, CrewId, SpriteSheet } from '../types'
 import { buildCrewSheets } from './characters'
 import { buildEnemySheets } from './enemies'
@@ -49,7 +50,7 @@ export async function loadArt(onProgress?: (t: number, label: string) => void): 
   onProgress?.(1, '¡Zarpando!')
   await nextFrame()
   cached = { crew, enemies, items, effects }
-  window.__ART__ = cached
+  if (EXPOSE_DEBUG) window.__ART__ = cached
   return cached
 }
 

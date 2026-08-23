@@ -17,6 +17,7 @@ import { createServer } from 'node:http'
 import { readFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { waitForHandle } from './lib/handles.mjs'
 
 const args = process.argv.slice(2)
 const argOf = (n, d) => {
@@ -77,7 +78,8 @@ page.on('console', (m) => {
 
 const url = `http://127.0.0.1:${PORT}${BASE}`
 await page.goto(url, { waitUntil: 'networkidle' })
-await page.waitForFunction(() => !!window.__LEVELS__ && !!document.querySelector('button'), { timeout: 60000 })
+await waitForHandle(page, '__LEVELS__')
+await page.waitForFunction(() => !!document.querySelector('button'), { timeout: 60000 })
 
 // Rotate the campaign so the wanted stage is the one Play starts.
 const picked = await page.evaluate((id) => {
@@ -98,7 +100,7 @@ if (!picked) {
 console.log(`framing ${picked.id} — "${picked.name}" (${picked.w}x${picked.h})`)
 
 await page.getByRole('button').first().click()
-await page.waitForFunction(() => !!window.__NAKAMA__, { timeout: 30000 })
+await waitForHandle(page, '__NAKAMA__')
 await page.waitForTimeout(900)
 
 const columns = AT.length ? AT : [{ tx: 8, ty: null }]
