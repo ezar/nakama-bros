@@ -159,26 +159,51 @@ export class Checkpoint extends Entity {
   }
 }
 
-/** Goal — the Going Merry's mast at the end of the level. */
+/**
+ * Goal — the Going Merry's mast at the end of the level.
+ *
+ * On a boss stage it is barred while the boss is alive. The mast is placed past
+ * the arena on purpose, so without this you could run straight by the fight and
+ * clear the stage — which makes a boss stage an ordinary stage with a large
+ * enemy standing in it. The bar is shown, not explained: the colours stay
+ * furled until the boss is down, and run up the moment it is.
+ */
 export class Goal extends Entity {
   readonly kind = 'trigger'
   private triggered = false
+  /** Throttles the refusal, so walking into a barred mast is not a machine gun. */
+  private refusedAt = -1
+
   constructor(x: number, y: number) {
     super(x, y, 18, 70)
     this.depth = 30
     this.body.collidesWithTiles = false
     this.cullable = false
   }
+
+  /** A boss still standing anywhere in the stage bars the mast. */
+  private barred(world: World): boolean {
+    return world.entities.some((e) => !e.dead && e.tags.has('boss'))
+  }
+
   update(dt: number, world: World): void {
     this.tickAnim(dt)
     this.sheet = art().items.goal ?? null
     if (this.triggered) return
+    const barred = this.barred(world)
+    this.play(barred ? 'locked' : 'idle')
     const p = world.player() as Player | null
-    if (p && !p.dead && rectsOverlap(this.rect(), p.rect())) {
-      this.triggered = true
-      p.startClear(world)
-      world.clearLevel()
+    if (!p || p.dead || !rectsOverlap(this.rect(), p.rect())) return
+    if (barred) {
+      if (this.age - this.refusedAt < 1.1) return
+      this.refusedAt = this.age
+      world.audio.playSfx('warn', { volume: 0.45 })
+      world.shake(0.08)
+      return
     }
+    this.triggered = true
+    p.startClear(world)
+    world.clearLevel()
   }
 }
 
