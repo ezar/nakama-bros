@@ -264,5 +264,93 @@ function buildMansion(): LevelDef {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 5-3 · El Salón de las Sombras — boss stage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildShadowHall(): LevelDef {
+  const W = 208
+  const H = 24
+  const G = 17
+  const b = new LevelBuilder(W, H)
+
+  b.ground(0, W - 1, G)
+
+  // ── The approach. The island's own rule once more before the fight: what
+  //    looks like floor is rotten, and only stone holds.
+  b.berryLine(2, 10, G - 1, 3)
+  b.onGround('grunt', 14)
+  deadTree(b, 19, G, 6)
+  b.spawn('bat', 23, G - 8)
+  b.pit(26, 32)
+  bridge(b, 26, 32, G, true)
+  b.berryArc(26, G - 2, 6, 3)
+  b.ground(33, 70, G)
+  b.onGround('checkpoint', 37)
+  b.onGround('shielder', 44)
+  stones(b, 50, 58, G, 4)
+  b.ledge(48, 60, G - 5)
+  b.berryLine(49, 59, G - 6, 2)
+  b.spawn('bat', 55, G - 9)
+  b.spawn('meat', 64, G - 4)
+
+  // ── The gallery. Broken floors at three heights over a drop, with the first
+  //    fragment on the highest — the island's vertical habit, said once.
+  b.pit(71, 112)
+  b.ledge(72, 80, G - 3)
+  b.ledge(84, 92, G - 6)
+  b.ledge(96, 104, G - 4)
+  b.spawn('fragment', 88, G - 7, { index: 0 })
+  b.berryLine(73, 103, G - 10, 5)
+  b.spawn('bat', 82, G - 12)
+  b.spawn('bat', 100, G - 10)
+  b.ledge(106, 112, G - 2)
+  b.ground(113, 148, G)
+  b.onGround('grunt', 120)
+  b.onGround('shielder', 128)
+
+  // ── The crypt stair. Down, then along, then up: the second fragment is at
+  //    the bottom, which is the one place the level does not push you toward.
+  b.clear(132, G - 6, 144, G - 1)
+  b.rect(132, G + 1, 144, G + 4, C.air)
+  b.hline(132, 144, G + 5, C.solid)
+  b.ladder(134, G, G + 4)
+  b.spawn('fragment', 142, G + 4, { index: 1 })
+  b.berryLine(136, 142, G + 3, 2)
+  b.spawn('bat', 139, G + 1)
+  b.onGround('checkpoint', 147)
+
+  // ── The hall. Stone, flat, walled at the back: the one room on the island
+  //    whose floor does not give way, because the fight needs a floor.
+  b.ground(149, W - 1, G)
+  b.rect(190, G - 6, 191, G - 1, C.solid)
+  b.spawn('boss-moria', 176, G - 1)
+  b.spawn('meat', 154, G - 4)
+  b.berryLine(152, 186, G - 6, 4)
+
+  // ── Past the hall: out through the window over the wall.
+  b.ledge(187, 194, G - 6)
+  b.spawn('fragment', 193, G - 7, { index: 2 })
+  b.ground(192, W - 1, G - 3)
+  b.spawn('goal', 199, G - 4)
+
+  return {
+    id: 'thriller-bark-3',
+    name: 'El Salón de las Sombras',
+    biome: 'thriller-bark',
+    w: W,
+    h: H,
+    startX: 3,
+    startY: G - 1,
+    timeLimit: 340,
+    music: 'boss',
+    weather: 'ash',
+    timeOfDay: 0.95,
+    rows: b.rows(),
+    spawns: b.spawns(),
+  }
+}
+
 export const thrillerBark1 = buildForest()
 export const thrillerBark2 = buildMansion()
+export const thrillerBark3 = buildShadowHall()

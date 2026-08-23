@@ -1,9 +1,9 @@
 import type { LevelDef, WorldDef } from '../../types'
-import { eastBlue1, eastBlue2, eastBlue3 } from './eastBlue'
+import { eastBlue1, eastBlue2, eastBlue3, eastBlue4 } from './eastBlue'
 import { alabasta1, alabasta2, alabasta3 } from './alabasta'
 import { skypiea1, skypiea2, skypiea3 } from './skypiea'
 import { water71, water72, water73 } from './water7'
-import { thrillerBark1, thrillerBark2 } from './thrillerBark'
+import { thrillerBark1, thrillerBark2, thrillerBark3 } from './thrillerBark'
 import { wano1, wano2, wano3 } from './wano'
 
 /**
@@ -18,7 +18,7 @@ export const WORLDS: WorldDef[] = [
     id: 'east-blue',
     name: 'East Blue',
     biome: 'east-blue',
-    levels: [eastBlue1, eastBlue2, eastBlue3],
+    levels: [eastBlue1, eastBlue2, eastBlue3, eastBlue4],
   },
   {
     id: 'alabasta',
@@ -42,7 +42,7 @@ export const WORLDS: WorldDef[] = [
     id: 'thriller-bark',
     name: 'Thriller Bark',
     biome: 'thriller-bark',
-    levels: [thrillerBark1, thrillerBark2],
+    levels: [thrillerBark1, thrillerBark2, thrillerBark3],
   },
   {
     id: 'wano',
@@ -74,6 +74,6 @@ if (typeof window !== 'undefined') {
 }
 
 export {
-  eastBlue1, eastBlue2, eastBlue3, alabasta1, alabasta2, alabasta3, skypiea1, skypiea2, skypiea3, water71, water72, water73,
-  thrillerBark1, thrillerBark2, wano1, wano2, wano3,
+  eastBlue1, eastBlue2, eastBlue3, eastBlue4, alabasta1, alabasta2, alabasta3, skypiea1, skypiea2, skypiea3, water71, water72, water73,
+  thrillerBark1, thrillerBark2, thrillerBark3, wano1, wano2, wano3,
 }

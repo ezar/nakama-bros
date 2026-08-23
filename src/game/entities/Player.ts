@@ -25,7 +25,7 @@ import { art } from '../../art'
 import { clamp, approach, rectsOverlap } from '../../engine/math'
 import { newLean, resetLean, stepLean } from '../lean'
 import { newBrake, stepBrake } from '../brake'
-import { cel } from '../../art/color'
+import { cel, rgba } from '../../art/color'
 import { PAL } from '../../art/palette'
 
 type State = 'normal' | 'hurt' | 'dead' | 'clear' | 'climb' | 'swim'
@@ -62,6 +62,15 @@ export class Player extends Entity {
   readonly kind = 'player'
   crew: CrewId
   tier: PowerTier = 'base'
+  /**
+   * Whether the player still owns their shadow.
+   *
+   * Thriller Bark's boss steals it rather than damaging you: you keep every
+   * hit point and every verb, but your attacks land for half until you break
+   * the shade carrying it. It is the one status effect in the game, it only
+   * exists inside that fight, and it always ends when the fight does.
+   */
+  private shadowLost = false
   state: State = 'normal'
   stance: Stance = 'stand'
 
@@ -147,6 +156,36 @@ export class Player extends Entity {
   }
 
   /** Attack reach box, live only during the active window of the swing. */
+  get hasShadow(): boolean {
+    return !this.shadowLost
+  }
+
+  /** What one melee hit is worth right now. */
+  get attackPower(): number {
+    return this.shadowLost ? 0.5 : 1
+  }
+
+  takeShadow(world: World): void {
+    if (this.shadowLost) return
+    this.shadowLost = true
+    world.events.emit('player:hurt', { x: this.x, y: this.y })
+    world.particles.burst(20, this.x, this.y - this.body.h * 0.5, {
+      speed: 90, speedVar: 50, life: 0.6, lifeVar: 0.2, size: 2.6, sizeEnd: 0.4,
+      color: PAL.night, colorEnd: rgba(PAL.magic, 0), shape: 'puff', drag: 0.06,
+      spawnRadius: this.body.w * 0.6,
+    })
+  }
+
+  restoreShadow(world: World): void {
+    if (!this.shadowLost) return
+    this.shadowLost = false
+    world.audio.playSfx('powerup', { volume: 0.5 })
+    world.particles.burst(24, this.x, this.y - this.body.h * 0.5, {
+      speed: 110, speedVar: 50, life: 0.5, lifeVar: 0.2, size: 2.4, sizeEnd: 0.3,
+      color: PAL.magic, colorEnd: PAL.white, shape: 'spark', additive: true, drag: 0.05,
+    })
+  }
+
   hitbox(): Rect | null {
     if (this.attackTimer <= 0) return null
     const total = this.stats.attackTime
@@ -1321,8 +1360,9 @@ export class Player extends Entity {
       ctx.restore()
     }
 
-    // Contact shadow — grounds the character against the tiles.
-    const shadowDrop = groundShadowDrop(this)
+    // Contact shadow — grounds the character against the tiles, and is the
+    // whole tell for the one status effect in the game: stolen, it is gone.
+    const shadowDrop = this.shadowLost ? null : groundShadowDrop(this)
     if (shadowDrop !== null) {
       ctx.save()
       ctx.globalAlpha = 0.3 * (1 - Math.min(1, shadowDrop / 60))

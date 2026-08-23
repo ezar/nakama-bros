@@ -1405,7 +1405,7 @@ export class BuggyBoss extends Boss {
  * in a row, and the only safe place is behind him.
  */
 export class FishmanWarlord extends Boss {
-  displayName = 'Jefe Gyojin'
+  displayName = 'Arlong'
   sheetKey = 'fishman-lord'
   private dashesLeft = 0
   private airborne = false
@@ -1589,7 +1589,7 @@ export class FishmanWarlord extends Boss {
  * moment he re-forms.
  */
 export class DesertWarlord extends Boss {
-  displayName = 'Señor de la Arena'
+  displayName = 'Crocodile'
   sheetKey = 'desert-lord'
   private scattered = false
   private scatterFrom = 0
@@ -1817,7 +1817,7 @@ export class DesertWarlord extends Boss {
  * for you, in the second and a half you have to reach it.
  */
 export class SkyTyrant extends Boss {
-  displayName = 'Tirano del Cielo'
+  displayName = 'Enel'
   sheetKey = 'sky-tyrant'
   private hoverY = 0
   private driftPhase = 0
@@ -2232,6 +2232,372 @@ export class OniLord extends Boss {
 }
 
 registerEntity('boss-kaido', (x, y) => new OniLord(x, y))
+
+/**
+ * The shadow master of Thriller Bark.
+ *
+ * His verb is theft. Every other boss in the game takes health off you; this
+ * one takes your shadow, and a player without a shadow moves the same but hits
+ * softer — the fight punishes you by making your own attacks worse until you
+ * take it back. You take it back by breaking the shade carrying it, which is
+ * why the arena fills with them rather than with projectiles.
+ *
+ * Act one is the shears and the floor. Act two starts stealing. Act three
+ * stops pretending and comes at you behind a wall of his own shadows.
+ */
+export class ShadowMaster extends Boss {
+  displayName = 'Moria'
+  sheetKey = 'shadow-master'
+  private stolen = false
+  private struckTwice = false
+
+  constructor(x: number, y: number) {
+    super(x, y, 32, 58)
+    this.maxHealth = 11
+    this.health = 11
+    this.accent = PAL.magic
+    this.phases = [
+      { at: 1, interval: 1.5, speed: 0.95, intensity: 0.82, moves: ['shear', 'graves'] },
+      { at: 0.66, interval: 1.25, speed: 1.15, intensity: 0.92, moves: ['steal', 'shear', 'graves'] },
+      { at: 0.33, interval: 1.05, speed: 1.3, intensity: 1, moves: ['swarm', 'steal', 'shear'] },
+    ]
+
+    this.moves = {
+      // Two cuts along the floor, a beat apart. The island's opening statement.
+      shear: {
+        name: 'shear', tell: 0.6, active: 0.55, recover: 1.3, color: PAL.magic,
+        fire: (world) => {
+          this.facePlayer(world)
+          world.audio.playSfx('slash', { volume: 0.65, rate: 0.8 })
+          const gy = groundYAt(world, this.x, this.y - 8)
+          world.spawn(new Shockwave(this.x + this.facing * 20, gy, this.facing, 190, PAL.magic))
+        },
+        during: (t, _dt, world) => {
+          if (t < 0.55 || this.struckTwice) return
+          this.struckTwice = true
+          const gy = groundYAt(world, this.x, this.y - 8)
+          world.audio.playSfx('slash', { volume: 0.5, rate: 1.1 })
+          world.spawn(new Shockwave(this.x - this.facing * 20, gy, (-this.facing) as 1 | -1, 190, PAL.magic))
+        },
+        end: () => {
+          this.struckTwice = false
+        },
+      },
+
+      // Hands out of the ground, marked before they arrive.
+      graves: {
+        name: 'graves', tell: 0.65, active: 1, recover: 1.35, color: PAL.poison,
+        fire: (world) => {
+          world.audio.playSfx('break', { volume: 0.45, rate: 0.75 })
+          const p = world.player()
+          const x0 = p ? p.x : this.x
+          for (let i = 0; i < 3; i++) {
+            const x = clamp(x0 + (i - 1) * 42, this.arenaL + 16, this.arenaR - 16)
+            const gy = groundYAt(world, x, this.y - 8)
+            world.spawn(new Warning(x, gy, 0.4 + i * 0.13, PAL.magic, 13, (w) => {
+              w.spawn(new Column(x, gy, 48, PAL.night, PAL.magic))
+            }))
+          }
+        },
+      },
+
+      // The theft. A shade crosses the arena, and if it reaches you it leaves
+      // with your shadow — your attacks land for less until you break it.
+      steal: {
+        name: 'steal', tell: 0.75, active: 1.2, recover: 1.5, color: PAL.magic,
+        start: (world) => {
+          this.facePlayer(world)
+          world.audio.playSfx('warn', { volume: 0.5, rate: 0.55 })
+        },
+        fire: (world) => {
+          const p = world.player() as Player | null
+          if (!p) return
+          world.audio.playSfx('hurt', { volume: 0.4, rate: 0.6 })
+          world.spawn(new Shade(this.x, this.y, this.dirToPlayer(world), this))
+          this.stolen = true
+        },
+      },
+
+      // No more single shades: the room fills with them at once.
+      swarm: {
+        name: 'swarm', tell: 0.8, active: 1.6, recover: 1.45, color: PAL.night,
+        fire: (world) => {
+          world.audio.playSfx('warn', { volume: 0.55, rate: 0.4 })
+          world.shake(0.3)
+          for (let i = 0; i < 3; i++) {
+            const dir: 1 | -1 = i % 2 === 0 ? 1 : -1
+            const x = dir === 1 ? this.arenaL + 20 : this.arenaR - 20
+            const gy = groundYAt(world, x, this.y - 8)
+            world.spawn(new Warning(x, gy, 0.3 + i * 0.3, PAL.magic, 12, (w) => {
+              w.spawn(new Shade(x, gy, dir, this))
+            }))
+          }
+        },
+      },
+    }
+  }
+
+  /** He keeps his distance and lets the room do the work. */
+  protected move(dt: number, world: World): void {
+    if (this.state !== 'strike') this.facePlayer(world)
+    this.body.vy = Math.min(this.body.vy + PHYS.gravity * dt, PHYS.maxFall)
+    if (this.state === 'wait') {
+      const p = world.player()
+      if (p) {
+        const gap = Math.abs(p.x - this.x)
+        const dir = gap < 96 ? -this.facing : this.facing
+        this.body.vx = dir * 44 * this.phases[this.phase].speed
+        this.playState('walk')
+      }
+    } else if (this.state === 'open' || this.state === 'stagger') {
+      this.body.vx *= 0.8
+    } else {
+      this.body.vx *= 0.9
+    }
+  }
+
+  /** Losing the fight gives the shadow back — nothing is carried out of it. */
+  protected onDefeated(world: World): void {
+    if (!this.stolen) return
+    const p = world.player() as Player | null
+    p?.restoreShadow(world)
+  }
+}
+
+/**
+ * One of his shades, carrying a stolen shadow if it managed to take one.
+ *
+ * It walks, it does not chase: the counterplay is to stand somewhere it is not
+ * and hit it on the way past. Breaking one that holds your shadow gives it
+ * straight back, which is the loop the whole fight is built on.
+ */
+export class Shade extends Entity {
+  readonly kind = 'enemy'
+  private carrying = false
+  private owner: Boss
+  private life = 7
+
+  constructor(x: number, y: number, dir: 1 | -1, owner: Boss) {
+    super(x, y, 16, 34)
+    this.owner = owner
+    this.facing = dir
+    this.body.vx = dir * 62
+    this.depth = 64
+    this.health = 1
+    this.tags.add('enemy')
+  }
+
+  update(dt: number, world: World): void {
+    this.age += dt
+    this.tickAnim(dt)
+    this.body.px = this.body.x
+    this.body.py = this.body.y
+    this.body.vy = Math.min(this.body.vy + PHYS.gravity * dt, PHYS.maxFall)
+    moveBody(this.body, world.map, dt, {})
+    if (this.body.onWall !== 0) this.facing = (-this.body.onWall) as 1 | -1
+    this.body.vx = this.facing * 62
+
+    const p = world.player() as Player | null
+    if (p && !p.dead && rectsOverlap(this.rect(), p.rect())) {
+      if (!this.carrying && p.hasShadow) {
+        // The theft itself: no damage, which is the point — it costs you your
+        // edge rather than your life, and you can win it back.
+        this.carrying = true
+        p.takeShadow(world)
+        world.audio.playSfx('hurt', { volume: 0.45, rate: 0.7 })
+        this.facing = (-this.facing) as 1 | -1
+      }
+    }
+    // A shade holding your shadow does not fade: it would take the shadow with
+    // it and leave you at half damage for the rest of the fight with nothing
+    // to hit. Empty-handed ones still expire, so the arena does not silt up.
+    if (!this.carrying && this.age > this.life) this.dead = true
+    void this.owner
+  }
+
+  damage(hit: Hit, world: World): boolean {
+    void hit
+    this.dead = true
+    world.audio.playSfx('break', { volume: 0.5, rate: 1.2 })
+    world.particles.burst(18, this.x, this.y - this.body.h * 0.5, {
+      speed: 120, speedVar: 60, life: 0.5, lifeVar: 0.2, size: 2.6, sizeEnd: 0.4,
+      color: PAL.magic, colorEnd: rgba(PAL.night, 0), shape: 'puff', drag: 0.06,
+      spawnRadius: this.body.w * 0.5,
+    })
+    if (this.carrying) {
+      const p = world.player() as Player | null
+      p?.restoreShadow(world)
+    }
+    return true
+  }
+
+  draw(rc: RenderContext, sx: number, sy: number): void {
+    const { ctx } = rc
+    const w = this.body.w
+    const h = this.body.h
+    const wob = Math.sin(this.age * 5) * 1.4
+    ctx.save()
+    ctx.translate(sx, sy)
+    ctx.globalAlpha = this.carrying ? 0.9 : 0.72
+    ctx.fillStyle = this.carrying ? rgba(PAL.magic, 0.9) : rgba(PAL.night, 0.95)
+    ctx.beginPath()
+    ctx.moveTo(-w * 0.5, 0)
+    ctx.quadraticCurveTo(-w * 0.62 + wob, -h * 0.55, -w * 0.22, -h * 0.82)
+    ctx.quadraticCurveTo(0, -h * 1.02, w * 0.24, -h * 0.82)
+    ctx.quadraticCurveTo(w * 0.62 - wob, -h * 0.55, w * 0.5, 0)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = rgba(PAL.poison, 0.95)
+    ctx.beginPath()
+    ctx.ellipse(-3, -h * 0.72, 1.5, 2, 0, 0, Math.PI * 2)
+    ctx.ellipse(3.2, -h * 0.72, 1.5, 2, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+registerEntity('boss-moria', (x, y) => new ShadowMaster(x, y))
+
+/**
+ * The government agent of Water 7.
+ *
+ * The fight is about distance, which is the one axis the other bosses leave
+ * alone: he hits you from across the arena with a strike that travels, and he
+ * closes the gap faster than you can open it. Every other boss is something to
+ * get away from; this one has to be kept at exactly the range where his tells
+ * are still readable.
+ *
+ * Act one is the finger pistol, aimed. Act two adds the run. Act three is both
+ * at once, from a man who no longer bothers looking like a man.
+ */
+export class Agent extends Boss {
+  displayName = 'Rob Lucci'
+  sheetKey = 'agent'
+  private rushing = false
+  private rushDir: 1 | -1 = 1
+  private shotsLeft = 0
+
+  constructor(x: number, y: number) {
+    super(x, y, 26, 56)
+    this.maxHealth = 11
+    this.health = 11
+    this.accent = PAL.mist
+    this.phases = [
+      { at: 1, interval: 1.45, speed: 1, intensity: 0.82, moves: ['pistol', 'sweep'] },
+      { at: 0.66, interval: 1.2, speed: 1.25, intensity: 0.92, moves: ['rush', 'pistol'] },
+      { at: 0.33, interval: 1, speed: 1.45, intensity: 1, moves: ['volley', 'rush', 'sweep'] },
+    ]
+
+    this.moves = {
+      // One shot, aimed where you are standing when the arm comes up. The tell
+      // is long and the shot is fast: it is a question about where you will be.
+      pistol: {
+        name: 'pistol', tell: 0.7, active: 0.35, recover: 1.3, color: PAL.mist,
+        fire: (world) => {
+          this.facePlayer(world)
+          world.audio.playSfx('slash', { volume: 0.55, rate: 1.4 })
+          world.spawn(new Knife(this.x + this.facing * 16, this.y - 30, this.facing * 320, 0))
+        },
+      },
+
+      // A low kick that throws the floor at you, both ways.
+      sweep: {
+        name: 'sweep', tell: 0.55, active: 0.5, recover: 1.25, color: PAL.steel,
+        fire: (world) => {
+          world.audio.playSfx('slash', { volume: 0.6, rate: 0.9 })
+          const gy = groundYAt(world, this.x, this.y - 8)
+          for (const dir of [1, -1] as const) {
+            world.spawn(new Shockwave(this.x + dir * 18, gy, dir, 210, PAL.mist))
+          }
+        },
+      },
+
+      // He closes. Faster than you can back away, so the answer is over him.
+      rush: {
+        name: 'rush', tell: 0.6, active: 0.75, recover: 1.5, color: PAL.danger,
+        start: (world) => {
+          this.facePlayer(world)
+          this.rushDir = this.dirToPlayer(world)
+          world.audio.playSfx('warn', { volume: 0.45, rate: 1.2 })
+        },
+        fire: () => {
+          this.rushing = true
+        },
+        during: (_t, _dt, world) => {
+          this.body.vx = this.rushDir * 300
+          this.facing = this.rushDir
+          if (this.x <= this.arenaL + this.body.w || this.x >= this.arenaR - this.body.w) {
+            this.rushing = false
+            this.body.vx = 0
+            world.shake(0.3)
+          }
+          if (world.rng.bool(0.4)) {
+            world.particles.emit({
+              x: this.x - this.rushDir * 12, y: this.y - world.rng.range(4, this.body.h * 0.7),
+              vx: -this.rushDir * world.rng.range(30, 70), vy: world.rng.range(-20, 10),
+              life: 0.35, lifeVar: 0.15, size: 2.2, sizeEnd: 0.3,
+              color: PAL.mist, colorEnd: rgba(PAL.slate, 0), shape: 'puff', drag: 0.06,
+            } as never)
+          }
+        },
+        end: () => {
+          this.rushing = false
+          this.body.vx = 0
+        },
+      },
+
+      // Act three: four shots on a fan, so there is no single safe height.
+      volley: {
+        name: 'volley', tell: 0.8, active: 1.1, recover: 1.4, color: PAL.mist,
+        start: () => {
+          this.shotsLeft = 4
+        },
+        during: (t, _dt, world) => {
+          const want = 4 - Math.floor(t * 4)
+          if (this.shotsLeft <= want || this.shotsLeft <= 0) return
+          this.shotsLeft--
+          const i = 3 - this.shotsLeft
+          world.audio.playSfx('slash', { volume: 0.45, rate: 1.5 })
+          world.spawn(new Knife(
+            this.x + this.facing * 16,
+            this.y - 12 - i * 12,
+            this.facing * 300,
+            0,
+          ))
+        },
+      },
+    }
+  }
+
+  /** Contact is only dangerous while he is committed to the run. */
+  get vulnerable(): boolean {
+    return !this.rushing && super.vulnerable
+  }
+
+  protected move(dt: number, world: World): void {
+    if (!this.rushing) this.facePlayer(world)
+    this.body.vy = Math.min(this.body.vy + PHYS.gravity * dt, PHYS.maxFall)
+    if (this.rushing) return
+    if (this.state === 'wait') {
+      const p = world.player()
+      if (p) {
+        // He holds a shooting distance rather than closing: the fight is about
+        // the gap, and he is the one who decides how wide it is.
+        const gap = Math.abs(p.x - this.x)
+        const want = 92
+        const dir = gap < want ? -this.facing : this.facing
+        this.body.vx = dir * 52 * this.phases[this.phase].speed
+        this.playState('walk')
+      }
+    } else if (this.state === 'open' || this.state === 'stagger') {
+      this.body.vx *= 0.8
+    } else {
+      this.body.vx *= 0.88
+    }
+  }
+}
+
+registerEntity('boss-lucci', (x, y) => new Agent(x, y))
 
 registerEntity('boss-buggy', (x, y) => new BuggyBoss(x, y))
 registerEntity('boss-fishman', (x, y) => new FishmanWarlord(x, y))

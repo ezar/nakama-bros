@@ -16,24 +16,35 @@ import { Tile } from '../../types'
  */
 
 describe('campaign', () => {
-  it('has seventeen stages across six islands', () => {
+  it('has nineteen stages across six islands', () => {
     expect(WORLDS).toHaveLength(6)
-    expect(ALL_LEVELS).toHaveLength(17)
+    expect(ALL_LEVELS).toHaveLength(19)
     expect(WORLDS.flatMap((w) => w.levels)).toHaveLength(ALL_LEVELS.length)
   })
 
-  it('puts every boss at the end of its island', () => {
-    // A boss stage is the last thing on an island, and the goal past its ring
-    // is barred until the boss falls — so a boss authored into the middle of a
-    // run would wall the campaign off at that point.
+  it('ends every island on a boss', () => {
+    // The rule that matters is this one. A boss earlier in an island is fine —
+    // East Blue meets Buggy at Orange Town before the Baratie, the way the
+    // story does — because the barred goal only ever bars its own stage, and
+    // beating the boss opens it. What would leave an island without a climax
+    // is the last stage not having one.
     for (const w of WORLDS) {
-      w.levels.forEach((l, i) => {
-        const hasBoss = l.spawns.some((s) => s.type.startsWith('boss-'))
-        if (!hasBoss) return
-        expect(i, `${l.id} is a boss stage but not the last of ${w.id}`).toBe(w.levels.length - 1)
-        expect(l.spawns.some((s) => s.type === 'goal'), `${l.id} has no goal`).toBe(true)
-      })
+      const last = w.levels[w.levels.length - 1]
+      expect(last.spawns.some((s) => s.type.startsWith('boss-')), `${w.id} does not end on a boss`).toBe(true)
     }
+  })
+
+  it('gives every boss stage a goal to bar', () => {
+    for (const l of ALL_LEVELS) {
+      if (!l.spawns.some((s) => s.type.startsWith('boss-'))) continue
+      expect(l.spawns.some((s) => s.type === 'goal'), `${l.id} has no goal`).toBe(true)
+    }
+  })
+
+  it('meets each boss exactly once', () => {
+    const seen = ALL_LEVELS.flatMap((l) => l.spawns.filter((s) => s.type.startsWith('boss-')).map((s) => s.type))
+    expect(new Set(seen).size, `duplicated: ${seen.join(', ')}`).toBe(seen.length)
+    expect(seen.length).toBe(7)
   })
 
   it('gives every stage a unique id and a Spanish name', () => {

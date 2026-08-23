@@ -54,19 +54,31 @@ partida, así que cambiarlo a mitad de fase quedaría a medio aplicar. El rango 
 East Blue, Alabasta, Skypiea, Water 7, Thriller Bark, Wano. Cada uno con su
 paleta, su tileset, su parallax y su clima.
 
-Diecisiete fases. Cinco de las seis islas terminan en una fase de jefe, que es
-siempre la última de la isla: la meta que hay pasada la arena no se activa
-mientras el jefe siga vivo, así que un jefe en mitad de una isla dejaría la
-campaña cortada ahí. Thriller Bark es la que falta.
+Diecinueve fases. **Toda isla acaba en un jefe.** La meta que hay pasada la
+arena no se activa mientras el jefe siga vivo, y ese candado sólo afecta a su
+propia fase: por eso puede haber un jefe antes del final de una isla sin cortar
+la campaña, que es lo que pasa en East Blue.
 
-| Isla | Fases | Jefe |
+El orden sigue al anime, islas y jefes. East Blue tiene cuatro fases porque
+tiene dos: Buggy en Orange Town, y Arlong cerrando el mar.
+
+| Isla | Fases | Jefes, en orden |
 |---|---|---|
-| East Blue | 3 | Buggy |
-| Alabasta | 3 | Señor de la Arena |
-| Skypiea | 3 | Tirano del Cielo |
-| Water 7 | 3 | Jefe Gyojin |
-| Thriller Bark | 2 | — |
-| Wano | 3 | Kaido |
+| East Blue | 4 | **Buggy** (1-2) · **Arlong** (1-4) |
+| Alabasta | 3 | **Crocodile** |
+| Skypiea | 3 | **Enel** |
+| Water 7 | 3 | **Rob Lucci** |
+| Thriller Bark | 3 | **Moria** |
+| Wano | 3 | **Kaido** |
+
+Los nombres son homenaje, como los de la tripulación; el diseño es de cosecha
+propia. Cada jefe tiene tres actos —al 100 %, al 66 % y al 33 % de vida— que
+**suman** ataques en vez de cambiarlos, para que lo que aprendes a leer en el
+primero siga sirviendo en el tercero.
+
+Moria es el único que no te quita vida: te quita la sombra, y sin ella pegas la
+mitad hasta que rompes la sombra que se la ha llevado. Es el único estado
+alterado del juego, sólo existe dentro de esa pelea, y nunca sale de ella.
 
 ## Enemigos
 
