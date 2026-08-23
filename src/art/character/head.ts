@@ -1,4 +1,4 @@
-import { cel, hexToRgb, mix, rgbToHsl, type Cel } from '../color'
+import { cel, hexToRgb, mix, rgba, rgbToHsl, type Cel } from '../color'
 import { blob, curve, ellipsePath, glint, inkStroke, type Pt } from '../ink'
 import { celPaint } from './paint'
 import type { Expression, Skeleton } from './rig'
@@ -633,6 +633,21 @@ function drawSkullFace(
       w * 0.17 * k, h * 0.15))
     ctx.restore()
   }
+  // A living head keeps its cranium under hair. A skull does not: the afro sits
+  // behind and above, and what it leaves is a bare brow half the height of the
+  // face, lit dead flat because the terminator is pushed down to the jaw. Flat,
+  // near-white, and cut off by the brow ridge, it read as a bandage tied round
+  // his head. The overhang casts, so give it the shadow it should already have
+  // — that is what turns the brow from a shape into a surface with a top.
+  ctx.save()
+  const cast = ctx.createLinearGradient(cx, cy - r * 1.12, cx, cy - r * 0.24)
+  cast.addColorStop(0, rgba('#241B33', 0.5))
+  cast.addColorStop(0.55, rgba('#241B33', 0.2))
+  cast.addColorStop(1, rgba('#241B33', 0))
+  ctx.fillStyle = cast
+  ctx.fill(ellipsePath(cx - r * 0.06, cy - r * 0.6, r * 1.05, r * 0.66))
+  ctx.restore()
+
   socket(cx + r * 0.38, 1, 1)
   if (o.turn < 0.94) socket(cx - r * 0.44, 1 - o.turn * 0.35, -1)
 

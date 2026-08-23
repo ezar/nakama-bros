@@ -5,26 +5,21 @@ import { KEY_LIGHT, type CelOptions } from '../ink'
  * The cel pass, as the characters need it.
  *
  * This is `ink.paint()`'s grammar — flat fill, hard terminator, rim, ink line —
- * reimplemented rather than wrapped, for two reasons.
+ * reimplemented rather than wrapped, and what is left of the reason is cost.
  *
- * The first is the rim. `ink.paint()` offsets its rim stroke *toward* the key
- * light and clips it to the shape; clipping keeps the half of the stroke that
- * falls inside the path, which is the half on the far side, so the highlight
- * lands on the edge that is in shadow and every form ends up lit from below. It
- * is a quiet bug — consistent everywhere, so nothing looks broken — but it puts
- * a cream band along a jaw and a white stripe under a bare arm, and a rim that
- * disagrees with its own terminator is the difference between a lit figure and
- * a plastic one.
+ * `ink.paint()` cuts the terminator by filling a half-plane `radius * 40 + 200`
+ * units on a side — about 1150 x 2300 device pixels for a torso — and relies on
+ * the clip to throw the rest away. Ten crew members at fifty frames each is
+ * around twenty-five thousand of those fills, and it was by a wide margin the
+ * most expensive thing in the art build. The half-plane here is sized to the
+ * part being painted, which is all it ever needed to be, and one clip covers
+ * both the terminator and the rim instead of one each.
  *
- * The second is cost. `ink.paint()` cuts the terminator by filling a half-plane
- * `radius * 40 + 200` units on a side — about 1150 x 2300 device pixels for a
- * torso — and relies on the clip to throw the rest away. Ten crew members at
- * fifty frames each is around twenty-five thousand of those fills, and it is by
- * a wide margin the most expensive thing in the whole art build. The half-plane
- * here is sized to the part being painted, which is all it ever needed to be.
- *
- * Everything under `character/` paints through this. If `ink.ts` is ever fixed
- * on both counts, this file becomes a one-line re-export.
+ * The rim used to differ too: `ink.paint()` offset its stroke toward the light,
+ * which clipping turns into a highlight on the shadowed edge. That was fixed at
+ * the source, and both now offset away from it. Everything under `character/`
+ * still paints through here for the cost; if the half-plane in `ink.ts` is ever
+ * sized to its subject, this file becomes a one-line re-export.
  */
 export function celPaint(
   ctx: CanvasRenderingContext2D,
