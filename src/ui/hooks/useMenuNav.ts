@@ -132,6 +132,11 @@ export function useMenuNav({
         case 'Enter':
         case ' ':
         case 'Spacebar':
+          // A focused control that is not part of the menu answers its own
+          // Enter. Without this the window listener would confirm the
+          // highlighted item as well, so pressing Enter on the title screen's
+          // lantern would light it *and* set sail.
+          if ((document.activeElement as HTMLElement | null)?.closest('[data-menu-outsider]')) return
           s.onConfirm(s.index)
           break
         case 'Escape':

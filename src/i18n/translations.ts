@@ -15,6 +15,8 @@ export const TRANSLATIONS = {
     'title.tagline': 'La aventura pirata de plataformas',
     'title.press': 'Pulsa cualquier tecla',
     'title.menu': 'Menú principal',
+    'title.lamp.off': 'Encender el farol',
+    'title.lamp.on': 'Apagar el farol',
     'title.fanmade': 'Proyecto de fans · arte generado por código',
 
     // ── Loading ──
@@ -181,6 +183,8 @@ export const TRANSLATIONS = {
     'title.tagline': 'The pirate platforming adventure',
     'title.press': 'Press any key',
     'title.menu': 'Main menu',
+    'title.lamp.off': 'Light the lantern',
+    'title.lamp.on': 'Put the lantern out',
     'title.fanmade': 'Fan project · every pixel drawn in code',
 
     'loading.title': 'Readying the Going Merry',

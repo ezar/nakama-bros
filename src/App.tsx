@@ -139,6 +139,7 @@ export default function App() {
             onCrew={() => setScreen('crew')}
             onMap={() => setScreen('map')}
             onOptions={() => setScreen('options')}
+            onLamp={(lit) => audio.playSfx(lit ? 'checkpoint' : 'menu-back')}
           />
         )
       case 'crew':

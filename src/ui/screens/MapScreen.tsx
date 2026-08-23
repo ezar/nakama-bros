@@ -443,6 +443,10 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
               opacity={0.75}
               strokeDasharray="4 9"
               strokeLinecap="round"
+              // The pricked dots walk the course you have already sailed. It is
+              // the one thing on this chart that says which way is forward
+              // without printing an arrow on it.
+              className={motion ? 'animate-chart-march' : undefined}
             />
 
             {/* islands */}
@@ -486,11 +490,15 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
           <div className="pointer-events-none absolute bottom-[4%] right-[4%] opacity-65">
             <CompassRose size={132} />
           </div>
-          <div className="pointer-events-none absolute left-[-2%] bottom-[1%] opacity-95">
-            <KrakenArm size={215} />
+          <div className="pointer-events-none absolute bottom-[1%] left-[-2%] origin-bottom-left opacity-95">
+            <div className={motion ? 'animate-kraken-curl' : undefined}>
+              <KrakenArm size={215} />
+            </div>
           </div>
           <div className="pointer-events-none absolute right-[3%] top-[1%] opacity-85">
-            <SeaSerpent size={230} />
+            <div className={motion ? 'animate-serpent-swim' : undefined}>
+              <SeaSerpent size={230} />
+            </div>
           </div>
           <div
             className="pointer-events-none absolute bottom-[13%] left-[16%] font-display text-xl"
@@ -506,19 +514,34 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
             <Nail size={14} />
           </span>
 
-          {/* The ship, riding at the island the player is looking at. */}
-          <div
+          {/*
+            The ship, riding at the island the player is looking at — and it
+            sails there rather than cutting. Moving the highlight up or down
+            the route used to teleport it across the ocean between two frames,
+            which is the one thing a chart with a ship on it should never do.
+          */}
+          <m.div
             className="pointer-events-none absolute"
-            style={{
+            initial={false}
+            animate={{
               left: `${(((shipAt?.[0] ?? 0) + 104) / VB.w) * 100}%`,
               top: `${(((shipAt?.[1] ?? 0) + 30) / VB.h) * 100}%`,
-              transform: 'translate(-50%,-100%)',
             }}
+            transition={
+              motion
+                ? { type: 'spring', stiffness: 62, damping: 17, mass: 1.1 }
+                : { duration: 0 }
+            }
           >
-            <div className={motion ? 'animate-bob' : undefined}>
-              <PirateShip width={104} motion={motion} />
+            {/* The -50%/-100% offset lives on a plain child: a motion element
+                owns its own `transform`, and anything written there by hand is
+                liable to be overwritten the moment it animates. */}
+            <div className="-translate-x-1/2 -translate-y-full">
+              <div className={motion ? 'animate-bob' : undefined}>
+                <PirateShip width={104} motion={motion} />
+              </div>
             </div>
-          </div>
+          </m.div>
 
           {/* Stage pips and island seals. */}
           {worlds.map((w, wi) => {
