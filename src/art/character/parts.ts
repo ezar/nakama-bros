@@ -1,5 +1,5 @@
 import { cel, mix, type Cel } from '../color'
-import { KEY_LIGHT, blob, curve, ellipsePath, glint, type Pt } from '../ink'
+import { SPRITE_LIGHT, blob, curve, ellipsePath, glint, type Pt } from '../ink'
 import { celPaint } from './paint'
 import type { FaceStyle } from './head'
 import type {
@@ -338,7 +338,7 @@ export function stretchLimb(
   // The normal pointing away from the key light is the side that goes dark.
   let nx = -uy
   let ny = ux
-  if (nx * KEY_LIGHT.x + ny * KEY_LIGHT.y > 0) {
+  if (nx * SPRITE_LIGHT.x + ny * SPRITE_LIGHT.y > 0) {
     nx = -nx
     ny = -ny
   }
@@ -380,7 +380,7 @@ export function stretchLimb(
     ctx.clip(path)
     ctx.strokeStyle = c.light
     ctx.lineWidth = rim * 2
-    ctx.translate(-KEY_LIGHT.x * rim * 0.95, -KEY_LIGHT.y * rim * 0.95)
+    ctx.translate(-SPRITE_LIGHT.x * rim * 0.95, -SPRITE_LIGHT.y * rim * 0.95)
     ctx.stroke(path)
     ctx.restore()
   }

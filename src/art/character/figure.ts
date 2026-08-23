@@ -51,7 +51,17 @@ export function drawFigure(
   // is drawn after the costume, and anyone with hair past their shoulders — the
   // navigator, the archaeologist — ends up wearing it as a cape with the whole
   // torso hidden underneath.
-  drawHairBack(ctx, hx, hy, r, pal.hair, look.hairBack(hx, hy, r, s))
+  // Hair follows the head round. You see more of the back of a head in profile
+  // than square on, so the mass behind the skull swings away from the facing
+  // direction as the turn comes up; the locks over the face travel forward with
+  // the face plane. Applied here rather than in twenty closures, for the same
+  // reason the skull's depth lives in `headPath` — it is one rig, and hair that
+  // followed the turn on six characters and not the other four would read as a
+  // bug in the four.
+  const hairBackX = hx - r * p.headTurn * 0.11
+  const hairFrontX = hx + r * p.headTurn * 0.09
+
+  drawHairBack(ctx, hairBackX, hy, r, pal.hair, look.hairBack(hairBackX, hy, r, s))
 
   drawLeg(ctx, s.legBack, s.footBack, { ...look.legs(far), dim: true })
   drawArm(ctx, s.armBack, far.skin, { ...look.arms(far), dim: true })
@@ -69,7 +79,7 @@ export function drawFigure(
     turn: p.headTurn,
     style: look.face,
   })
-  drawHairFront(ctx, hx, hy, r, pal.hair, look.hairFront(hx, hy, r, s))
+  drawHairFront(ctx, hairFrontX, hy, r, pal.hair, look.hairFront(hairFrontX, hy, r, s))
   look.headgear?.(ctx, hx, hy, r, s)
 
   drawArm(ctx, s.armFront, pal.skin, look.arms(pal))

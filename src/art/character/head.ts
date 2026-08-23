@@ -127,19 +127,28 @@ const EXPRESSIONS: Record<Expression, EyeShape> = {
  */
 export function headPath(cx: number, cy: number, r: number, turn: number, heft = 1): Path2D {
   const jaw = (0.62 + turn * 0.08) * heft
+  // A skull is longer front-to-back than it is across, so turning it toward
+  // profile shows more of it: the occiput swings out behind and the face plane
+  // comes forward. Without this the features simply slide across a ball, which
+  // is the tell that gives a flipbook character away.
+  const back = turn * 0.16
+  const front = turn * 0.11
+  // The cranium's mass sits behind the face, so the top of the head drifts back
+  // as it turns — the difference between a profile and a face pushed sideways.
+  const crown = turn * 0.2
   // Taller than it is wide. A head as broad as the shoulders reads as a chibi
   // whatever is drawn on it; keeping the cranium narrow is what lets the head
   // be big enough to carry a face without the body looking like a doll's.
   return blob([
-    [cx - r * 0.86, cy - r * 0.4],
-    [cx - r * 0.7, cy - r * 1.0],
-    [cx + r * 0.04, cy - r * 1.14],
-    [cx + r * 0.76, cy - r * 0.72],
-    [cx + r * (0.84 + turn * 0.06) * heft, cy + r * 0.02],
-    [cx + r * 0.66 * heft, cy + r * (jaw * 0.66)],
+    [cx - r * (0.86 + back), cy - r * 0.4],
+    [cx - r * (0.7 + back * 0.8), cy - r * 1.0],
+    [cx + r * (0.04 - crown), cy - r * 1.14],
+    [cx + r * (0.76 + front * 0.6), cy - r * 0.72],
+    [cx + r * (0.84 + turn * 0.06 + front) * heft, cy + r * 0.02],
+    [cx + r * (0.66 + front * 0.5) * heft, cy + r * (jaw * 0.66)],
     [cx + r * 0.18, cy + r * (jaw + 0.08)],
     [cx - r * 0.4, cy + r * (jaw - 0.06)],
-    [cx - r * 0.74 * heft, cy + r * 0.2],
+    [cx - r * (0.74 + back * 0.5) * heft, cy + r * 0.2],
   ] as Pt[], 0.88)
 }
 
@@ -171,6 +180,35 @@ export function drawNeck(ctx: CanvasRenderingContext2D, s: Skeleton, skin: Cel, 
   celPaint(ctx, path, throat, { shadow: 0.4, radius: 1.2, pivot: s.neck, line: 0.4, occlusion: 0.5 })
 }
 
+/**
+ * The nose in profile.
+ *
+ * A face turned to the side on a perfectly smooth ball is the tell that gives a
+ * flipbook head away — a real profile breaks its own contour, and a painted-on
+ * tick never will. This is a small wedge off the brow, laid down *under* the
+ * skull so the skull's own fill closes the seam and only the part that projects
+ * past the contour is ever seen.
+ *
+ * It fades in from half a turn: below that the nose is genuinely inside the
+ * silhouette and a bump there would read as a lump on the cheek.
+ */
+function noseWedge(cx: number, cy: number, r: number, turn: number, nose: number): Path2D | null {
+  const t = Math.max(0, Math.min(1, (turn - 0.5) / 0.42)) * nose
+  if (t < 0.02) return null
+  // Five points and a slack tension, because a nose is the one place on this
+  // face that needs a corner: bridge, tip, and the notch under it. Rounded off,
+  // it stops being a nose and becomes a swollen cheek. The first and last sit
+  // well inside the skull, where the skull's own fill will bury them.
+  const out = 0.17 * t
+  return blob([
+    [cx + r * 0.5, cy - r * 0.14],
+    [cx + r * (0.86 + out * 0.6), cy + r * 0.08],
+    [cx + r * (1.0 + out), cy + r * 0.28],
+    [cx + r * (0.78 + out * 0.3), cy + r * 0.37],
+    [cx + r * 0.48, cy + r * 0.4],
+  ] as Pt[], 0.35)
+}
+
 export function drawHead(
   ctx: CanvasRenderingContext2D,
   s: Skeleton,
@@ -194,7 +232,7 @@ export function drawHead(
   // whitening it.
   const skinL = rgbToHsl(hexToRgb(o.skin.core)).l
   const rimFade = 1 - Math.max(0, (skinL - 0.6) / 0.4) * 0.82
-  celPaint(ctx, path, o.skin, {
+  const paint = (target: Path2D): void => celPaint(ctx, target, o.skin, {
     shadow: 0.27,
     radius: r * 1.2,
     pivot: [cx + r * 0.1, cy - r * 0.1],
@@ -202,6 +240,14 @@ export function drawHead(
     rimColor: mix(o.skin.light, skinL > 0.72 ? '#FFE6BE' : '#FFFFFF', 0.25),
     line: 0.5,
   })
+
+  // A snout is already a profile, and a skull has a cavity where a nose would
+  // be — neither wants one bolted on.
+  if (!st0.muzzle && !st0.skull) {
+    const wedge = noseWedge(cx, cy, r, o.turn, st0.nose)
+    if (wedge) paint(wedge)
+  }
+  paint(path)
 
   drawFace(ctx, cx, cy, r, o, path)
   return { center: [cx, cy], r, path }

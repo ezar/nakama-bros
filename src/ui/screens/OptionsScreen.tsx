@@ -6,7 +6,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
-import { buildLabel } from '../../build'
+import { buildLabel, copyrightYears } from '../../build'
 
 /**
  * Settings, written on the same sheet as everything else.
@@ -223,7 +223,7 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
             >
               <p>{t('legal.oda')}</p>
               <p>{t('legal.fan')}</p>
-              <p>{t('legal.code')}</p>
+              <p>{t('legal.code', { years: copyrightYears })}</p>
             </div>
             {/* The build. The title screen hides its copy on a narrow screen,
                 and a phone running this as a cached PWA is exactly where

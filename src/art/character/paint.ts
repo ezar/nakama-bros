@@ -1,5 +1,5 @@
 import { cel, type Cel } from '../color'
-import { KEY_LIGHT, type CelOptions } from '../ink'
+import { SPRITE_LIGHT, type CelOptions } from '../ink'
 
 /**
  * The cel pass, as the characters need it.
@@ -28,7 +28,7 @@ export function celPaint(
   opts: CelOptions = {},
 ): void {
   const c = typeof colors === 'string' ? cel(colors) : colors
-  const light = opts.light ?? KEY_LIGHT
+  const light = opts.light ?? SPRITE_LIGHT
   const shadow = opts.shadow ?? 0.42
   const radius = opts.radius ?? 8
   const [px, py] = opts.pivot ?? [0, 0]

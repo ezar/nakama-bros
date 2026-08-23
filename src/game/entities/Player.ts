@@ -1,5 +1,5 @@
 import { TILE, Tile } from '../../types'
-import type { CrewId, Hit, PowerTier, RenderContext, Rect } from '../../types'
+import type { CrewId, Facing, Hit, PowerTier, RenderContext, Rect } from '../../types'
 import { Entity } from './Entity'
 import { FloatingText } from './FloatingText'
 import type { World } from '../world'
@@ -23,6 +23,7 @@ import {
 import type { SignatureDef } from '../config'
 import { art } from '../../art'
 import { clamp, approach, rectsOverlap } from '../../engine/math'
+import { newLean, resetLean, stepLean } from '../lean'
 import { cel } from '../../art/color'
 import { PAL } from '../../art/palette'
 
@@ -50,6 +51,12 @@ const STAND_H = 30
  * simulation must be able to run without art loaded, which is what lets the
  * physics be tested headless.
  */
+/** How long the pivot holds: the three turn frames at 0.05s each. */
+const TURN_TIME = 0.15
+
+/** The three landing frames at 0.07s each, scaled down by a soft impact. */
+const LAND_TIME = 0.21
+
 export class Player extends Entity {
   readonly kind = 'player'
   crew: CrewId
@@ -230,13 +237,29 @@ export class Player extends Entity {
     // ── Stance ───────────────────────────────────────────────────────────────
     this.updateStance(dt, world, grounded, inWater, maxSpeed)
 
+    // ── Body language ────────────────────────────────────────────────────────
+    if (this.turnTimer > 0) this.turnTimer = Math.max(0, this.turnTimer - dt)
+    if (this.landTimer > 0) this.landTimer = Math.max(0, this.landTimer - dt)
+    // Before the horizontal pass, so the lean answers the velocity the player
+    // was actually drawn at last frame rather than pre-empting this one.
+    stepLean(this.leanState, this.body.vx, grounded, dt)
+
     // ── Signature move ───────────────────────────────────────────────────────
     this.updateSignature(dt, world, grounded, inWater)
 
     // ── Horizontal ───────────────────────────────────────────────────────────
     const control = this.moveControl()
     const want = this.wallLock > 0 ? 0 : input.axisX
-    if (want !== 0 && control > 0.3 && this.sigTimer <= 0) this.facing = want > 0 ? 1 : -1
+    if (want !== 0 && control > 0.3 && this.sigTimer <= 0) {
+      const next: Facing = want > 0 ? 1 : -1
+      // A change of facing is a whole-body event, not a sprite flip. Hold the
+      // pivot long enough for its three frames to play; above skid speed the
+      // skid already covers it, and in the air there is nothing to pivot on.
+      if (next !== this.facing && grounded && Math.abs(this.body.vx) <= PHYS.skidSpeed) {
+        this.turnTimer = TURN_TIME
+      }
+      this.facing = next
+    }
     const turning = want !== 0 && Math.sign(want) !== Math.sign(this.body.vx) && this.body.vx !== 0
     if (control > 0) {
       let accel = (turning ? PHYS.turnAccel : PHYS.accel) * control
@@ -370,6 +393,9 @@ export class Player extends Entity {
       this.squash(1 + impact * 0.35, 1 - impact * 0.3)
       world.events.emit('player:land', { x: this.x, y: this.y, speed: res.impactSpeed })
       this.airDashUsed = false
+      // A hop does not need recovering from — below this the body has nothing
+      // to absorb and the crouch reads as a stumble.
+      if (impact > 0.18) this.landTimer = LAND_TIME * (0.5 + impact * 0.5)
       if (impact > 0.25) {
         world.audio.playSfx('land', { volume: 0.4 + impact * 0.6 })
         world.particles.burst(Math.round(4 + impact * 10), this.x, this.y, {
@@ -616,6 +642,31 @@ export class Player extends Entity {
   private breaksTerrain(): boolean {
     return this.sigTimer > 0 && this.signature.breaksBricks
   }
+
+  /** Seconds left of the turn-around pivot; the sprite flips instantly, the body does not. */
+  private turnTimer = 0
+
+  /**
+   * Seconds left of the landing recovery.
+   *
+   * The `land` frames were baked from the start and nothing ever played them:
+   * the animation went straight from `fall` to `run` on touchdown, so a drop
+   * ended with the legs already mid-stride and the impact went entirely
+   * unanswered by the body.
+   */
+  private landTimer = 0
+
+  /**
+   * Which gait is running.
+   *
+   * Held as state rather than derived from the speed each frame, because `play`
+   * restarts the cycle whenever the name changes: a bare threshold makes the
+   * feet pop every time the player brushes past it.
+   */
+  private gait: 'walk' | 'run' = 'run'
+
+  /** Secondary motion: see `src/game/lean.ts`. */
+  private leanState = newLean()
 
   private updateSignature(dt: number, world: World, grounded: boolean, inWater: boolean): void {
     this.sigCooldown = Math.max(0, this.sigCooldown - dt)
@@ -1092,6 +1143,9 @@ export class Player extends Entity {
   kill(world: World): void {
     if (this.state === 'dead') return
     this.state = 'dead'
+    // The update stops here, so the lean would otherwise freeze at whatever it
+    // held on the last live frame and be there waiting on respawn.
+    resetLean(this.leanState)
     this.stateTimer = 0
     this.cancelMoves()
     this.body.collidesWithTiles = false
@@ -1163,14 +1217,51 @@ export class Player extends Entity {
       this.play('skid')
       return
     }
-    if (Math.abs(this.body.vx) > PHYS.idleSpeed) {
-      this.play('run')
-      // Animation speed follows actual speed, so the feet never skate.
-      const ratio = Math.abs(this.body.vx) / (this.stats.runSpeed * this.mods.speed)
-      this.animTime += (ratio - 1) * 0.016
+    if (this.turnTimer > 0) {
+      this.play('turn')
       return
     }
-    this.play(want !== 0 ? 'run' : 'idle')
+    // Landing is a two-foot recovery, so it belongs to a drop rather than to a
+    // stride: come down mid-run and the run cycle is the truthful frame, and
+    // folding into a crouch there reads as tripping over nothing.
+    if (this.landTimer > 0 && Math.abs(this.body.vx) < PHYS.skidSpeed) {
+      this.play('land')
+      return
+    }
+    if (Math.abs(this.body.vx) > PHYS.idleSpeed) {
+      this.play(this.gaitFor(want))
+      return
+    }
+    this.play(want !== 0 ? this.gaitFor(want) : 'idle')
+  }
+
+  /**
+   * Pick a gait and keep its feet on the ground.
+   *
+   * `walk` was baked with the rest of the set and never played: under a run the
+   * player got the running cycle slowed down, which is a body running in
+   * treacle rather than a body walking. They are different poses — the walk has
+   * a straighter spine and a third of the stride.
+   *
+   * The gait follows the *input*, not the speed. A speed threshold sounds
+   * right and is not: keyboards and the touch pad only ever report a full push,
+   * so every acceleration would spend two or three frames crossing the band,
+   * and `play` restarts the cycle whenever the name changes — which reads as a
+   * stumble rather than a walk. A stick asking for half speed is asking for a
+   * walk, and nothing else ever asks. With no input at all the last gait
+   * stands, so running to a halt keeps running rather than dropping a stride.
+   */
+  private gaitFor(want: number): 'walk' | 'run' {
+    const push = Math.abs(want)
+    // A band, so a stick resting on the boundary cannot restart the cycle.
+    if (this.gait === 'run' && push > 0.01 && push < 0.58) this.gait = 'walk'
+    else if (this.gait === 'walk' && push > 0.66) this.gait = 'run'
+    // Animation speed follows actual speed, so the feet never skate. Each gait
+    // is authored for its own pace, so each scales against its own nominal.
+    const top = this.stats.runSpeed * this.mods.speed
+    const nominal = this.gait === 'walk' ? top * 0.42 : top
+    this.animTime += (Math.abs(this.body.vx) / nominal - 1) * 0.016
+    return this.gait
   }
 
   draw(rc: RenderContext, sx: number, sy: number): void {
@@ -1216,6 +1307,11 @@ export class Player extends Entity {
     // Pressed against a wall, the body leans into it — a character sliding
     // down a surface they are not touching reads as a bug.
     ctx.translate(sx + this.wallDir * 3, sy)
+    // Shear about the feet, in world space and before the facing mirror: the
+    // lean belongs to the direction the body is accelerating, not to the
+    // direction it happens to be drawn.
+    const lean = this.leanState.lean
+    if (lean !== 0) ctx.transform(1, 0, lean, 1, 0, 0)
     ctx.scale(this.squashX * scale, this.squashY * scale)
     if (this.facing === -1) ctx.scale(-1, 1)
     if (this.wallDir !== 0) {
