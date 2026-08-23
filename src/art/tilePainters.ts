@@ -1404,16 +1404,30 @@ function face(
   v: Vary,
   light: Light,
   side: -1 | 1,
+  /**
+   * True when the tile has open air on *both* sides — a pillar one tile wide.
+   *
+   * A cliff gets a lit band four units in and a shadowed one four and a half,
+   * and against a mass of ground that is a shallow bevel on an edge. On a
+   * sixteen-unit tile with a face on each side it is eight and a half of the
+   * sixteen, so the same material reads flatter and paler as a pillar than it
+   * does in bulk — which is what made the free-standing columns look washed
+   * out next to the ground they grow from. Narrow the bevels instead of
+   * dropping them: a pillar still has two sides.
+   */
+  narrow = false,
 ): void {
   const rock = cel(t.rock)
   const lit = side === -1 ? light.x < 0 : light.x > 0
-  const x0 = side === -1 ? 0 : TILE - 4
+  const litW = narrow ? 2.6 : 4
+  const shadeW = narrow ? 2.9 : 4.5
+  const x0 = side === -1 ? 0 : TILE - litW
 
   ctx.save()
   if (lit) {
-    gradientFill(ctx, roundRectPath(x0, 0, 4, TILE, 0), x0, 0, x0 + side * -4, 0, [
+    gradientFill(ctx, roundRectPath(x0, 0, litW, TILE, 0), x0, 0, x0 + side * -litW, 0, [
       [0, rgba(rock.light, 0)],
-      [1, rgba(rock.light, 0.4)],
+      [1, rgba(rock.light, narrow ? 0.32 : 0.4)],
     ])
     ctx.globalAlpha = 0.75
     ctx.strokeStyle = rock.light
@@ -1424,9 +1438,10 @@ function face(
     ctx.lineTo(e, TILE)
     ctx.stroke()
   } else {
-    gradientFill(ctx, roundRectPath(x0, 0, 4.5, TILE, 0), x0, 0, x0 + side * -4.5, 0, [
+    const sx = side === -1 ? 0 : TILE - shadeW
+    gradientFill(ctx, roundRectPath(sx, 0, shadeW, TILE, 0), sx, 0, sx + side * -shadeW, 0, [
       [0, rgba(rock.deep, 0)],
-      [1, rgba(rock.deep, 0.62)],
+      [1, rgba(rock.deep, narrow ? 0.5 : 0.62)],
     ])
   }
   ctx.restore()
@@ -1552,8 +1567,9 @@ export function paintSolid({ ctx, mask, variant, biome }: TileDrawArgs): void {
   inclusions(ctx, v, t, light)
 
   if (openN) capBand(ctx, t, v, light, openW, openE)
-  if (openW) face(ctx, t, v, light, -1)
-  if (openE) face(ctx, t, v, light, 1)
+  const pillar = openW && openE
+  if (openW) face(ctx, t, v, light, -1, pillar)
+  if (openE) face(ctx, t, v, light, 1, pillar)
   if (openS) underside(ctx, t, v)
 
   // Inner corner: a tile with ground above it but open air beside it sits in
