@@ -152,6 +152,15 @@ export abstract class Boss extends Entity {
   private popTimer = 0
   private pops = 0
   private introDone = false
+  /**
+   * The difficulty's tempo multiplier, read once on entry.
+   *
+   * Every wind-up, every open window and every pause between attacks is
+   * multiplied by it — but never the active window of an attack, which is the
+   * part you have to get out of the way of. So Fácil is the same fight, read
+   * at a slower tempo, not a different one.
+   */
+  private tempo = 1
 
   /** Left and right walls of the room, resolved from the tilemap on entry. */
   protected arenaL = -Infinity
@@ -248,6 +257,7 @@ export abstract class Boss extends Entity {
     if (!this.arenaReady) this.resolveArena(world)
     if (!this.introDone) {
       this.introDone = true
+      this.applyDifficulty(world)
       world.audio.setIntensity(this.phases[0].intensity)
       this.onIntro(world)
     }
@@ -265,16 +275,33 @@ export abstract class Boss extends Entity {
     this.touchPlayer(world)
   }
 
+  /**
+   * Take the run's difficulty, once, before a single hit can land.
+   *
+   * Health is scaled here rather than in the constructor because that is where
+   * the subclass sets it and there is no world to ask yet. The floor is two
+   * clean hits per act: the acts *are* the fight, and a boss that dies before
+   * it has shown you its third one has not been made easier, it has been cut.
+   */
+  private applyDifficulty(world: World): void {
+    const d = world.difficulty
+    this.tempo = d.enemyTiming
+    if (d.bossHealth !== 1) {
+      this.maxHealth = Math.max(this.phases.length * 2, Math.round(this.maxHealth * d.bossHealth))
+      this.health = this.maxHealth
+    }
+  }
+
   /** The state timeline. Subclasses drive behaviour through move callbacks. */
   private runTimeline(dt: number, world: World): void {
     const phase = this.phases[this.phase]
     switch (this.state) {
       case 'wait':
-        if (this.stateTime >= phase.interval) this.beginMove(world)
+        if (this.stateTime >= phase.interval * this.tempo) this.beginMove(world)
         else this.playState('walk')
         break
       case 'tell':
-        if (this.stateTime >= (this.current?.tell ?? 0)) {
+        if (this.stateTime >= (this.current?.tell ?? 0) * this.tempo) {
           this.state = 'strike'
           this.stateTime = 0
           this.playState('attack', true)
@@ -299,14 +326,14 @@ export abstract class Boss extends Entity {
         break
       }
       case 'open':
-        if (this.stateTime >= (this.current?.recover ?? 0.8)) {
+        if (this.stateTime >= (this.current?.recover ?? 0.8) * this.tempo) {
           this.state = 'wait'
           this.stateTime = 0
           this.current = null
         }
         break
       case 'stagger':
-        if (this.stateTime >= 1.1) {
+        if (this.stateTime >= 1.1 * this.tempo) {
           this.state = 'wait'
           this.stateTime = 0
           this.current = null
@@ -336,7 +363,7 @@ export abstract class Boss extends Entity {
       return
     }
     // Nothing was in range: hold the beat and try again next tick.
-    this.stateTime = Math.max(0, phase.interval - 0.25)
+    this.stateTime = Math.max(0, phase.interval * this.tempo - 0.25)
   }
 
   /** The universal wind-up: same sound, same sparks, whatever is coming. */
@@ -608,7 +635,10 @@ export abstract class Boss extends Entity {
   /** The wind-up glyph, shared with the enemy roster so the read is learned once. */
   protected drawTell(rc: RenderContext, sx: number, sy: number): void {
     if (this.state !== 'tell' || !this.current) return
-    const t = clamp01(this.stateTime / Math.max(0.001, this.current.tell))
+    // Against the stretched duration, not the table's: on Fácil the glyph has
+    // to fill at the pace the strike actually arrives, or it saturates early
+    // and stops being a countdown.
+    const t = clamp01(this.stateTime / Math.max(0.001, this.current.tell * this.tempo))
     const { ctx } = rc
     ctx.save()
     ctx.translate(sx, sy - this.body.h - 12 - t * 4)
@@ -642,7 +672,7 @@ export abstract class Boss extends Entity {
    */
   protected drawOpening(rc: RenderContext, sx: number, sy: number): void {
     if (!this.vulnerable) return
-    const total = this.state === 'stagger' ? 1.1 : (this.current?.recover ?? 0.8)
+    const total = (this.state === 'stagger' ? 1.1 : (this.current?.recover ?? 0.8)) * this.tempo
     const t = clamp01(this.stateTime / total)
     const { ctx } = rc
     ctx.save()

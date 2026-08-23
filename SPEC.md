@@ -44,10 +44,23 @@ que te dan.
 | Empiezas en | gear 2 (un golpe de margen) | base | base |
 | Invulnerabilidad tras el golpe | ×1,6 | ×1 | ×0,7 |
 | Reloj del nivel | ×1,5 | ×1 | ×0,85 |
+| Velocidad de los enemigos | ×0,85 | ×1 | ×1 |
+| Avisos, aperturas y pausas | ×1,35 | ×1 | ×1 |
+| Vida de los jefes | ×0,7 | ×1 | ×1 |
+
+Las tres últimas filas cambian a la oposición, no al personaje, y sólo en Fácil:
+el ataque se telegrafía más rato y la ventana de después dura más, así que la
+pelea se lee a otro tempo — pero son los mismos golpes y en el mismo orden que
+en Normal. Lo que **no** se estira nunca es el rato que un ataque está vivo:
+alargar eso haría más difícil esquivarlo, que es justo lo contrario. Y los jefes
+cuestan menos golpes limpios, con un suelo de dos por acto, porque un jefe que
+esquivas de sobra pero no consigues rematar no es una pelea difícil, es una
+pelea larga.
 
 Se lee una sola vez, al arrancar el nivel: decide vidas y reloj al construir la
-partida, así que cambiarlo a mitad de fase quedaría a medio aplicar. El rango S
-—y con él el dibujo— se puede conseguir en cualquiera de los tres.
+partida, y cada enemigo y cada jefe la toman en su primer paso, así que
+cambiarlo a mitad de fase quedaría a medio aplicar. El rango S —y con él el
+dibujo— se puede conseguir en cualquiera de los tres.
 
 ## Mundos
 

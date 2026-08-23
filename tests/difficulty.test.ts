@@ -19,7 +19,32 @@ describe('difficulty', () => {
   })
 
   it('leaves Normal as the neutral setting', () => {
-    expect(DIFFICULTY.normal).toEqual({ lives: 3, startTier: 'base', invuln: 1, time: 1 })
+    expect(DIFFICULTY.normal).toEqual({
+      lives: 3, startTier: 'base', invuln: 1, time: 1,
+      enemySpeed: 1, enemyTiming: 1, bossHealth: 1,
+    })
+  })
+
+  it('only makes the opposition softer on Fácil', () => {
+    // Difícil already takes lives, clock and mercy away. Making the enemies
+    // meaner on top of that was never asked for, and it would quietly change
+    // fights that people have already learned.
+    expect(DIFFICULTY.hard.enemySpeed).toBe(DIFFICULTY.normal.enemySpeed)
+    expect(DIFFICULTY.hard.enemyTiming).toBe(DIFFICULTY.normal.enemyTiming)
+    expect(DIFFICULTY.hard.bossHealth).toBe(DIFFICULTY.normal.bossHealth)
+
+    expect(DIFFICULTY.easy.enemySpeed).toBeLessThan(1)
+    expect(DIFFICULTY.easy.enemyTiming).toBeGreaterThan(1)
+    expect(DIFFICULTY.easy.bossHealth).toBeLessThan(1)
+  })
+
+  it('keeps Fácil a slower read of the same fight, not a broken one', () => {
+    // A boss that dies before its second act never shows the player what the
+    // fight was, and an enemy that has stopped moving is scenery. Both floors
+    // matter more than the exact numbers above them.
+    expect(DIFFICULTY.easy.bossHealth).toBeGreaterThanOrEqual(0.6)
+    expect(DIFFICULTY.easy.enemySpeed).toBeGreaterThanOrEqual(0.7)
+    expect(DIFFICULTY.easy.enemyTiming).toBeLessThanOrEqual(1.6)
   })
 
   it('gets harder in every dimension at once', () => {
@@ -43,6 +68,10 @@ describe('difficulty', () => {
       expect(DIFFICULTY[d].lives).toBeGreaterThanOrEqual(1)
       expect(DIFFICULTY[d].time).toBeGreaterThan(0)
       expect(DIFFICULTY[d].invuln).toBeGreaterThan(0)
+      expect(DIFFICULTY[d].enemyTiming).toBeGreaterThan(0)
+      expect(DIFFICULTY[d].bossHealth).toBeGreaterThan(0)
+      // Zero would freeze every walker in the game where it stands.
+      expect(DIFFICULTY[d].enemySpeed).toBeGreaterThan(0)
     }
   })
 
