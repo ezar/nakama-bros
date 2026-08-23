@@ -918,6 +918,193 @@ interface BossAnim {
   loop?: boolean
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Boss 5 — the oni of Onigashima
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The biggest build in the game: he has to read as the end of the road. */
+const ONI_BUILD: Build = {
+  hip: 33, thigh: 15.5, shin: 15, torso: 22, upper: 14, fore: 12.6,
+  headR: 7.6, hipW: 9, shW: 13, legR: 5, armR: 4.8, z: 3.2,
+}
+
+/**
+ * The kanabō: a studded iron club, and the whole silhouette's second read.
+ *
+ * Phase two chips the head of it — the same weapon after a beating rather than
+ * a different weapon — so the tell the player has learned still works.
+ */
+function kanabo(
+  ctx: CanvasRenderingContext2D,
+  at: Pt,
+  angle: number,
+  len: number,
+  phase: Phase,
+): void {
+  ctx.save()
+  ctx.translate(at[0], at[1])
+  ctx.rotate(angle)
+  const iron = C(TONE.ironDark)
+  // The head of the club is a heavy bar and the grip is thin: a shape that
+  // reads as weight even in silhouette. A uniform stick reads as a bone.
+  paint(ctx, roundRectPath(-3, -1.7, len * 0.34, 3.4, 1.4), iron, {
+    shadow: 0.34, radius: len * 0.3, pivot: [0, 0], rim: 0.4, line: 0.5,
+  })
+  paint(ctx, roundRectPath(len * 0.26, -3.6, len * 0.78, 7.2, 2.4), iron, {
+    shadow: 0.34, radius: len * 0.5, pivot: [len * 0.6, 0], rim: 0.45, line: 0.6, occlusion: 0.25,
+  })
+  // Studs, in two rows, thinning toward the grip. Dark iron with a lit crown,
+  // not bright steel — bright studs eat the club they are sitting on.
+  for (let i = 0; i < 6; i++) {
+    const x = len * (0.36 + i * 0.11)
+    if (phase === 2 && i > 3) continue
+    for (const dy of [-3.1, 3.1]) {
+      ctx.fillStyle = iron.line
+      ctx.fill(ellipsePath(x, dy, 1.5, 1.4))
+      ctx.fillStyle = i % 2 ? C(TONE.brass).core : iron.light
+      ctx.fill(ellipsePath(x, dy - 0.3, 0.9, 0.8))
+    }
+  }
+  if (phase === 2) {
+    // The head is broken off short, with the break left rough.
+    ctx.fillStyle = C(TONE.ironDark).line
+    ctx.fill(blob([[len * 0.78, -3], [len * 0.94, -1], [len * 0.8, 1.4], [len * 0.96, 3.2], [len * 0.7, 3]] as Pt[], 0.5))
+  } else {
+    glint(ctx, len * 0.86, -2.2, 2.6, 0.7, -0.3, PAL.white, 0.5)
+  }
+  ctx.restore()
+}
+
+function drawOniLord(s: Surface, t: number, mode: BossMode, phase: Phase): void {
+  const ctx = s.ctx
+  const cx = s.w * 0.5
+  const gy = s.h - 1.5
+  const b = ONI_BUILD
+  const cloth = phase === 1 ? TONE.oniCloth : mix(TONE.oniCloth, PAL.ink, 0.3)
+  const skin = phase === 1 ? TONE.oniSkin : mix(TONE.oniSkin, PAL.luffyRedDeep, 0.3)
+  const look: Look = {
+    cloth, legs: mix(cloth, PAL.ink, 0.3), skin,
+    boot: mix(PAL.dirtDeep, PAL.ink, 0.35), sleeve: 0, bulk: 1.14,
+  }
+  let pose = bossPose(mode, t, 1)
+  if (mode === 'windup') {
+    // Club all the way back over the shoulder: the one frame that warns you.
+    pose = P({ hip: 2.6, lean: -0.34, legN: [0.45, -0.7], legF: [-0.6, 0.8], armN: [-2.9, 0.5], armF: [-2.0, 0.8], footN: 0.3, footF: -0.3, drag: -6 })
+  } else if (mode === 'attack') {
+    pose = P({ hip: -1.8, lean: 0.5, legN: [1.0, -0.3], legF: [-0.9, 0.5], armN: [1.5, 0.1], armF: [0.5, 0.9], footN: 0.5, footF: -0.5, drag: 5 })
+  }
+  const rig = solveRig(cx, gy, b, pose)
+  const sway = Math.sin(t * Math.PI * 2)
+  const d = pose.drag
+  if (mode === 'defeat') dust(ctx, cx, gy, 30, mix(PAL.dusk, PAL.ink, 0.3))
+
+  drawFigure(ctx, rig, b, look, pose, {
+    back: (c, r) => {
+      // A war banner on a short staff behind the shoulder, torn in phase two.
+      const hem = tornEdge(
+        [r.sh[0] - 6 - d * 0.6, r.sh[1] + 18],
+        [r.sh[0] - 18 - d, r.sh[1] + 14],
+        phase === 2 ? 7 : 3,
+        phase === 2 ? 3 : 1,
+      )
+      paint(c, blob([
+        [r.sh[0] - 5, r.sh[1] - 6],
+        [r.sh[0] - 16 - d * 0.7, r.sh[1] - 3 + sway * 2],
+        ...hem,
+      ] as Pt[], 0.66), C(mix(PAL.luffyRedDeep, PAL.night, 0.25)), {
+        shadow: 0.44, radius: 12, pivot: r.sh, rim: 0.45, line: 0.55, occlusion: 0.24,
+      })
+      if (phase === 2) {
+        // Embers coming off him: the fight is burning down, and so is he.
+        sparks(c, r.sh[0] - 4, r.sh[1] + 2, 12, 5, PAL.ember, t * 7)
+      }
+    },
+    overTorso: (c, r) => {
+      // A knotted rope belt over a bare chest — the scale of him is the point,
+      // so nothing covers the torso.
+      const { px, py } = spine(r)
+      paint(c, limbPath(
+        r.hip[0] - px * 3 - 7, r.hip[1] - py * 3 - 1,
+        r.hip[0] + px * 3 + 7, r.hip[1] + py * 3 + 1, 3, 2.6,
+      ), C(TONE.strap), { shadow: 0.4, radius: 4, pivot: r.hip, rim: 0.4, line: 0.5 })
+      c.fillStyle = C(TONE.brass).core
+      c.fill(ellipsePath(r.hip[0] + 1, r.hip[1], 2.8, 2.4))
+      if (phase === 2) {
+        scar(c, [r.sh[0] - 4, r.sh[1] + 6], [r.sh[0] + 6, r.sh[1] + 16], C(PAL.luffyRedDeep).core)
+      }
+    },
+    front: (c, r) => {
+      const a = Math.atan2(r.handN[1] - r.elbowN[1], r.handN[0] - r.elbowN[0])
+      kanabo(c, r.handN, a, 28, phase)
+      if (mode === 'attack') sparks(c, r.handN[0] + 12, r.handN[1], 9, 6, PAL.ember, t * 12)
+    },
+    head: (c, r) => {
+      const rr = b.headR
+      const hx = r.head[0]
+      const hy = r.head[1] + (mode === 'defeat' ? 3 : 0)
+      paint(c, headPath(hx, hy, rr, 1.02), C(skin, 0.3), {
+        shadow: FACE_SHADOW, radius: rr * 1.3, pivot: [hx, hy], rim: 0.45, line: 0.5,
+      })
+      earAndNeck(c, hx, hy, rr, C(skin, 0.3))
+      // Two horns. Phase two takes the near one off at the root, which is the
+      // clearest possible statement that the fight has changed.
+      // Horns: thick at the root, swept back, ridged. Two thin white spikes
+      // read as ears, which is the one thing an oni must not read as.
+      const horn = C(mix(TONE.horn, PAL.sandDeep, 0.35))
+      const drawHorn = (dx: number, lean: number, len: number) => {
+        const bx = hx + dx
+        const by = hy - rr * 0.66
+        const tipX = bx + lean
+        const tipY = by - len
+        paint(c, blob([
+          [bx - 2.9, by + 0.6],
+          [bx + 2.9, by + 0.2],
+          [bx + lean * 0.5 + 1.5, by - len * 0.55],
+          [tipX, tipY],
+          [bx + lean * 0.5 - 1.4, by - len * 0.5],
+        ] as Pt[], 0.55), horn, {
+          shadow: 0.34, radius: len, pivot: [bx, by - len * 0.3], rim: 0.65, line: 0.55,
+        })
+        // Two growth ridges, so it reads as horn rather than as a painted cone.
+        c.strokeStyle = horn.line
+        c.lineWidth = 0.5
+        for (const u of [0.3, 0.55]) {
+          c.beginPath()
+          c.moveTo(bx - 2.4 + lean * u * 0.6, by - len * u)
+          c.lineTo(bx + 2.4 + lean * u * 0.6, by - len * u * 0.94)
+          c.stroke()
+        }
+      }
+      drawHorn(-rr * 0.58, -3.4, rr * 1.7)
+      if (phase === 1) drawHorn(rr * 0.6, 3.4, rr * 1.7)
+      else {
+        c.fillStyle = horn.line
+        c.fill(blob([
+          [hx + rr * 0.4, hy - rr * 0.6],
+          [hx + rr * 0.9, hy - rr * 0.66],
+          [hx + rr * 0.7, hy - rr * 0.95],
+        ] as Pt[], 0.4))
+      }
+      eyes3q(c, hx, hy + rr * 0.05, rr, { angry: true, color: phase === 1 ? PAL.gold : PAL.ember })
+      nose(c, hx, hy + rr * 0.3, rr, C(skin, 0.3))
+      mouth(c, hx, hy + rr * 0.66, rr, phase === 1 ? 'grim' : 'open')
+      // Tusks, under the mouth, so the profile reads oni even in silhouette.
+      for (const dx of [-rr * 0.34, rr * 0.36]) {
+        c.fillStyle = horn.light
+        c.fill(blob([
+          [hx + dx - 1.1, hy + rr * 0.58],
+          [hx + dx + 1.1, hy + rr * 0.58],
+          [hx + dx + 0.2, hy + rr * 0.1],
+        ] as Pt[], 0.35))
+      }
+      if (phase === 2) {
+        scar(c, [hx - rr * 0.2, hy - rr * 0.5], [hx + rr * 0.8, hy + rr * 0.35], C(PAL.luffyRedDeep).core)
+      }
+    },
+  })
+  if (mode === 'windup') sparks(ctx, rig.handN[0] - 10, rig.handN[1] - 8, 10, 6, PAL.ember, t * 6)
+}
+
 /**
  * The state set every boss ships, in both phases. Phase two is prefixed `p2-`,
  * so a boss entity swaps prefix when its health crosses the threshold and keeps
@@ -952,6 +1139,7 @@ const BOSSES: Record<string, [BossPainter, number, number]> = {
   'fishman-lord': [drawFishLord, 116, 86],
   'desert-lord': [drawSandLord, 116, 86],
   'sky-tyrant': [drawSkyTyrant, 120, 108],
+  'oni-lord': [drawOniLord, 152, 110],
 }
 
 export type BossKey = keyof typeof BOSSES

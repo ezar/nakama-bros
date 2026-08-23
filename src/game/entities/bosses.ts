@@ -2061,6 +2061,178 @@ export class Orb extends Entity {
 // Registry
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The oni of Onigashima — the last thing in the campaign.
+ *
+ * Three acts, and each one adds a verb rather than swapping the set: the club
+ * is the whole fight and everything else is the club doing more. Act one is
+ * two shockwaves and the floor coming up; act two puts him across the arena at
+ * speed; act three brings the sky into it. Nothing is removed, so a player who
+ * learned to read the wind-up in act one is still reading it in act three.
+ *
+ * He is deliberately the slowest boss in the game to open: the tell is long,
+ * the recovery is long, and the difficulty is that the room fills up.
+ */
+export class OniLord extends Boss {
+  displayName = 'Kaido'
+  sheetKey = 'oni-lord'
+  private charging = false
+  private chargeDir: 1 | -1 = 1
+  private struckTwice = false
+
+  constructor(x: number, y: number) {
+    super(x, y, 32, 60)
+    this.maxHealth = 12
+    this.health = 12
+    this.accent = PAL.ember
+    this.phases = [
+      { at: 1, interval: 1.6, speed: 0.9, intensity: 0.85, moves: ['slam', 'quake'] },
+      { at: 0.66, interval: 1.3, speed: 1.1, intensity: 0.95, moves: ['charge', 'slam', 'quake'] },
+      { at: 0.33, interval: 1.05, speed: 1.2, intensity: 1, moves: ['thunder', 'slam', 'charge'] },
+    ]
+
+    this.moves = {
+      // The club comes down and the floor answers in both directions. Jumping
+      // one wave is not enough, which is what makes the arena feel small.
+      slam: {
+        name: 'slam', tell: 0.65, active: 0.5, recover: 1.4, color: PAL.ember,
+        fire: (world) => {
+          this.facePlayer(world)
+          world.audio.playSfx('boss-hit', { volume: 0.5, rate: 0.6 })
+          world.shake(0.35)
+          world.hitstop(6)
+          const gy = groundYAt(world, this.x, this.y - 8)
+          for (const dir of [1, -1] as const) {
+            world.spawn(new Shockwave(this.x + dir * 20, gy, dir, 170, PAL.ember))
+          }
+        },
+        during: (t, _dt, world) => {
+          // A second, faster pair a beat later — the same attack, said twice.
+          if (t < 0.55 || this.struckTwice) return
+          this.struckTwice = true
+          const gy = groundYAt(world, this.x, this.y - 8)
+          world.audio.playSfx('boss-hit', { volume: 0.4, rate: 0.8 })
+          for (const dir of [1, -1] as const) {
+            world.spawn(new Shockwave(this.x + dir * 20, gy, dir, 240, PAL.ember))
+          }
+        },
+        end: () => {
+          this.struckTwice = false
+        },
+      },
+
+      // The ground comes up in three places around where you are standing.
+      quake: {
+        name: 'quake', tell: 0.7, active: 0.95, recover: 1.45, color: PAL.dirtDeep,
+        fire: (world) => {
+          world.audio.playSfx('break', { volume: 0.5, rate: 0.9 })
+          const p = world.player()
+          const x0 = p ? p.x : this.x
+          for (let i = 0; i < 3; i++) {
+            const x = clamp(x0 + (i - 1) * 44, this.arenaL + 16, this.arenaR - 16)
+            const gy = groundYAt(world, x, this.y - 8)
+            world.spawn(new Warning(x, gy, 0.4 + i * 0.14, PAL.ember, 14, (w) => {
+              w.spawn(new Column(x, gy, 54, PAL.dirtDeep, PAL.ember))
+            }))
+          }
+        },
+      },
+
+      // He crosses the room shoulder-first. There is one way past him and it
+      // is over the top, which is the same jump the whole game has taught.
+      charge: {
+        name: 'charge', tell: 0.8, active: 0.9, recover: 1.6, color: PAL.danger,
+        start: (world) => {
+          this.facePlayer(world)
+          this.chargeDir = this.dirToPlayer(world)
+          world.audio.playSfx('warn', { volume: 0.5, rate: 0.7 })
+        },
+        fire: (world) => {
+          this.charging = true
+          world.shake(0.2)
+        },
+        during: (_t, dt, world) => {
+          this.body.vx = this.chargeDir * 260
+          this.facing = this.chargeDir
+          if (this.x <= this.arenaL + this.body.w || this.x >= this.arenaR - this.body.w) {
+            // Into the wall: he stops himself, and that is the opening.
+            this.charging = false
+            this.body.vx = 0
+            world.shake(0.4)
+            world.hitstop(8)
+          }
+          if (world.rng.bool(0.5)) {
+            world.particles.emit({
+              x: this.x - this.chargeDir * 14, y: this.y - world.rng.range(2, this.body.h * 0.6),
+              vx: -this.chargeDir * world.rng.range(40, 90), vy: world.rng.range(-30, 10),
+              life: 0.45, lifeVar: 0.2, size: 2.6, sizeEnd: 0.4,
+              color: PAL.ember, colorEnd: rgba(PAL.danger, 0), shape: 'spark', additive: true,
+              drag: 0.05,
+            } as never)
+          }
+          void dt
+        },
+        end: () => {
+          this.charging = false
+          this.body.vx = 0
+        },
+      },
+
+      // Act three: the roof of the island joins in.
+      thunder: {
+        name: 'thunder', tell: 0.75, active: 1.3, recover: 1.35, color: PAL.magic,
+        fire: (world) => {
+          world.audio.playSfx('warn', { volume: 0.45, rate: 1.4 })
+          const p = world.player()
+          for (let i = 0; i < 3; i++) {
+            const x = clamp(
+              (p ? p.x : this.x) + world.rng.range(-70, 70),
+              this.arenaL + 14, this.arenaR - 14,
+            )
+            const gy = groundYAt(world, x, this.y - 8)
+            world.spawn(new Warning(x, gy, 0.32 + i * 0.22, PAL.magic, 12, (w) => {
+              w.spawn(new Lightning(x, this.arenaTop, gy, Math.floor(x)))
+            }))
+          }
+        },
+      },
+    }
+  }
+
+  /**
+   * He walks, and that is all. Where the other bosses circle or keep a
+   * fighting distance, this one closes: the pressure of the fight is that the
+   * room keeps getting smaller, and standing still is never the answer.
+   */
+  protected move(dt: number, world: World): void {
+    if (!this.charging) this.facePlayer(world)
+    this.body.vy = Math.min(this.body.vy + PHYS.gravity * dt, PHYS.maxFall)
+    if (this.charging) return
+    if (this.state === 'wait') {
+      const p = world.player()
+      if (p) {
+        const gap = Math.abs(p.x - this.x)
+        // Close, but never stand on top of the player: an unavoidable contact
+        // hit is not difficulty.
+        const dir = gap < 52 ? -this.facing : this.facing
+        this.body.vx = dir * 40 * this.phases[this.phase].speed
+        this.playState('walk')
+      }
+    } else if (this.state === 'open' || this.state === 'stagger') {
+      this.body.vx *= 0.82
+    } else {
+      this.body.vx *= 0.9
+    }
+  }
+
+  protected onIntro(world: World): void {
+    world.audio.playSfx('boss-die', { volume: 0.35, rate: 0.5 })
+    world.shake(0.5)
+  }
+}
+
+registerEntity('boss-kaido', (x, y) => new OniLord(x, y))
+
 registerEntity('boss-buggy', (x, y) => new BuggyBoss(x, y))
 registerEntity('boss-fishman', (x, y) => new FishmanWarlord(x, y))
 registerEntity('boss-desert', (x, y) => new DesertWarlord(x, y))
