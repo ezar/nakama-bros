@@ -8,6 +8,7 @@ import { useCountUp } from '../hooks/useCountUp'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { useShortViewport } from '../hooks/useShortViewport'
+import { useFitScale } from '../hooks/useFitScale'
 import { Paper } from '../art/Paper'
 import { BerryIcon, FragmentIcon, Nail, WaxSeal } from '../art/Icons'
 import { RANK_COLOR, UI, formatBerry, rankFor } from '../theme'
@@ -98,6 +99,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
+  const fit = useFitScale()
   const crewId = useProgress((s) => s.crew) as CrewId
   const crew = CREW[crewId] ?? CREW.luffy
   const best = useProgress((s) => s.records[result.levelId]?.bestScore ?? 0)
@@ -176,8 +178,27 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
           centred inside a fixed box, so on a phone held sideways the poster's
           head and the buttons under it were simply cut off — and the buttons
           are the whole point of this screen. */}
-      <div className={`flex min-h-full flex-col px-4 ${short ? 'py-2' : 'py-4'}`}>
-        <div className="m-auto flex flex-col items-center">
+      <div
+        className="flex min-h-full flex-col"
+        style={{
+          paddingTop: `calc(${short ? '0.5rem' : '1rem'} + var(--safe-t))`,
+          paddingRight: 'calc(1rem + var(--safe-r))',
+          paddingBottom: `calc(${short ? '0.5rem' : '1rem'} + var(--safe-b))`,
+          paddingLeft: 'calc(1rem + var(--safe-l))',
+        }}
+      >
+        {/* Scrolling is the fallback, not the plan: the poster shrinks as a
+            whole until the buttons under it are on screen. */}
+        <div className="m-auto" style={{ height: fit.height }}>
+        <div
+          ref={fit.ref as (el: HTMLDivElement | null) => void}
+          className="flex flex-col items-center"
+          style={
+            fit.scale < 1
+              ? { transform: `scale(${fit.scale})`, transformOrigin: 'top center' }
+              : undefined
+          }
+        >
         <m.div
           initial={motion ? { y: -620, rotate: -13 } : false}
           animate={{ y: 0, rotate: -1.4 }}
@@ -313,6 +334,7 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
             </button>
           ))}
         </m.div>
+        </div>
         </div>
       </div>
     </m.div>

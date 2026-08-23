@@ -138,8 +138,13 @@ export function LevelIntroScreen({ level, onDone }: { level: LevelDef; onDone: (
       </m.div>
 
       <div
-        className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 font-body text-[10px] uppercase tracking-[0.28em]"
-        style={{ color: UI.paperDim, textShadow: '0 1px 4px rgba(0,0,0,0.9)', opacity: 0.85 }}
+        className="absolute left-1/2 z-10 -translate-x-1/2 font-body text-[10px] uppercase tracking-[0.28em]"
+        style={{
+          bottom: 'calc(1rem + var(--safe-b))',
+          color: UI.paperDim,
+          textShadow: '0 1px 4px rgba(0,0,0,0.9)',
+          opacity: 0.85,
+        }}
       >
         {t('intro.skip')}
       </div>

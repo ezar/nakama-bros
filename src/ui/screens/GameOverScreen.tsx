@@ -4,6 +4,7 @@ import { useT } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { useShortViewport } from '../hooks/useShortViewport'
+import { useFitScale } from '../hooks/useFitScale'
 import { Paper } from '../art/Paper'
 import { JollyRoger, WaxSeal } from '../art/Icons'
 import { UI } from '../theme'
@@ -17,6 +18,7 @@ export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMen
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
+  const fit = useFitScale()
   const items = useMemo(
     () => [
       { label: t('over.retry'), run: onRetry, primary: true },
@@ -49,9 +51,24 @@ export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMen
           sideways both buttons used to sit just past the bottom edge, which on
           a Game Over screen means no way to carry on at all. */}
       <div
-        className="flex min-h-full flex-col px-4 py-4"
+        className="flex min-h-full flex-col"
+        style={{
+          paddingTop: 'calc(1rem + var(--safe-t))',
+          paddingRight: 'calc(1rem + var(--safe-r))',
+          paddingBottom: 'calc(1rem + var(--safe-b))',
+          paddingLeft: 'calc(1rem + var(--safe-l))',
+        }}
       >
-        <div className={`m-auto flex flex-col items-center ${short ? 'gap-4' : 'gap-7'}`}>
+        <div className="m-auto" style={{ height: fit.height }}>
+        <div
+          ref={fit.ref as (el: HTMLDivElement | null) => void}
+          className={`flex flex-col items-center ${short ? 'gap-4' : 'gap-7'}`}
+          style={
+            fit.scale < 1
+              ? { transform: `scale(${fit.scale})`, transformOrigin: 'top center' }
+              : undefined
+          }
+        >
       <m.div
         initial={{ scale: motion ? 1.35 : 1, opacity: 0, rotate: motion ? -9 : -3 }}
         animate={{ scale: 1, opacity: 1, rotate: -3 }}
@@ -106,6 +123,7 @@ export function GameOverScreen({ onRetry, onMenu }: { onRetry: () => void; onMen
             {it.label}
           </button>
         ))}
+        </div>
         </div>
         </div>
       </div>

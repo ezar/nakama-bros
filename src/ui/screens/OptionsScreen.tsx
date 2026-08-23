@@ -133,7 +133,16 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           sideways the top and the bottom were simply cut off — which is where
           the legal notice and the build stamp live. The lantern wash stays put
           outside the scroller. */}
-      <div className="relative z-10 h-full w-full overflow-y-auto overscroll-contain p-6">
+      <div
+        className="relative z-10 h-full w-full overflow-y-auto overscroll-contain"
+        style={{
+          padding: '1.5rem',
+          paddingTop: 'calc(1.5rem + var(--safe-t))',
+          paddingRight: 'calc(1.5rem + var(--safe-r))',
+          paddingBottom: 'calc(1.5rem + var(--safe-b))',
+          paddingLeft: 'calc(1.5rem + var(--safe-l))',
+        }}
+      >
         {/* `m-auto`, not `justify-center`: a centred flex child that overflows
             spills past the top of the scroll box and cannot be scrolled back to. */}
         <div className="flex min-h-full flex-col">
