@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ALL_LEVELS, WORLDS, levelById, nextLevelId } from './index'
 import { formatIssue, validateLevel } from './validate'
 import { LevelBuilder, C } from './builder'
+import { tower } from './props'
 import { decodeRows } from './tileCodec'
 import { Tile } from '../../types'
 
@@ -107,6 +108,23 @@ describe('LevelBuilder', () => {
     expect(validateLevel({
       ...ALL_LEVELS[0], w: 10, h: 12, rows: b.rows(), spawns: [], startX: 1, startY: 9,
     }).filter((i) => i.message.includes('ladder'))).toEqual([])
+  })
+
+  it('leaves a doorway under a tower, so its ladder can be walked to', () => {
+    const b = new LevelBuilder(20, 20)
+    b.ground(0, 19, 16)
+    const t = tower(b, 6, 10, 16, 6)
+    // Two clear rows between the piers and the floor: the street runs through
+    // the tower. Sealed piers put the ladder behind a wall, which is how every
+    // tower in the campaign shipped once.
+    for (const x of [6, 10]) {
+      expect(b.get(x, 15)).toBe(C.air)
+      expect(b.get(x, 14)).toBe(C.air)
+      expect(b.get(x, 13)).toBe(C.solid)
+    }
+    // And the ladder still reaches the ground it is now approachable from.
+    expect(b.get(t.ladder, 15)).toBe(C.climb)
+    expect(b.get(t.ladder, t.deck)).toBe(C.climb)
   })
 
   it('places a floor-standing spawn on the floor it finds', () => {
