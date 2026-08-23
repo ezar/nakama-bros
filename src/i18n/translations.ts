@@ -15,6 +15,8 @@ export const TRANSLATIONS = {
     'title.tagline': 'La aventura pirata de plataformas',
     'title.press': 'Pulsa cualquier tecla',
     'title.menu': 'Menú principal',
+    'title.lamp.off': 'Encender el farol',
+    'title.lamp.on': 'Apagar el farol',
     'title.fanmade': 'Proyecto de fans · arte generado por código',
 
     // ── Loading ──
@@ -108,7 +110,7 @@ export const TRANSLATIONS = {
     'difficulty.easy': 'Fácil',
     'difficulty.normal': 'Normal',
     'difficulty.hard': 'Difícil',
-    'difficulty.note.easy': '5 vidas, empiezas en gear 2 y el reloj va sobrado.',
+    'difficulty.note.easy': '5 vidas, gear 2 de salida, reloj de sobra, y enemigos que avisan más y caen antes.',
     'difficulty.note.normal': '3 vidas. La aventura tal y como está pensada.',
     'difficulty.note.hard': 'Una sola vida, menos tiempo y casi nada de tregua.',
     'difficulty.same': 'El salto y la carrera son iguales en las tres.',
@@ -181,6 +183,8 @@ export const TRANSLATIONS = {
     'title.tagline': 'The pirate platforming adventure',
     'title.press': 'Press any key',
     'title.menu': 'Main menu',
+    'title.lamp.off': 'Light the lantern',
+    'title.lamp.on': 'Put the lantern out',
     'title.fanmade': 'Fan project · every pixel drawn in code',
 
     'loading.title': 'Readying the Going Merry',
@@ -266,7 +270,7 @@ export const TRANSLATIONS = {
     'difficulty.easy': 'Easy',
     'difficulty.normal': 'Normal',
     'difficulty.hard': 'Hard',
-    'difficulty.note.easy': '5 lives, you start in gear 2, and the clock is generous.',
+    'difficulty.note.easy': '5 lives, you start in gear 2, a generous clock, and enemies that telegraph longer and go down sooner.',
     'difficulty.note.normal': '3 lives. The adventure as it was built.',
     'difficulty.note.hard': 'One life, less time, and almost no mercy.',
     'difficulty.same': 'The jump and the run are identical on all three.',

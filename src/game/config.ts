@@ -104,6 +104,14 @@ export const TIER_MODS: Record<PowerTier, {
  * changes is how much rope you get — lives, clock, the mercy window after a hit
  * — and, on Fácil, that you start in gear 2, which is worth one free mistake
  * because a hit drops a tier before it kills.
+ *
+ * What the opposition does changes too, but only in the same spirit: on Fácil
+ * an attack is telegraphed for longer and the window afterwards stays open for
+ * longer, so the fight is read at a slower tempo — the moves themselves, and
+ * the order they come in, are the ones you will meet on Normal. Bosses also
+ * cost fewer clean hits, because a boss you can dodge all day but cannot
+ * finish is not a hard fight, it is a long one, and that was the complaint
+ * this row exists to answer.
  */
 export const DIFFICULTY: Record<Difficulty, {
   lives: number
@@ -113,10 +121,31 @@ export const DIFFICULTY: Record<Difficulty, {
   invuln: number
   /** Multiplier on every level's clock. */
   time: number
+  /** Multiplier on how fast the ordinary enemies walk, charge and pounce. */
+  enemySpeed: number
+  /**
+   * Multiplier on every wind-up, recovery and pause an enemy or a boss takes.
+   * Above one the whole fight is read at a slower tempo: more time to see what
+   * is coming, and a longer window afterwards to answer it. Never touches how
+   * long an attack is *live* — a slower punch that hangs around longer would
+   * be harder to get past, not easier.
+   */
+  enemyTiming: number
+  /** Multiplier on how many clean hits a boss costs. */
+  bossHealth: number
 }> = {
-  easy: { lives: 5, startTier: 'gear2', invuln: 1.6, time: 1.5 },
-  normal: { lives: 3, startTier: 'base', invuln: 1, time: 1 },
-  hard: { lives: 1, startTier: 'base', invuln: 0.7, time: 0.85 },
+  easy: {
+    lives: 5, startTier: 'gear2', invuln: 1.6, time: 1.5,
+    enemySpeed: 0.85, enemyTiming: 1.35, bossHealth: 0.7,
+  },
+  normal: {
+    lives: 3, startTier: 'base', invuln: 1, time: 1,
+    enemySpeed: 1, enemyTiming: 1, bossHealth: 1,
+  },
+  hard: {
+    lives: 1, startTier: 'base', invuln: 0.7, time: 0.85,
+    enemySpeed: 1, enemyTiming: 1, bossHealth: 1,
+  },
 }
 
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']

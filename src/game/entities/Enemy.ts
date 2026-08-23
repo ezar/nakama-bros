@@ -130,6 +130,7 @@ export abstract class Enemy extends Entity {
   /** Seconds of squash animation before removal. */
   protected dyingFor = -1
   private cooldownLeft = 0
+  private paced = false
   /** One strike per attack: set when `strikeBox` connects, cleared on entry. */
   protected struck = false
 
@@ -185,6 +186,7 @@ export abstract class Enemy extends Entity {
   update(dt: number, world: World): void {
     this.tickAnim(dt)
     this.sheet = this.resolveSheet()
+    if (!this.paced) this.applyDifficulty(world)
 
     if (this.dyingFor >= 0) {
       // A flattened body stays flattened where it fell: letting gravity keep
@@ -216,6 +218,29 @@ export abstract class Enemy extends Entity {
     }
 
     this.checkPlayer(world)
+  }
+
+  /**
+   * Take the run's difficulty, once, before the first step is simulated.
+   *
+   * The fields are rewritten rather than multiplied at each read: `speed` is
+   * used by a dozen subclasses in their own way and `alertTime` is what the
+   * telegraph glyph counts against, so scaling the source keeps every one of
+   * them honest without asking any of them to know about difficulty.
+   *
+   * `attackTime` is deliberately left alone. It is the window in which the
+   * strike is live, and stretching that would make the attack *harder* to get
+   * past, which is the opposite of the point.
+   */
+  private applyDifficulty(world: World): void {
+    this.paced = true
+    const d = world.difficulty
+    if (d.enemySpeed !== 1) this.speed *= d.enemySpeed
+    if (d.enemyTiming !== 1) {
+      this.alertTime *= d.enemyTiming
+      this.recoverTime *= d.enemyTiming
+      this.attackCooldown *= d.enemyTiming
+    }
   }
 
   /** Walls and ledges only turn an enemy that is actually walking a beat. */
