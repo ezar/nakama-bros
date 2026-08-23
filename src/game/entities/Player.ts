@@ -23,6 +23,7 @@ import {
 import type { SignatureDef } from '../config'
 import { art } from '../../art'
 import { clamp, approach, rectsOverlap } from '../../engine/math'
+import { newLean, resetLean, stepLean } from '../lean'
 import { cel } from '../../art/color'
 import { PAL } from '../../art/palette'
 
@@ -233,8 +234,13 @@ export class Player extends Entity {
     // ── Stance ───────────────────────────────────────────────────────────────
     this.updateStance(dt, world, grounded, inWater, maxSpeed)
 
-    // ── Signature move ───────────────────────────────────────────────────────
+    // ── Body language ────────────────────────────────────────────────────────
     if (this.turnTimer > 0) this.turnTimer = Math.max(0, this.turnTimer - dt)
+    // Before the horizontal pass, so the lean answers the velocity the player
+    // was actually drawn at last frame rather than pre-empting this one.
+    stepLean(this.leanState, this.body.vx, grounded, dt)
+
+    // ── Signature move ───────────────────────────────────────────────────────
     this.updateSignature(dt, world, grounded, inWater)
 
     // ── Horizontal ───────────────────────────────────────────────────────────
@@ -632,6 +638,9 @@ export class Player extends Entity {
 
   /** Seconds left of the turn-around pivot; the sprite flips instantly, the body does not. */
   private turnTimer = 0
+
+  /** Secondary motion: see `src/game/lean.ts`. */
+  private leanState = newLean()
 
   private updateSignature(dt: number, world: World, grounded: boolean, inWater: boolean): void {
     this.sigCooldown = Math.max(0, this.sigCooldown - dt)
@@ -1108,6 +1117,9 @@ export class Player extends Entity {
   kill(world: World): void {
     if (this.state === 'dead') return
     this.state = 'dead'
+    // The update stops here, so the lean would otherwise freeze at whatever it
+    // held on the last live frame and be there waiting on respawn.
+    resetLean(this.leanState)
     this.stateTimer = 0
     this.cancelMoves()
     this.body.collidesWithTiles = false
@@ -1236,6 +1248,11 @@ export class Player extends Entity {
     // Pressed against a wall, the body leans into it — a character sliding
     // down a surface they are not touching reads as a bug.
     ctx.translate(sx + this.wallDir * 3, sy)
+    // Shear about the feet, in world space and before the facing mirror: the
+    // lean belongs to the direction the body is accelerating, not to the
+    // direction it happens to be drawn.
+    const lean = this.leanState.lean
+    if (lean !== 0) ctx.transform(1, 0, lean, 1, 0, 0)
     ctx.scale(this.squashX * scale, this.squashY * scale)
     if (this.facing === -1) ctx.scale(-1, 1)
     if (this.wallDir !== 0) {
