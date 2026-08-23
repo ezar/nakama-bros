@@ -217,8 +217,64 @@ export function validateLevel(def: LevelDef): Issue[] {
   // ── 7. Reachability ────────────────────────────────────────────────────────
   out.push(...reachability(def, g))
 
+  // ── 8. Sealed pockets ──────────────────────────────────────────────────────
+  out.push(...sealed(def, g))
+
   return out
 }
+
+/**
+ * Pickups walled off from the rest of the map.
+ *
+ * Section 7 is generous on purpose, and its generosity has a blind spot: it
+ * steps from one standing spot to another within a jump's reach without asking
+ * whether anything stands between them. A pocket at street level, sealed by a
+ * pier at each end, is a jump of five tiles from the pavement — so it read as
+ * reachable, and two Poneglyph fragments sat inside walls nobody could pass.
+ *
+ * This is the opposite kind of test: no jumps, no reach, just whether the
+ * item's tile is connected to the start at all by tiles a body could occupy.
+ * It is a lower bound and it cannot cry wolf — bricks and crumbling blocks
+ * count as open because they break, slopes count as open because half of one
+ * is air, and everything else that is flagged is genuinely bricked in.
+ */
+function sealed(def: LevelDef, g: Grid): Issue[] {
+  // Only tiles nothing can get through. Breakables and slopes stay open, so a
+  // flag here is never a matter of opinion.
+  const shut = (x: number, y: number): boolean => {
+    const c = g.at(x, y)
+    return c === C.solid || c === C.question || c === C.used || c === C.ice || c === C.bouncy
+  }
+  const seen = new Uint8Array(def.w * def.h)
+  const key = (x: number, y: number) => y * def.w + x
+  const queue: number[] = [key(def.startX, def.startY)]
+  while (queue.length) {
+    const k = queue.pop() as number
+    const x = k % def.w
+    const y = Math.floor(k / def.w)
+    if (x < 0 || x >= def.w || y < 0 || y >= def.h) continue
+    if (seen[k] || shut(x, y)) continue
+    seen[k] = 1
+    queue.push(key(x + 1, y), key(x - 1, y), key(x, y + 1), key(x, y - 1))
+  }
+
+  const out: Issue[] = []
+  for (const s of def.spawns) {
+    if (!PICKUPS.has(s.type)) continue
+    if (seen[key(s.tx, s.ty)]) continue
+    out.push({
+      level: def.id,
+      severity: 'error',
+      tx: s.tx,
+      ty: s.ty,
+      message: `${s.type} is walled in — no route from the start reaches its tile`,
+    })
+  }
+  return out
+}
+
+/** Things the player is meant to be able to touch. */
+const PICKUPS = new Set(['berry', 'meat', 'fruit', 'fragment', 'oneup', 'checkpoint', 'goal'])
 
 /**
  * A deliberately generous flood over standable spots.
