@@ -1405,7 +1405,7 @@ export class BuggyBoss extends Boss {
  * in a row, and the only safe place is behind him.
  */
 export class FishmanWarlord extends Boss {
-  displayName = 'Jefe Gyojin'
+  displayName = 'Arlong'
   sheetKey = 'fishman-lord'
   private dashesLeft = 0
   private airborne = false
@@ -1589,7 +1589,7 @@ export class FishmanWarlord extends Boss {
  * moment he re-forms.
  */
 export class DesertWarlord extends Boss {
-  displayName = 'Señor de la Arena'
+  displayName = 'Crocodile'
   sheetKey = 'desert-lord'
   private scattered = false
   private scatterFrom = 0
@@ -1817,7 +1817,7 @@ export class DesertWarlord extends Boss {
  * for you, in the second and a half you have to reach it.
  */
 export class SkyTyrant extends Boss {
-  displayName = 'Tirano del Cielo'
+  displayName = 'Enel'
   sheetKey = 'sky-tyrant'
   private hoverY = 0
   private driftPhase = 0

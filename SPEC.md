@@ -59,12 +59,17 @@ siempre la última de la isla: la meta que hay pasada la arena no se activa
 mientras el jefe siga vivo, así que un jefe en mitad de una isla dejaría la
 campaña cortada ahí. Thriller Bark es la que falta.
 
+Los jefes llevan nombre propio, como la tripulación: son homenaje, y el diseño
+es de cosecha propia. El de Alabasta se llamaba «Señor de la Arena» teniendo
+gancho en la mano y deshaciéndose en arena, que era describir a un personaje en
+vez de nombrarlo.
+
 | Isla | Fases | Jefe |
 |---|---|---|
 | East Blue | 3 | Buggy |
-| Alabasta | 3 | Señor de la Arena |
-| Skypiea | 3 | Tirano del Cielo |
-| Water 7 | 3 | Jefe Gyojin |
+| Alabasta | 3 | Crocodile |
+| Skypiea | 3 | Enel |
+| Water 7 | 3 | Arlong |
 | Thriller Bark | 2 | — |
 | Wano | 3 | Kaido |
 
