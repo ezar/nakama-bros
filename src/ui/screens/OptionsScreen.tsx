@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 import { motion as m } from 'framer-motion'
 import { useSettings } from '../../store/settingsStore'
+import { useProgress } from '../../store/progressStore'
 import { useT } from '../../i18n/useT'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
 import { buildLabel, copyrightYears } from '../../build'
+import { GiftDrawing } from '../GiftDrawing'
 
 /**
  * Settings, written on the same sheet as everything else.
@@ -101,6 +103,7 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
   const t = useT()
   const s = useSettings()
   const motion = useUiMotion()
+  const giftEarned = useProgress((p) => p.giftEarned)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -225,6 +228,15 @@ export function OptionsScreen({ onBack }: { onBack: () => void }) {
               <p>{t('legal.fan')}</p>
               <p>{t('legal.code', { years: copyrightYears })}</p>
             </div>
+            {/* The drawing, once it has been won. This is its home: the panel
+                that already carries the credits is where a "drawn by" belongs,
+                and unlike the result poster it is somewhere you can go back to. */}
+            {giftEarned && (
+              <div className="mt-4 flex flex-col items-center">
+                <GiftDrawing width={188} tilt={0} />
+              </div>
+            )}
+
             {/* The build. The title screen hides its copy on a narrow screen,
                 and a phone running this as a cached PWA is exactly where
                 someone needs to check which one they are looking at. */}

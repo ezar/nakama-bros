@@ -3,8 +3,9 @@
 ## Qué es esto
 
 Un plataformas 2D al nivel de los clásicos de Nintendo, con la tripulación del
-Sombrero de Paja. Todo el arte se genera por código (no hay ni un solo PNG de
-assets): sprites, tiles, cielos y efectos se rasterizan en canvas al arrancar.
+Sombrero de Paja. Todo el arte se genera por código: sprites, tiles, cielos y
+efectos se rasterizan en canvas al arrancar. La única excepción, deliberada y
+documentada más abajo, es un dibujo hecho a mano que el juego da como premio.
 
 Lee `SPEC.md` antes de tocar el motor.
 
@@ -128,6 +129,21 @@ que el agua empieza a moverse. Los valores viven por triplicado —
 `scripts/icons.mjs`, el `<style>` de `index.html` y `src/ui/art/SeaScene.tsx` —
 porque la tarjeta tiene que pintar sin bundle y el PNG sin navegador. Si tocas
 uno, toca los tres y regenera los PNG.
+
+## La única excepción a «todo por código»
+
+`public/drawings/luffy.jpg` es un dibujo hecho a mano. Es el único fichero de
+arte del repositorio que no sale de un algoritmo, y está ahí a propósito: lo
+dibujó la hija del autor y el juego lo entrega como premio al sacar rango S,
+que exige todos los fragmentos de la fase y una vuelta sin morir. Después vive
+en el panel de Opciones, junto a los créditos.
+
+No lo conviertas en código, no lo regeneres y no lo borres por incoherente con
+la regla de arriba. La regla sigue en pie para todo lo demás.
+
+Se muestra desde `src/ui/GiftDrawing.tsx`, que también guarda el nombre de la
+autora en un único sitio (`ARTIST`). El desbloqueo es `giftEarned` en
+`progressStore`, y sobrevive a `reset()` a propósito.
 
 ## Arte promocional
 
