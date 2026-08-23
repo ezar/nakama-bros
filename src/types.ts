@@ -144,6 +144,15 @@ export interface Frame {
   /** Offset in world units from the entity origin (feet-centre) to the frame's top-left. */
   ox: number
   oy: number
+  /**
+   * How tall the frame actually *draws*, in world units above the origin.
+   *
+   * Not the same as `-oy`, which is the frame box and is identical for every
+   * pose in a sheet. Anything that has to fit a drawing into a gap — a crouch
+   * under a low ceiling — needs the pose's own height, and reading it off the
+   * box instead means squashing a standing figure in an open field.
+   */
+  tall: number
   /** Frame duration in seconds. */
   dur: number
 }

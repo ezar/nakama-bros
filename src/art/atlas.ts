@@ -50,6 +50,30 @@ export interface SheetOptions {
  * a clean alpha channel, then blitted into one sheet canvas — a single texture,
  * one drawImage per sprite at runtime, no per-frame path work in the game loop.
  */
+/**
+ * How tall a frame draws, in world units above the entity origin.
+ *
+ * Every frame in a sheet shares one box, so `-oy` says the same thing about a
+ * standing figure and a crouching one. Whatever has to fit a drawing through a
+ * gap needs to know how tall the drawing *is*, which is only knowable here,
+ * where the pixels are.
+ *
+ * Scanned a row at a time from the top with an early exit rather than pulling
+ * the whole frame: the head is near the top of the box, so this reads a couple
+ * of dozen rows out of a hundred and fifty.
+ */
+function drawnTall(s: Surface, oy: number): number {
+  const { ctx, canvas } = s
+  const w = canvas.width
+  for (let r = 0; r < canvas.height; r++) {
+    const d = ctx.getImageData(0, r, w, 1).data
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] > 8) return Math.max(0, -(oy + r / ART_SCALE))
+    }
+  }
+  return 0
+}
+
 export class SheetBuilder {
   private specs: Array<{ name: string; spec: AnimSpec; frames: FrameSpec[] }> = []
 
@@ -117,7 +141,7 @@ export class SheetBuilder {
           surface: s,
           frame: {
             sx: rowW, sy: sheetH, sw: pw, sh: ph,
-            w: fw, h: fh, ox, oy, dur: f.dur,
+            w: fw, h: fh, ox, oy, tall: drawnTall(s, oy), dur: f.dur,
           },
         }
         row.push(placed)

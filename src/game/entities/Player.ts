@@ -1353,7 +1353,11 @@ export class Player extends Entity {
     // drawn height of the frame and squash it into the stance hitbox, rather
     // than guessing a constant that clips through a one-tile ceiling.
     if (this.stance !== 'stand') {
-      const drawnH = Math.max(1, -frame.oy)
+      // The pose's own height, not the frame box. `-frame.oy` is the same 48.5
+      // for every frame in the sheet, so measuring against it squashed the
+      // crouch to 62% and stretched it to 117% *everywhere*, open sky included
+      // — which is the pancake the comment below was written to prevent.
+      const drawnH = Math.max(1, frame.tall)
       // Fit to the headroom, not to the hitbox: the hitbox is a promise about
       // where the body cannot go, and squashing to it in the open would draw a
       // pancake standing in a field.
