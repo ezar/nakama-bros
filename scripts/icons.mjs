@@ -75,60 +75,44 @@ function iconSvg(size, { inset = 0.13, ring = true } = {}) {
  */
 function splashSvg(w, h) {
   const min = Math.min(w, h)
-  const wide = w > h
-  const horizon = h * 0.62
-  const markSize = min * (wide ? 0.32 : 0.38)
-  const mx = (w - markSize) / 2
-  // The drawn mark runs to 0.83 of its box, so this stands it just clear of
-  // the water rather than floating in the middle of the sky.
-  const my = horizon - markSize * 0.92
-  // "NAKAMA BROS" measures about 7.8em in Rubik 800; cap the size by that so
-  // a tall, narrow device does not run the wordmark off both edges.
-  const titleSize = Math.min(min * (wide ? 0.1 : 0.115), (w * 0.78) / 7.8)
-  const baseline = horizon + markSize * (wide ? 0.42 : 0.46)
+  const horizon = h * 0.64
 
-  // A deterministic scatter of stars — a real PRNG would churn all forty PNGs
-  // on every re-run of this script for nothing. The sin-hash this used to
-  // employ correlates badly for consecutive integers and piled the whole field
-  // into one corner, so it is a plain LCG instead, seeded the same every time.
-  let seed = 20260822
-  const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296)
-  const stars = Array.from({ length: 120 }, () => {
-    const x = rnd() * w
-    const t = rnd()
-    const r = min * (0.0009 + (1 - t) * 0.0012)
-    return `<circle cx="${x.toFixed(1)}" cy="${(t * horizon).toFixed(1)}" r="${r.toFixed(2)}"`
-      + ` opacity="${(0.16 + (1 - t) * 0.62).toFixed(2)}"/>`
-  }).join('')
-
-  // A ship hull-down on the horizon, dark against the last of the sun. Small
-  // on purpose: it sets the scale of the sea without competing with the mark.
-  const shipH = min * 0.078
-  const sx = w * (wide ? 0.78 : 0.85)
+  // "NAKAMA BROS" measures about 7.8em in Rubik 800; cap the size by that so a
+  // tall, narrow device does not run the wordmark off both edges.
+  const titleSize = Math.min(min * (w > h ? 0.11 : 0.14), (w * 0.8) / 7.8)
+  const markSize = titleSize * 1.36
+  const top = h * 0.18
+  const baseline = top + markSize + titleSize * 0.72
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>
+    <!-- The same evening SeaScene paints, so the launch image, the boot card
+         in index.html, the loading screen and the title are one continuous
+         view. Change one and change all four. -->
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#04070F"/>
-      <stop offset="0.45" stop-color="#0A1930"/>
-      <stop offset="0.85" stop-color="#22405C"/>
-      <stop offset="1" stop-color="#3D5B6E"/>
+      <stop offset="0" stop-color="#05101F"/>
+      <stop offset="0.18" stop-color="#0F2C51"/>
+      <stop offset="0.38" stop-color="#2A5877"/>
+      <stop offset="0.53" stop-color="#6C8B92"/>
+      <stop offset="0.6" stop-color="#C69A66"/>
+      <stop offset="0.634" stop-color="#F2C480"/>
+      <stop offset="0.64" stop-color="#A9C0B3"/>
     </linearGradient>
     <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${UI.seaMid}"/>
-      <stop offset="0.3" stop-color="${UI.seaDeep}"/>
-      <stop offset="1" stop-color="${UI.night}"/>
+      <stop offset="0" stop-color="#A9C0B3"/>
+      <stop offset="0.26" stop-color="#3E7B8D"/>
+      <stop offset="1" stop-color="${UI.seaDeep}"/>
     </linearGradient>
-    <linearGradient id="sun" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#FFE0A0" stop-opacity="0.8"/>
-      <stop offset="0.22" stop-color="#E8834A" stop-opacity="0.34"/>
-      <stop offset="1" stop-color="#0A1930" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="path" cx="0.5" cy="0" r="1">
-      <stop offset="0" stop-color="#FFDFA4" stop-opacity="0.3"/>
-      <stop offset="0.45" stop-color="#FFDFA4" stop-opacity="0.1"/>
-      <stop offset="1" stop-color="#FFDFA4" stop-opacity="0"/>
+    <radialGradient id="haze">
+      <stop offset="0" stop-color="#FFDE96" stop-opacity="0.55"/>
+      <stop offset="0.26" stop-color="#F6B24A" stop-opacity="0.28"/>
+      <stop offset="0.62" stop-color="#F6B24A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="disc" cx="0.42" cy="0.38" r="0.62">
+      <stop offset="0" stop-color="#FFE9AE"/>
+      <stop offset="0.58" stop-color="#F5B24A"/>
+      <stop offset="1" stop-color="#E2853A"/>
     </radialGradient>
     <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FFF3CE"/>
@@ -144,44 +128,14 @@ function splashSvg(w, h) {
       <stop offset="0" stop-color="${UI.brass}"/>
       <stop offset="1" stop-color="${UI.brass}" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="vignette" cx="0.5" cy="0.5" r="0.8">
-      <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
-      <stop offset="1" stop-color="#000" stop-opacity="0.55"/>
-    </radialGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="${(min * 0.014).toFixed(1)}"/>
-    </filter>
   </defs>
 
-  <rect width="${w}" height="${horizon}" fill="url(#sky)"/>
-  <g fill="#DCEDF0">${stars}</g>
-  <rect y="${horizon - h * 0.34}" width="${w}" height="${h * 0.34}" fill="url(#sun)"/>
-
-  <!-- A tall ship on the horizon, drawn before the sea so the waterline cuts
-       the hull off cleanly. Long and low with one mast: at this size a
-       silhouette only survives if it is mostly negative space. -->
-  <g transform="translate(${sx} ${horizon}) scale(${shipH / 48})" fill="#0A1422" opacity="0.7">
-    <path d="M-26 0 L 26 0 L 20 -3.6 C 7 -5.2, -9 -5.2, -20 -3.6 Z"/>
-    <path d="M26 -2.4 L 36 -6.4 L 36 -5.1 L 26 -1.3 Z"/>
-    <rect x="-0.6" y="-44" width="1.2" height="39"/>
-    <rect x="-11.5" y="-30" width="23" height="1"/>
-    <rect x="-7.5" y="-42" width="15" height="0.9"/>
-    <path d="M-10 -29.2 L 10 -29.2 L 11.5 -15.5 C 4 -12.4, -4 -12.4, -11.5 -15.5 Z"/>
-    <path d="M-6.5 -41 L 6.5 -41 L 7.5 -32 C 2.6 -30.2, -2.6 -30.2, -7.5 -32 Z"/>
-    <path d="M0.6 -44 L 7.5 -42.3 L 0.6 -40.6 Z"/>
-  </g>
-
+  <rect width="${w}" height="${h}" fill="url(#sky)"/>
+  <ellipse cx="${w * 0.68}" cy="${h * 0.46}" rx="${w * 0.26}" ry="${w * 0.26}" fill="url(#haze)"/>
+  <circle cx="${w * 0.68}" cy="${h * 0.605}" r="${w * 0.08}" fill="url(#disc)"/>
   <rect y="${horizon}" width="${w}" height="${h - horizon}" fill="url(#sea)"/>
 
-  <!-- the sun's path on the water: a soft corridor, blurred so it reads as
-       light rather than as a jetty laid across the bay -->
-  <g filter="url(#soft)">
-    <polygon fill="url(#path)"
-             points="${w / 2 - min * 0.03},${horizon} ${w / 2 + min * 0.03},${horizon}
-                     ${w / 2 + w * 0.22},${h} ${w / 2 - w * 0.22},${h}"/>
-  </g>
-
-  <g transform="translate(${mx} ${my}) scale(${markSize / 64})">${mark()}</g>
+  <g transform="translate(${(w - markSize) / 2} ${top}) scale(${markSize / 64})">${mark()}</g>
 
   <g text-anchor="middle" font-family="Rubik, system-ui, sans-serif" font-weight="800"
      font-size="${titleSize}" letter-spacing="${-titleSize * 0.012}">
@@ -193,7 +147,7 @@ function splashSvg(w, h) {
   </g>
 
   <!-- brass keel line, capped like a chart rule -->
-  <g transform="translate(${w / 2} ${baseline + titleSize * 0.68})">
+  <g transform="translate(${w / 2} ${baseline + titleSize * 0.44})">
     <rect x="${-titleSize * 3.4}" y="${-titleSize * 0.012}" width="${titleSize * 2.9}"
           height="${Math.max(1, titleSize * 0.024)}" fill="url(#keelL)"/>
     <rect x="${titleSize * 0.5}" y="${-titleSize * 0.012}" width="${titleSize * 2.9}"
@@ -201,7 +155,6 @@ function splashSvg(w, h) {
     <path d="M0 ${-titleSize * 0.1} L ${titleSize * 0.1} 0 L 0 ${titleSize * 0.1} L ${-titleSize * 0.1} 0 Z"
           fill="${UI.brassLit}"/>
   </g>
-
 </svg>`
 }
 
