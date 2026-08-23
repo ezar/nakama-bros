@@ -319,6 +319,12 @@ export function CrewScreen({ selected, onSelect, onStart, onBack }: Props) {
       exit={{ opacity: 0 }}
       transition={{ duration: motion ? 0.3 : 0 }}
       className="wood relative flex h-full w-full flex-col items-center justify-center overflow-hidden"
+      style={{
+        paddingTop: 'var(--safe-t)',
+        paddingRight: 'var(--safe-r)',
+        paddingBottom: 'var(--safe-b)',
+        paddingLeft: 'var(--safe-l)',
+      }}
     >
       {/* lantern wash from the upper left, and the dark of the hold everywhere else */}
       <div

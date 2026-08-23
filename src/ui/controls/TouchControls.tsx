@@ -137,12 +137,15 @@ export function TouchControls({ input, visible }: Props) {
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-20 touch-none select-none"
+      // Inset, not padded: the pad and the buttons are absolutely positioned,
+      // and those measure from the padding box, which padding does not move.
+      // The jump button was sitting half under the rounded corner.
+      className="pointer-events-none absolute z-20 touch-none select-none"
       style={{
-        paddingLeft: 'var(--safe-l)',
-        paddingRight: 'var(--safe-r)',
-        paddingBottom: 'var(--safe-b)',
-        paddingTop: 'var(--safe-t)',
+        top: 'var(--safe-t)',
+        right: 'var(--safe-r)',
+        bottom: 'var(--safe-b)',
+        left: 'var(--safe-l)',
       }}
     >
       {/* ── Steering ── */}
@@ -220,7 +223,7 @@ export function TouchControls({ input, visible }: Props) {
         aria-label={t('touch.pause')}
         className="pointer-events-auto absolute right-4 grid h-10 w-10 place-items-center rounded-[6px] transition-transform duration-75 data-[pressed=true]:translate-y-[3px]"
         style={{
-          top: 'calc(var(--safe-t) + 4.5rem)',
+          top: '4.5rem',
           border: `2px solid ${UI.brassDark}`,
           backgroundImage: 'linear-gradient(180deg, rgba(255,226,180,0.14), rgba(0,0,0,0.4))',
           backgroundColor: 'rgba(16,9,4,0.6)',

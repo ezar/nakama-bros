@@ -269,8 +269,17 @@ export const Hud = memo(function Hud({ hud, compass, compact = false }: Props) {
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 select-none"
-      style={{ padding: 'calc(0.5rem + var(--safe-t)) calc(0.5rem + var(--safe-r)) calc(0.5rem + var(--safe-b)) calc(0.5rem + var(--safe-l))' }}
+      // Inset, not padded. Every child here is absolutely positioned, and an
+      // absolute child measures from its container's *padding box* — padding
+      // sits inside that box, so it moved none of them and the plaque still
+      // ran under the notch. Shrinking the box itself is what they follow.
+      className="pointer-events-none absolute select-none"
+      style={{
+        top: 'calc(0.5rem + var(--safe-t))',
+        right: 'calc(0.5rem + var(--safe-r))',
+        bottom: 'calc(0.5rem + var(--safe-b))',
+        left: 'calc(0.5rem + var(--safe-l))',
+      }}
     >
       {/* ── Top left: who, how many lives, what gear ── */}
       <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">

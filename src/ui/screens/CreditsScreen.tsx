@@ -140,7 +140,11 @@ export function CreditsScreen({ onBack }: { onBack: () => void }) {
 
       <div
         ref={rollRef}
-        className="relative z-10 h-full w-full overflow-y-auto overscroll-contain px-6"
+        className="relative z-10 h-full w-full overflow-y-auto overscroll-contain"
+        style={{
+          paddingRight: 'calc(1.5rem + var(--safe-r))',
+          paddingLeft: 'calc(1.5rem + var(--safe-l))',
+        }}
       >
         <div className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-6 py-[18vh] text-center">
           <div className="flex flex-col items-center gap-2">
@@ -272,7 +276,11 @@ export function CreditsScreen({ onBack }: { onBack: () => void }) {
           screens to find is not a way out. Top-left rather than under the roll,
           where it sat on top of whatever was passing — including the drawing. */}
       <button
-        className="op-button absolute left-3 top-3 z-20 !px-3 !py-1.5 !text-xs sm:left-5 sm:top-5"
+        className="op-button absolute z-20 !px-3 !py-1.5 !text-xs"
+        style={{
+          left: 'calc(0.75rem + var(--safe-l))',
+          top: 'calc(0.75rem + var(--safe-t))',
+        }}
         onClick={onBack}
       >
         {t('options.back')}

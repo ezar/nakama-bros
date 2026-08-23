@@ -7,6 +7,7 @@ import { useProgress } from '../../store/progressStore'
 import { useT } from '../../i18n/useT'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { useShortViewport } from '../hooks/useShortViewport'
+import { useFitScale } from '../hooks/useFitScale'
 import { useCrewPortraits } from '../hooks/useCrewPortraits'
 import { SeaScene } from '../art/SeaScene'
 import { BerryIcon, FragmentIcon, Rope } from '../art/Icons'
@@ -52,6 +53,7 @@ export function EndingScreen({ onCredits, onPort }: { onCredits: () => void; onP
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
+  const fit = useFitScale()
   const portraits = useCrewPortraits()
   const records = useProgress((s) => s.records)
   const totalBerries = useProgress((s) => s.totalBerries)
@@ -108,8 +110,25 @@ export function EndingScreen({ onCredits, onPort }: { onCredits: () => void; onP
             'linear-gradient(180deg, rgba(4,10,18,0.7) 0%, rgba(4,10,18,0.42) 34%, rgba(4,10,18,0.74) 100%)',
         }}
       />
-      <div className={`relative z-10 flex min-h-full flex-col px-5 ${short ? 'py-1.5' : 'py-6'}`}>
-        <div className={`m-auto flex w-full max-w-[520px] flex-col items-center text-center ${short ? 'gap-1' : 'gap-3'}`}>
+      <div
+        className="relative z-10 flex min-h-full flex-col"
+        style={{
+          paddingTop: `calc(${short ? '0.375rem' : '1.5rem'} + var(--safe-t))`,
+          paddingRight: 'calc(1.25rem + var(--safe-r))',
+          paddingBottom: `calc(${short ? '0.375rem' : '1.5rem'} + var(--safe-b))`,
+          paddingLeft: 'calc(1.25rem + var(--safe-l))',
+        }}
+      >
+        <div className="m-auto w-full max-w-[520px]" style={{ height: fit.height }}>
+        <div
+          ref={fit.ref as (el: HTMLDivElement | null) => void}
+          className={`flex w-full flex-col items-center text-center ${short ? 'gap-1' : 'gap-3'}`}
+          style={
+            fit.scale < 1
+              ? { transform: `scale(${fit.scale})`, transformOrigin: 'top center' }
+              : undefined
+          }
+        >
           <m.div
             initial={motion ? { y: 14, opacity: 0 } : false}
             animate={{ y: 0, opacity: 1 }}
@@ -197,6 +216,7 @@ export function EndingScreen({ onCredits, onPort }: { onCredits: () => void; onP
           >
             {t('ending.again')}
           </p>
+        </div>
         </div>
       </div>
     </m.div>

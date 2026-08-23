@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { motion as m } from 'framer-motion'
 import type { Biome, LevelDef, WorldDef } from '../../types'
 import type { LevelRecord } from '../../store/progressStore'
 import { useT, type TFunction } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
+import { useShortViewport } from '../hooks/useShortViewport'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { CompassRose, FragmentIcon, KrakenArm, Nail, SeaSerpent, WaxSeal } from '../art/Icons'
@@ -40,6 +41,11 @@ const NODES: Array<[number, number]> = [
   [892, 146],
   [1070, 330],
 ]
+
+/** Half a row of `n` pips, in the chart's own scaled units. */
+function half(n: number): string {
+  return `calc((var(--pip) * ${n} + var(--pip-gap) * ${n - 1}) / 2)`
+}
 
 /** Catmull-Rom through the anchors, so the route curves like a plotted course. */
 function routePath(pts: Array<[number, number]>): string {
@@ -225,8 +231,12 @@ function StagePip({
       onMouseEnter={onHover}
       onFocus={onHover}
       onClick={onClick}
-      className="relative grid h-7 w-7 place-items-center rounded-full border-2 font-body text-[11px] font-extrabold transition-transform duration-150"
+      className="relative grid place-items-center rounded-full border-2 font-body font-extrabold transition-transform duration-150"
       style={{
+        height: 'var(--pip)',
+        width: 'var(--pip)',
+        fontSize: 'calc(var(--pip) * 0.4)',
+        lineHeight: 1,
         borderColor: state === 'locked' ? 'rgba(42,29,20,0.3)' : INK,
         background: fill,
         color,
@@ -266,6 +276,7 @@ function Legend({ t }: { t: TFunction }) {
 export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps) {
   const t = useT()
   const motion = useUiMotion()
+  const short = useShortViewport(560)
 
   const flat = useMemo<Flat[]>(
     () =>
@@ -312,7 +323,16 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: motion ? 0.3 : 0 }}
-      className="wood-dark relative flex h-full w-full flex-col items-center justify-center overflow-hidden px-4 py-3"
+      className="wood-dark relative flex h-full w-full flex-col items-center justify-center overflow-hidden"
+      // The wood stays edge to edge; the chart moves inside the notch. On a
+      // phone held sideways the island cut-out sits over one side of the
+      // screen, and East Blue's first stage was underneath it.
+      style={{
+        paddingTop: 'calc(0.75rem + var(--safe-t))',
+        paddingRight: 'calc(1rem + var(--safe-r))',
+        paddingBottom: 'calc(0.75rem + var(--safe-b))',
+        paddingLeft: 'calc(1rem + var(--safe-l))',
+      }}
     >
       <div
         className="pointer-events-none absolute inset-0"
@@ -322,17 +342,48 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
         }}
       />
 
-      <header className="relative z-10 mb-2 flex items-baseline gap-4">
-        <h2 className="op-title text-3xl text-op-gold sm:text-4xl">{t('map.title')}</h2>
+      <header className={`relative z-10 flex shrink-0 items-baseline gap-4 ${short ? 'mb-1' : 'mb-2'}`}>
+        <h2 className={`op-title text-op-gold ${short ? 'text-xl' : 'text-3xl sm:text-4xl'}`}>{t('map.title')}</h2>
         <span className="font-body text-[10px] uppercase tracking-[0.26em] text-op-parchment/55">
           {t('map.subtitle')}
         </span>
       </header>
 
-      {/* The chart itself. Everything positions against its aspect box. */}
+      {/*
+        The chart itself. Everything positions against its aspect box.
+
+        The box used to be `min(1180px, 95vw)` wide with the aspect ratio
+        deciding its height, which on a phone held sideways made it taller than
+        the screen: Skypiea was cut off at the top and the legend fell out of
+        the bottom. Two things were wrong. `vw` is the whole window, so it
+        reached straight through the notch padding this screen sets; and width
+        alone cannot fit a box whose height is the scarce dimension. So the
+        wrapper takes whatever height is left over after the header and the
+        dossier, becomes a size container, and the chart is the largest box of
+        the right shape that fits inside it — by width or by height, whichever
+        runs out first.
+      */}
       <div
-        className="relative z-10 w-[min(1180px,95vw)]"
-        style={{ aspectRatio: `${VB.w} / ${VB.h}` }}
+        className="relative z-10 flex min-h-0 w-full flex-1 items-center justify-center"
+        style={{ containerType: 'size' }}
+      >
+      <div
+        className="relative"
+        style={
+          {
+            width: `min(1180px, 100%, calc(100cqh * ${VB.w} / ${VB.h}))`,
+            aspectRatio: `${VB.w} / ${VB.h}`,
+            // The pips are HTML on top of the SVG, so unlike everything drawn
+            // inside the viewBox they do not scale with the chart. At full size
+            // that is what you want — a 28px target. On a shrunk chart it meant
+            // East Blue's four stages were wider than the paper under them and
+            // the first one hung off the edge. So they scale with the sheet,
+            // down to a floor that stays tappable.
+            containerType: 'inline-size',
+            '--pip': 'max(20px, calc(100cqw * 28 / 1180))',
+            '--pip-gap': 'max(3px, calc(100cqw * 6 / 1180))',
+          } as CSSProperties
+        }
       >
         <Paper seed={7} edges="all" bite={1.3} age={0.7} className="h-full w-full">
           <svg viewBox={`0 0 ${VB.w} ${VB.h}`} className="h-full w-full" aria-hidden="true">
@@ -477,9 +528,15 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
               <div
                 key={w.id}
                 className="absolute flex -translate-x-1/2 flex-col items-center gap-1"
-                style={{ left: `${(x / VB.w) * 100}%`, top: `${((y + 34) / VB.h) * 100}%` }}
+                style={{
+                  // Centred on the island, but never further out than half its
+                  // own row: an island near the margin slides its pips inboard
+                  // rather than letting them fall off the sheet.
+                  left: `clamp(${half(w.levels.length)}, ${(x / VB.w) * 100}%, calc(100% - ${half(w.levels.length)}))`,
+                  top: `${((y + 34) / VB.h) * 100}%`,
+                }}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center" style={{ gap: 'var(--pip-gap)' }}>
                   {w.levels.map((lvl, si) => {
                     const fi = flat.findIndex((f) => f.level.id === lvl.id)
                     const state = records[lvl.id]?.cleared ? 'cleared' : isLocked(fi) ? 'locked' : 'open'
@@ -510,9 +567,12 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
           })}
         </Paper>
       </div>
+      </div>
 
       {/* Dossier for the highlighted stage, and the way out. */}
-      <div className="relative z-10 mt-3 flex w-[min(1180px,95vw)] items-end justify-between gap-4">
+      <div
+        className={`relative z-10 flex w-full max-w-[1180px] shrink-0 items-end justify-between gap-4 ${short ? 'mt-2' : 'mt-3'}`}
+      >
         <div className="hidden sm:block">
           <Legend t={t} />
         </div>
@@ -563,9 +623,11 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
         </div>
       </div>
 
-      <div className="relative z-10 mt-1 font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/40">
-        {t('map.hint')}
-      </div>
+      {!short && (
+        <div className="relative z-10 mt-1 shrink-0 font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/40">
+          {t('map.hint')}
+        </div>
+      )}
     </m.div>
   )
 }
