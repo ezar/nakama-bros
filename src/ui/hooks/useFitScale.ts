@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-/** Nearest ancestor that scrolls vertically — the box whose height is the budget. */
-function scrollParent(el: HTMLElement): HTMLElement | null {
+/**
+ * The box whose height is the budget.
+ *
+ * Usually the nearest ancestor that scrolls: on the sheet screens the block is
+ * centred inside a scroller, and the scroller's height is what it has to fit.
+ *
+ * Where there is no scroller the parent is the answer instead. The title
+ * screen is `overflow-hidden` all the way up — nothing there scrolls, on
+ * purpose — and returning null meant the whole hook quietly did nothing, which
+ * is a worse failure than being wrong: it looks exactly like a layout that had
+ * no problem.
+ */
+function budgetBox(el: HTMLElement): HTMLElement | null {
   for (let n = el.parentElement; n; n = n.parentElement) {
     const o = getComputedStyle(n).overflowY
     if (o === 'auto' || o === 'scroll') return n
   }
-  return null
+  return el.parentElement
 }
 
 /**
@@ -42,7 +53,7 @@ export function useFitScale(min = 0.55): {
     const natural = el.offsetHeight
     el.style.transform = applied
 
-    const box = scrollParent(el)
+    const box = budgetBox(el)
     if (!natural || !box) return
     // The safe-area padding is rarely on the scroller itself — it usually sits
     // on a wrapper in between — so the budget is the scroller minus every
