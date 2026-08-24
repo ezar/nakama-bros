@@ -23,7 +23,7 @@ import { ChallengePanel } from './ui/ChallengePanel'
 import { VersusScreen } from './ui/screens/VersusScreen'
 import { RaceResultScreen } from './ui/screens/RaceResultScreen'
 import type { RaceSession } from './net/session'
-import { consumeChallengeFromLocation } from './game/challengeLink'
+import { consumeChallengeFromLocation, watchForChallenges } from './game/challengeLink'
 import { decodeChallenge } from './game/ghostCode'
 
 type Screen =
@@ -117,7 +117,15 @@ export default function App() {
         setScreen('challenge')
         return
       }
-      setScreen('title')
+      /*
+        Only if nothing has already moved on.
+
+        The load is the longest window in the session, and a challenge tapped
+        during it is handled by the watcher below — which will have put the
+        offer on screen. Assigning the title unconditionally would wipe it a
+        moment later, which is a worse bug than the one being fixed.
+      */
+      setScreen((s) => (s === 'loading' ? 'title' : s))
     })
     // Runs once, at boot: `invite` is settled before the first render and
     // never changes, and re-running this would reload the whole art library.
@@ -162,6 +170,32 @@ export default function App() {
   }, [audio, settings.master, settings.music, settings.sfx])
 
   const level = levelById(levelId) ?? ALL_LEVELS[0]
+
+  /**
+   * Accept a challenge that has arrived, wherever it arrived from.
+   *
+   * Saved first and offered second, so that dismissing it — or closing the tab
+   * on the offer — still leaves it on the chart. The offer is skipped while a
+   * stage is being played: interrupting a run with a screen is worse than
+   * letting the player find the challenge waiting when they come out.
+   */
+  const takeInvite = useCallback(
+    (code: string, playing: boolean) => {
+      const challenge = decodeChallenge(code)
+      if (!challenge || !levelById(challenge.levelId)) return
+      saveRival(challenge.levelId, { ...challenge.track, name: challenge.name })
+      if (playing) return
+      setInviteLevel(challenge.levelId)
+      setScreen('challenge')
+    },
+    [saveRival],
+  )
+
+  // A link opened while the game is already running does not reload it — see
+  // `watchForChallenges`. Without this the challenge would simply be dropped.
+  useEffect(() => {
+    return watchForChallenges((code) => takeInvite(code, screen === 'play'))
+  }, [takeInvite, screen])
 
   const startLevel = useCallback((id: string) => {
     setLevelId(id)
@@ -277,6 +311,7 @@ export default function App() {
           <ChallengeScreen
             key="challenge"
             rival={rival}
+            levelId={target.id}
             levelName={target.name}
             locked={levelLocked(target.id, records, WORLDS)}
             onAccept={() => startLevel(target.id)}

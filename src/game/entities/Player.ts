@@ -1491,11 +1491,30 @@ export class Player extends Entity {
       frame.sx, frame.sy, frame.sw, frame.sh,
       frame.ox, frame.oy, frame.w, frame.h,
     )
+    /*
+      The hit flash, as a second pass of the sprite rather than a wash over it.
+
+      This used to fill a white rectangle with `source-atop`, on the assumption
+      that the composite would clip the fill to the sprite just drawn. It does
+      not: `source-atop` works against everything already on the canvas, and by
+      this point that is the sky and the terrain — so every hit painted a white
+      rectangle the size of the frame over the stage.
+
+      It was worst in gear 3, which is how it got noticed: that tier is scaled
+      to 155%, so the rectangle is half again as large as at any other size.
+
+      Redrawing the frame additively brightens the character and cannot touch a
+      pixel the sprite does not cover. It is also what every enemy and boss in
+      the game already does for the same effect.
+    */
     if (this.flash > 0.01) {
-      ctx.globalCompositeOperation = 'source-atop'
       ctx.globalAlpha = this.flash
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(frame.ox, frame.oy, frame.w, frame.h)
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.drawImage(
+        this.sheet.image,
+        frame.sx, frame.sy, frame.sw, frame.sh,
+        frame.ox, frame.oy, frame.w, frame.h,
+      )
     }
     ctx.restore()
   }

@@ -180,3 +180,30 @@ describe('challenge links', () => {
     }
   })
 })
+
+describe('a challenge arriving at a game that is already open', () => {
+  it('is still found once the address bar has changed under it', () => {
+    // The case that was silently dropped: a link opened while the game runs
+    // does not reload it. Nothing here reads `location` — that is the browser
+    // half — but the parsing this depends on has to hold for a bare hash too.
+    const code = encodeChallenge(challenge())!
+    expect(codeFromUrl(`https://ezar.github.io/nakama-bros/#r=${code}`)).toBe(code)
+    expect(decodeChallenge(codeFromUrl(`#r=${code}`)!)?.name).toBe('Luca')
+  })
+
+  it('rebuilds the same code from a rival that was already saved', () => {
+    /*
+      What the "copy the code" button on the invite screen does.
+
+      By the time it is pressed the address bar has been cleared — that is what
+      stops a reload re-offering the same challenge — so the code has to be
+      made again from the stored rival. It must come out identical, or the
+      challenge that gets carried to the installed app is a different one.
+    */
+    const sent = challenge(80, 'Leyre')
+    const code = encodeChallenge(sent)!
+    const got = decodeChallenge(code)!
+    const again = encodeChallenge({ levelId: got.levelId, name: got.name, track: got.track })
+    expect(again).toBe(code)
+  })
+})

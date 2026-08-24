@@ -62,3 +62,37 @@ export function consumeChallengeFromLocation(): string | null {
   }
   return code
 }
+
+/**
+ * Watch for a challenge arriving at a game that is already open.
+ *
+ * Reading the address bar once at startup is not enough, and the case it
+ * misses is the ordinary one: a link opened while the game is already running
+ * does not reload it. Where the game is installed to the home screen the
+ * system hands the link to the running app; where it is a tab, changing only
+ * the hash is a same-document navigation. Neither restarts anything, so the
+ * challenge would arrive and be dropped without a word.
+ *
+ * `hashchange` covers the tab. Coming back to the foreground covers the
+ * installed app, which may be resumed on the new address without firing
+ * anything else — and costs nothing when there is no challenge waiting, which
+ * is almost every time.
+ */
+export function watchForChallenges(onCode: (code: string) => void): () => void {
+  if (typeof window === 'undefined') return () => undefined
+  const check = () => {
+    const code = consumeChallengeFromLocation()
+    if (code) onCode(code)
+  }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') check()
+  }
+  window.addEventListener('hashchange', check)
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('pageshow', onVisible)
+  return () => {
+    window.removeEventListener('hashchange', check)
+    document.removeEventListener('visibilitychange', onVisible)
+    window.removeEventListener('pageshow', onVisible)
+  }
+}
