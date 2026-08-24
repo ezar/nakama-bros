@@ -1,4 +1,5 @@
 import { CREW_IDS } from './config'
+import { b64Bytes, bytesFromB64, checksum16 } from '../engine/bytes'
 import type { CrewId } from '../types'
 import {
   GHOST_ANIMS, GHOST_MAX_POSES, GHOST_MIN_POSES, decodeGhost, type GhostPose, type GhostTrack,
@@ -88,8 +89,14 @@ export function capName(name: string): string {
   return chars.join('')
 }
 
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
-const B64_INDEX = new Map([...B64].map((c, i) => [c, i]))
+/**
+ * The storage format's alphabet, spelled out here rather than shared.
+ *
+ * `packPose` at the bottom rebuilds the characters of a *stored* track, so
+ * this is a fact about `ghost.ts` rather than a choice made here. It happens
+ * to match base64url today; it must not start following it.
+ */
+const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
 
 /** Marks a code as ours before a single bit is read. */
 const PREFIX = 'NB1'
@@ -145,54 +152,6 @@ class BitReader {
     const sign = 1 << (bits - 1)
     return (v & sign) !== 0 ? v - (1 << bits) : v
   }
-}
-
-const toBase64Url = (bytes: number[]): string => {
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i], b = bytes[i + 1], c = bytes[i + 2]
-    out += B64[a >> 2]
-    out += B64[((a & 3) << 4) | ((b ?? 0) >> 4)]
-    if (b === undefined) break
-    out += B64[((b & 15) << 2) | ((c ?? 0) >> 6)]
-    if (c === undefined) break
-    out += B64[c & 63]
-  }
-  return out
-}
-
-const fromBase64Url = (s: string): number[] | null => {
-  const bytes: number[] = []
-  let acc = 0
-  let bits = 0
-  for (const ch of s) {
-    const v = B64_INDEX.get(ch)
-    if (v === undefined) return null
-    acc = ((acc << 6) | v) & 0xffff
-    bits += 6
-    if (bits >= 8) {
-      bits -= 8
-      bytes.push((acc >> bits) & 0xff)
-    }
-  }
-  return bytes
-}
-
-/**
- * FNV-1a, folded to sixteen bits.
- *
- * Not a security measure — nobody is attacking a challenge code, and if a
- * child hand-edits one to claim a faster time the worst outcome is a sibling
- * argument. It is here to catch a code that arrived damaged, which is the
- * failure that actually happens.
- */
-const checksum = (bytes: number[]): number => {
-  let h = 0x811c9dc5
-  for (const b of bytes) {
-    h ^= b
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return ((h >>> 16) ^ h) & 0xffff
 }
 
 /*
@@ -289,8 +248,8 @@ export function encodeChallenge(challenge: Challenge): string | null {
 
   const body = w.finish()
   if (body.length > 0xffff) return null
-  const sum = checksum(body)
-  return PREFIX + toBase64Url([
+  const sum = checksum16(body)
+  return PREFIX + b64Bytes([
     (body.length >> 8) & 0xff, body.length & 0xff,
     ...body,
     (sum >> 8) & 0xff, sum & 0xff,
@@ -321,14 +280,14 @@ export function decodeChallenge(code: string): Challenge | null {
     is *short* is still caught, by the checksum.
   */
   const raw = code.slice(start + PREFIX.length).replace(/[^A-Za-z0-9\-_]/g, '')
-  const bytes = fromBase64Url(raw)
+  const bytes = bytesFromB64(raw)
   if (!bytes || bytes.length < 6) return null
 
   const declared = (bytes[0] << 8) | bytes[1]
   if (bytes.length < 2 + declared + 2) return null
   const body = bytes.slice(2, 2 + declared)
   const sum = ((bytes[2 + declared] << 8) | bytes[2 + declared + 1]) & 0xffff
-  if (checksum(body) !== sum) return null
+  if (checksum16(body) !== sum) return null
 
   const r = new BitReader(body)
   if (r.read(6) !== CODE_VERSION) return null
@@ -405,7 +364,7 @@ export function decodeChallenge(code: string): Challenge | null {
 function packPose(x: number, y: number, anim: number, facing: 1 | -1): string {
   const n = ((x & ((1 << ABS_X) - 1)) << ABS_Y) | ((y + Y_BIAS) & ((1 << ABS_Y) - 1))
   return (
-    B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63] +
-    B64[((anim << 1) | (facing === 1 ? 1 : 0)) & 63]
+    ALPHA[(n >> 18) & 63] + ALPHA[(n >> 12) & 63] + ALPHA[(n >> 6) & 63] + ALPHA[n & 63] +
+    ALPHA[((anim << 1) | (facing === 1 ? 1 : 0)) & 63]
   )
 }

@@ -8,6 +8,8 @@ import { useProgress } from '../store/progressStore'
 import { useSettings } from '../store/settingsStore'
 import type { AudioApi } from '../types'
 import type { GhostRacer } from '../game/ghost'
+import type { RaceSession } from '../net/session'
+import { RaceCountdown } from './RaceCountdown'
 import { PAL } from '../art/palette'
 
 interface Props {
@@ -18,6 +20,8 @@ interface Props {
   onGameOver: () => void
   onPause: () => void
   paused: boolean
+  /** A live race against another device, or absent for an ordinary run. */
+  race?: RaceSession | null
 }
 
 const isTouchDevice = () =>
@@ -28,7 +32,7 @@ const isTouchDevice = () =>
  * re-renders during play: the HUD updates from a throttled callback, and the
  * game loop drives the canvas directly.
  */
-export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, paused }: Props) {
+export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, paused, race }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameRef = useRef<Game | null>(null)
   const [hud, setHud] = useState<HudSnapshot | null>(null)
@@ -53,9 +57,12 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
       your own shadow off is a statement about clutter, not a refusal of a
       race you already agreed to. Dismissing the rival is how you decline it.
     */
-    const rival = progress.rivals[level.id]
+    const rival = race ? undefined : progress.rivals[level.id]
     if (rival) racers.push({ track: rival, tint: PAL.bloodOrange })
-    const mine = raceGhost ? progress.ghosts[level.id] : undefined
+    // Your own shadow stays out of a live race too. Three translucent bodies
+    // on one stage is not a race, it is a crowd — and the one that matters is
+    // the one that is actually running against you right now.
+    const mine = raceGhost && !race ? progress.ghosts[level.id] : undefined
     if (mine) racers.push({ track: mine })
     const game = new Game(canvas, level, crew, audio, {
       onHud: setHud,
@@ -66,7 +73,7 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
     // Read once, here: the difficulty decides lives and the clock at
     // construction, so changing it mid-stage would be half-applied. The next
     // level picks up the new setting.
-    }, undefined, difficulty, racers)
+    }, undefined, difficulty, racers, race ?? null)
     gameRef.current = game
     game.start()
     // A stable handle for automated screenshots and visual review runs.
@@ -88,7 +95,9 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
       if (EXPOSE_DEBUG) delete (window as unknown as { __NAKAMA__?: Game }).__NAKAMA__
     }
     // The game owns its own lifetime; re-creating it on every prop change would
-    // restart the level, so only the level and crew may re-mount it.
+    // restart the level, so only the level and crew may re-mount it. A race
+    // session is created before this mounts and outlives it, for the same
+    // reason: swapping one mid-stage is not a thing that can happen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level, crew])
 
@@ -140,6 +149,7 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
       {gameRef.current && (
         <TouchControls input={gameRef.current.inputManager} visible={showTouch} />
       )}
+      {race && <RaceCountdown race={race} />}
     </div>
   )
 }

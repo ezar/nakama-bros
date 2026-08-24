@@ -16,6 +16,8 @@ interface Props {
   onOptions: () => void
   /** Optional: shows the Grand Line entry when the router can serve a map. */
   onMap?: () => void
+  /** Optional: shows the live-race entry. Same contract as `onMap`. */
+  onVersus?: () => void
   /**
    * The lantern was struck. The screen owns the light; the router owns the
    * sound, the same way the crew screen reports a pick and lets App chime.
@@ -214,7 +216,7 @@ const SPARKS = [
   { x: -6, y: -34, d: 0.83 },
 ]
 
-export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onLamp }: Props) {
+export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp }: Props) {
   const t = useT()
   const motion = useUiMotion()
   // Below this the menu runs off the bottom and the last plank ends up behind
@@ -231,9 +233,10 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onLamp }: Props)
       { key: 'crew', label: t('title.crew'), icon: <HatLife size={22} />, action: onCrew },
     ]
     if (onMap) list.push({ key: 'map', label: t('title.map'), icon: <StarMark size={19} />, action: onMap })
+    if (onVersus) list.push({ key: 'versus', label: t('versus.open'), icon: <JollyRoger size={19} />, action: onVersus })
     list.push({ key: 'options', label: t('title.options'), icon: <ShipWheel size={20} />, action: onOptions })
     return list
-  }, [t, onPlay, onCrew, onOptions, onMap])
+  }, [t, onPlay, onCrew, onOptions, onMap, onVersus])
 
   const { itemRef } = useMenuNav({
     count: items.length,
