@@ -116,7 +116,13 @@ function buildDunes(): LevelDef {
   crates(b, 242, G, 2)
   b.spawn('goal', 246, G - 1)
 
-  return {
+    // ── A secret, cut into a dune. Last in the builder on purpose: the terrain
+  //    passes above would pave over anything laid down before them.
+  b.block(14, 12, 18, 14)
+  b.secret(15, 13, 17, 14, 'left')
+  b.spawn('fruit', 16, 14)
+
+return {
     id: 'alabasta-1',
     name: 'Dunas de Erumalu',
     biome: 'alabasta',

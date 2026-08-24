@@ -221,6 +221,49 @@ export function validateLevel(def: LevelDef): Issue[] {
   // ── 8. Sealed pockets ──────────────────────────────────────────────────────
   out.push(...sealed(def, g))
 
+  // ── 9. Secrets ─────────────────────────────────────────────────────────────
+  out.push(...secrets(def, g))
+
+  return out
+}
+
+/**
+ * Fake walls that are not hiding anything.
+ *
+ * A `%` is the only tile in the game that lies, and both ways of getting it
+ * wrong are invisible in the ASCII: it reads as terrain either way, and the
+ * level still loads. So the two things that make it a secret are checked here.
+ *
+ * It has to be *in* something — a lone fake tile in open air is a lie nobody
+ * will ever walk into, because nothing about it invites a shoulder. And it has
+ * to *front* a hollow: a fake tile with solid rock behind it opens onto
+ * nowhere, which is the mistake that turns twenty minutes of level authoring
+ * into a wall that just happens not to work.
+ */
+function secrets(def: LevelDef, g: Grid): Issue[] {
+  const out: Issue[] = []
+  for (let y = 0; y < def.h; y++) {
+    for (let x = 0; x < def.w; x++) {
+      if (g.at(x, y) !== C.fake) continue
+      const around = [g.at(x - 1, y), g.at(x + 1, y), g.at(x, y - 1), g.at(x, y + 1)]
+      if (!around.some((c) => SOLIDISH.has(c) || c === C.fake)) {
+        out.push({
+          level: def.id, severity: 'error', tx: x, ty: y,
+          message: 'fake wall touches no real wall — nothing would make a player push into it',
+        })
+      }
+      // Decor is what a secret room is filled with; air would be a hole you
+      // could see from across the screen, so it counts too, but only as the
+      // thing being hidden.
+      const hides = [g.at(x - 1, y), g.at(x + 1, y)].some((c) => c === C.decor || c === C.air)
+      if (!hides) {
+        out.push({
+          level: def.id, severity: 'error', tx: x, ty: y,
+          message: 'fake wall opens onto solid rock — it hides nothing',
+        })
+      }
+    }
+  }
   return out
 }
 

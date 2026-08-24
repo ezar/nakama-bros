@@ -515,7 +515,40 @@ export class Player extends Entity {
       this.hurt(world, { amount: 1, dirX: -this.facing, dirY: -1, sourceId: 0, kind: 'hazard' })
     }
 
+    this.revealFakeWalls(world)
+
     this.updateAnimState(inWater, this.body.grounded, want)
+  }
+
+  /**
+   * Walk into a wall that is not there and it stops pretending.
+   *
+   * Every tile the body currently overlaps is checked, not just the one under
+   * the nose: entering a secret sideways, from below, or mid-roll all have to
+   * work, and at speed a body can cross two columns in a step.
+   *
+   * The swap is to a tile that draws the same art at a third of the alpha, so
+   * the room stays framed by the wall it was hidden behind and the way out is
+   * obvious. Once per tile — `Fake` becomes `FakeSeen` and never matches again,
+   * which is also what stops the puff firing sixty times a second.
+   */
+  private revealFakeWalls(world: World): void {
+    const r = this.rect()
+    const x0 = Math.floor(r.x / TILE)
+    const x1 = Math.floor((r.x + r.w - 1) / TILE)
+    const y0 = Math.floor(r.y / TILE)
+    const y1 = Math.floor((r.y + r.h - 1) / TILE)
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (world.map.get(tx, ty) !== Tile.Fake) continue
+        world.map.set(tx, ty, Tile.FakeSeen)
+        world.audio.playSfx('break', { volume: 0.34, rate: 1.5 })
+        world.particles.burst(9, tx * TILE + TILE / 2, ty * TILE + TILE / 2, {
+          speed: 46, speedVar: 26, life: 0.5, lifeVar: 0.2, size: 2.2, sizeEnd: 0.3,
+          color: PAL.cream, colorEnd: PAL.mist, shape: 'circle', drag: 0.12, spawnRadius: 6,
+        })
+      }
+    }
   }
 
   // ── Stance ─────────────────────────────────────────────────────────────────

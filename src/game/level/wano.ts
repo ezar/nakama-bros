@@ -102,7 +102,12 @@ function buildKuri(): LevelDef {
   b.ground(246, W - 1, G)
   b.spawn('goal', 251, G - 1)
 
-  return {
+    // ── A secret under the terraces. Last in the builder, as everywhere else.
+  b.block(174, 13, 178, 15)
+  b.secret(175, 14, 177, 15, 'left')
+  b.spawn('fruit', 176, 15)
+
+return {
     id: 'wano-1',
     name: 'Camino de Kuri',
     biome: 'wano',

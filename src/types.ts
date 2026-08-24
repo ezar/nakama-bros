@@ -112,6 +112,23 @@ export const enum Tile {
   Crumble = 13,
   /** Ladder / rigging — climbable, non-solid. */
   Climb = 14,
+  /**
+   * A wall that is not there.
+   *
+   * Draws pixel for pixel as `Solid` — same tileset entry, same autotiling,
+   * same grass on top — and collides with nothing. Walk into it and you are
+   * through. It is the only tile in the game that lies, which is the point.
+   */
+  Fake = 15,
+  /**
+   * A fake wall somebody has already walked through.
+   *
+   * Same art at a fraction of the alpha and without its grass. This exists so
+   * a child who has found a secret room can see the way back out; a wall that
+   * stayed opaque behind them would make the reward feel like a trap. Never
+   * authored — the game swaps `Fake` for it on contact.
+   */
+  FakeSeen = 16,
 }
 
 export interface TileFlags {

@@ -110,7 +110,13 @@ function buildForest(): LevelDef {
   b.spawn('goal', 238, G - 1)
   b.berryLine(230, 236, G - 1, 2)
 
-  return {
+    // ── A secret in the treeline. Last in the builder — see the note in
+  //    Villa Fuchsia for why the order matters.
+  b.block(58, 15, 62, 17)
+  b.secret(59, 16, 61, 17, 'left')
+  b.spawn('oneup', 60, 17)
+
+return {
     id: 'thriller-bark-1',
     name: 'Bosque de Sombras',
     biome: 'thriller-bark',

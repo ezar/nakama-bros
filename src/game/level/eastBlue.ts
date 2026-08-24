@@ -166,6 +166,18 @@ function buildVillaFuchsia(): LevelDef {
   b.spawn('goal', 214, G - 1)
   b.berryLine(207, 213, G - 2, 2)
 
+  // ── The secret. Last on purpose: every other call above writes terrain, and
+  //    a bluff laid down early gets quietly paved over by the ground pass that
+  //    follows it. Authored here, nothing can overwrite it.
+  //
+  //    Columns 150-154, between the two rigging towers — a stretch with floor
+  //    under it and open sky above, so the bluff reads as an obstacle to hop
+  //    rather than as scenery. Its left face is a lie. The first secret in the
+  //    game is a 1UP: felt at once, and costs nothing to walk past.
+  b.block(150, G - 3, 154, G - 1)
+  b.secret(151, G - 2, 153, G - 1, 'left')
+  b.spawn('oneup', 152, G - 1)
+
   return {
     id: 'east-blue-1',
     name: 'Villa Fuchsia',
