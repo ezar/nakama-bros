@@ -45,6 +45,45 @@ const REPEAT_DELAY = 400
 const REPEAT_RATE = 130
 const DEADZONE = 0.55
 
+/**
+ * Is this key going into a text field?
+ *
+ * If it is, the menu must not see it at all — not just not confirm on it.
+ * `a`, `d`, `w` and `s` are movement keys here, and `Backspace` is "go back",
+ * and all of them are swallowed with `preventDefault`. Typing a name into the
+ * challenge sheet therefore lost letters and could not delete: the field is
+ * drawn over the chart, and the chart's menu was eating the keystrokes on
+ * their way past `window`.
+ *
+ * A `select` counts. Its own keyboard handling is how a stage gets picked in
+ * the race lobby, and arrow keys there belong to it, not to the screen behind.
+ */
+export function isTyping(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el || typeof el.tagName !== 'string') return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
+}
+
+/**
+ * Is a dialog covering this menu?
+ *
+ * A screen underneath a modal is not being looked at, so it must not answer
+ * the keyboard: arrow keys were still walking the chart behind an open sheet,
+ * and because the selection moves DOM focus with it, the focus jumped out of
+ * whatever the player was typing in — which on a phone closes the keyboard
+ * mid-word.
+ *
+ * Asked of the DOM rather than passed down as a prop, so a screen never has to
+ * know which dialogs exist above it. A dialog that runs its own menu is not
+ * covered by itself, which is what the containment test is for.
+ */
+function coveredByModal(item: HTMLElement | null): boolean {
+  if (typeof document === 'undefined') return false
+  const modal = document.querySelector('[role="dialog"][aria-modal="true"]')
+  return !!modal && !modal.contains(item)
+}
+
 export function useMenuNav({
   count,
   index,
@@ -85,6 +124,9 @@ export function useMenuNav({
   useEffect(() => {
     if (!enabled) return
     const el = items.current[index]
+    // Not while a dialog is up, and not out of a field being typed into: on a
+    // phone, moving focus closes the keyboard.
+    if (coveredByModal(el) || isTyping(document.activeElement)) return
     if (el && document.activeElement !== el) el.focus({ preventScroll: false })
   }, [index, enabled])
 
@@ -92,7 +134,9 @@ export function useMenuNav({
     if (!enabled) return
     const onKey = (e: KeyboardEvent) => {
       if (performance.now() < armedAt.current) return
+      if (isTyping(e.target)) return
       const s = state.current
+      if (coveredByModal(items.current[s.index] ?? null)) return
       const horiz = s.orientation !== 'vertical'
       const vert = s.orientation !== 'horizontal'
       const cols = s.orientation === 'grid' ? Math.max(1, s.columns) : 1
@@ -167,6 +211,7 @@ export function useMenuNav({
       raf = requestAnimationFrame(tick)
       const now = performance.now()
       if (now < armedAt.current) return
+      if (coveredByModal(items.current[state.current.index] ?? null)) return
       const pads = navigator.getGamepads?.() ?? []
       const pad = Array.from(pads).find((p) => p && p.connected)
       if (!pad) return
