@@ -4,6 +4,7 @@ import { useT } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { useShortViewport } from '../hooks/useShortViewport'
+import { useFitScale } from '../hooks/useFitScale'
 import { SeaScene } from '../art/SeaScene'
 import { GameLogo } from '../art/Logo'
 import { Anchor, HatLife, JollyRoger, Rope, ShipWheel, StarMark } from '../art/Icons'
@@ -222,6 +223,7 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp
   // Below this the menu runs off the bottom and the last plank ends up behind
   // the gunwale — reachable, since that bar is click-through, but invisible.
   const compact = useShortViewport(560)
+  const fit = useFitScale()
   const [index, setIndex] = useState(0)
   // Session-only on purpose: coming back to the title finds it dark again, so
   // the discovery is there to be made a second time.
@@ -268,9 +270,28 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp
         }}
       />
 
-      <div
-        className={`relative z-10 flex h-full w-full flex-col items-center justify-center px-6 pt-6 ${compact ? 'gap-3 pb-14' : 'gap-8 pb-20'}`}
-      >
+      {/*
+        One column: the scene above, the deck rail below, and nothing guessing
+        how tall the other one is.
+
+        The rail used to be an overlay pinned to the bottom, and this column
+        left a fixed amount of padding to clear it — `pb-14` on a short screen.
+        That is a guess about another element's height, and it was wrong the
+        moment a fifth item joined the menu on a phone whose home indicator
+        makes the rail taller: OPCIONES ended up behind the planking. It was
+        still clickable, because the rail is click-through, but a button you
+        cannot see is not a button you can press.
+
+        In the flow the rail takes the room it needs and the menu centres in
+        what is left, whatever either of them turns out to measure.
+      */}
+      <div className="relative z-10 flex h-full w-full flex-col">
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-3">
+        <div
+          ref={fit.ref as (el: HTMLDivElement | null) => void}
+          className={`flex flex-col items-center ${compact ? 'gap-3' : 'gap-8'}`}
+          style={fit.scale < 1 ? { transform: `scale(${fit.scale})` } : undefined}
+        >
         <m.div
           initial={{ y: motion ? -30 : 0, opacity: 0, scale: motion ? 0.96 : 1 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -307,8 +328,8 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp
             />
           ))}
         </m.nav>
+        </div>
       </div>
-
       {/*
         After the menu in the source, though it hangs above it on screen: tab
         order follows the document, and the first thing a keyboard should reach
@@ -326,12 +347,10 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp
         }}
       />
 
-      {/* The gunwale we are standing behind. Decoration only, and it sits on
-          z-10 over the menu, which on a short screen reaches down behind it —
-          so the whole thing is click-through. Widening the text row with the
-          build stamp was enough to put it over the OPCIONES plank and make
-          that button unpressable. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+      {/* The gunwale we are standing behind. Decoration only, so it stays
+          click-through — but it is now laid out rather than hung over the top,
+          which is what stops it covering the last plank of the menu. */}
+      <div className="pointer-events-none relative w-full shrink-0">
         <div className="relative">
           <div className="absolute -top-3 left-0 w-full overflow-hidden opacity-95">
             <Rope length={1440} thickness={15} className="w-full" />
@@ -350,6 +369,7 @@ export function TitleScreen({ onPlay, onCrew, onOptions, onMap, onVersus, onLamp
             </span>
           </div>
         </div>
+      </div>
       </div>
     </m.div>
   )
