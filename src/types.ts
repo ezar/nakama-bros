@@ -16,9 +16,67 @@ export const TILE = 16
 /**
  * The camera viewport, in world units. About 24 x 13.5 tiles — a close,
  * modern framing where the character reads as a character rather than a token.
+ *
+ * The height is the design: it decides how tall a jump looks and how much
+ * ground you can see below you, and it is fixed everywhere so a stage frames
+ * the same on every device.
+ *
+ * The width is not, and that is deliberate. A phone held sideways is about
+ * 2.17:1; a 16:9 frame on it wastes a fifth of the screen on black bars down
+ * both sides. Rather than letterbox, the view widens to match the screen and
+ * you simply see further left and right — the same trick a modern game uses on
+ * an ultrawide monitor. A 16:9 screen resolves to exactly the design width, so
+ * nothing changes on a laptop.
+ *
+ * `GAME_W` is a live binding, not a constant, and `resolveViewWidth` must run
+ * **before anything is built**: the parallax layers are baked at this width and
+ * the post-processing buffers are allocated from it, so a value that changed
+ * afterwards would leave art sized for a view that no longer exists.
  */
-export const GAME_W = 384
+export let GAME_W = 384
 export const GAME_H = 216
+
+/** The width the game is authored against, and the floor for any screen. */
+export const DESIGN_W = 384
+
+/**
+ * The widest the view may open.
+ *
+ * 2.22:1, which covers every phone made. Past that — an ultrawide monitor —
+ * letterboxing comes back, on purpose: seeing eight tiles further ahead than
+ * the person who designed the stage stops being a fit and starts being a
+ * different game.
+ */
+export const MAX_VIEW_W = 480
+
+/**
+ * The view width for a screen of this shape, in world units.
+ *
+ * Rounded to a multiple of four because the post chain downsamples the buffer
+ * by four, and the buffer is three times this: an odd width would leave that
+ * pass working on a fractional canvas.
+ */
+export function viewWidthFor(screenW: number, screenH: number): number {
+  if (!(screenW > 0) || !(screenH > 0)) return DESIGN_W
+  const wanted = GAME_H * (screenW / screenH)
+  const clamped = Math.min(MAX_VIEW_W, Math.max(DESIGN_W, wanted))
+  return Math.round(clamped / 4) * 4
+}
+
+/**
+ * Fix the view width for this session. Call once, before art or renderers.
+ *
+ * Deliberately not re-run on rotation or resize: every parallax layer is baked
+ * to this width at load, so changing it later would need the whole art library
+ * rebuilt mid-game. A phone that rotates keeps the width it booted with, and
+ * the frame letterboxes as it used to — which is the right trade for a case
+ * that ends with the player rotating back.
+ */
+export function resolveViewWidth(screenW: number, screenH: number): number {
+  GAME_W = viewWidthFor(screenW, screenH)
+  BUFFER_W = GAME_W * RENDER_SCALE
+  return GAME_W
+}
 
 /**
  * Device pixels per world unit in the render buffer.
@@ -33,8 +91,8 @@ export const RENDER_SCALE = 3
 /** Sprite sheets are drawn at this multiple of world units. Matches RENDER_SCALE. */
 export const ART_SCALE = 3
 
-/** Frame buffer dimensions in device pixels. */
-export const BUFFER_W = GAME_W * RENDER_SCALE
+/** Frame buffer dimensions in device pixels. Width follows `GAME_W`. */
+export let BUFFER_W = GAME_W * RENDER_SCALE
 export const BUFFER_H = GAME_H * RENDER_SCALE
 
 /** Physics runs at a locked step; rendering interpolates between steps. */
@@ -385,6 +443,15 @@ export interface LevelResult {
   levelId: string
   cleared: boolean
   timeLeft: number
+  /**
+   * Seconds the run took, wall to wall.
+   *
+   * Not derivable from `timeLeft`: that counts down from a limit the
+   * difficulty stretches, so the same run reports a different number on easy.
+   * This is the clock a ghost is recorded against, which makes it the only one
+   * two players can be compared on.
+   */
+  runTime: number
   berries: number
   score: number
   /** Of 3 collectible Poneglyph fragments. */

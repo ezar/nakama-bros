@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { motion as m } from 'framer-motion'
 import type { Biome, LevelDef, WorldDef } from '../../types'
-import type { LevelRecord } from '../../store/progressStore'
+import { useProgress, type LevelRecord } from '../../store/progressStore'
 import { useT, type TFunction } from '../../i18n/useT'
 import { useMenuNav } from '../hooks/useMenuNav'
 import { useShortViewport } from '../hooks/useShortViewport'
@@ -9,7 +9,7 @@ import { useUiMotion } from '../hooks/useUiMotion'
 import { Paper } from '../art/Paper'
 import { CompassRose, FragmentIcon, KrakenArm, Nail, SeaSerpent, WaxSeal } from '../art/Icons'
 import { PirateShip } from '../art/SeaScene'
-import { UI } from '../theme'
+import { UI, formatRunTime } from '../theme'
 
 /**
  * The Grand Line, as the navigator's own chart.
@@ -27,6 +27,8 @@ export interface MapScreenProps {
   records: Record<string, LevelRecord>
   /** Chosen stage. The router is expected to start it. */
   onSelect: (levelId: string) => void
+  /** Open the challenge sheet for a stage. Absent hides the button. */
+  onChallenge?: (levelId: string) => void
   onBack: () => void
 }
 
@@ -201,6 +203,27 @@ export function stageLocked(
   return i > openIndex && !records[flat[i]?.level.id ?? '']?.cleared
 }
 
+/** The chart's stages in campaign order — the sequence the rules run over. */
+export function flatten(worlds: WorldDef[]): Flat[] {
+  return worlds.flatMap((world, wi) => world.levels.map((level, si) => ({ world, wi, level, si })))
+}
+
+/**
+ * The same question the chart asks, asked by stage id instead of by position.
+ *
+ * Exists because a challenge link can name any stage in the game, and letting
+ * one open a stage the campaign has not reached would make the campaign
+ * optional. Written as a call into the two functions above rather than as the
+ * rule again: the comment on `stageLocked` is about what happens when two
+ * places disagree on this, and a second copy is how that happens.
+ */
+export function levelLocked(levelId: string, records: Record<string, LevelRecord>, worlds: WorldDef[]): boolean {
+  const flat = flatten(worlds)
+  const i = flat.findIndex((f) => f.level.id === levelId)
+  if (i < 0) return true
+  return stageLocked(i, unlockedIndex(flat, records), flat, records)
+}
+
 function StagePip({
   n,
   state,
@@ -273,18 +296,12 @@ function Legend({ t }: { t: TFunction }) {
   )
 }
 
-export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps) {
+export function MapScreen({ worlds, records, onSelect, onChallenge, onBack }: MapScreenProps) {
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
 
-  const flat = useMemo<Flat[]>(
-    () =>
-      worlds.flatMap((world, wi) =>
-        world.levels.map((level, si) => ({ world, wi, level, si })),
-      ),
-    [worlds],
-  )
+  const flat = useMemo<Flat[]>(() => flatten(worlds), [worlds])
 
   const openIndex = useMemo(() => unlockedIndex(flat, records), [flat, records])
   const [index, setIndex] = useState(openIndex)
@@ -292,6 +309,9 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
 
   const current = flat[Math.min(index, flat.length - 1)]
   const rec = current ? records[current.level.id] : undefined
+  const rivals = useProgress((s) => s.rivals)
+  const clearRival = useProgress((s) => s.clearRival)
+  const rival = current ? rivals[current.level.id] : undefined
   const isLocked = (i: number) => stageLocked(i, openIndex, flat, records)
 
   const { itemRef } = useMenuNav({
@@ -615,6 +635,23 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
               <div className="font-body text-[10px] uppercase tracking-[0.2em] text-op-parchment/55">
                 {current?.world.name} · {t('map.stage', { n: (current?.si ?? 0) + 1 })}
               </div>
+              {/* A challenge waiting on this island. Shown on the chart rather
+                  than only inside the sheet, because it is the thing that has
+                  to be noticed without being looked for. */}
+              {rival && (
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="truncate font-body text-[10px] font-extrabold uppercase tracking-[0.16em] text-op-wax-light">
+                    {t('challenge.racing', { name: rival.name || '?' })} · {formatRunTime(rival.time)}
+                  </span>
+                  <button
+                    className="shrink-0 font-body text-[9px] uppercase tracking-[0.14em] text-op-parchment/50 underline"
+                    data-menu-outsider
+                    onClick={() => current && clearRival(current.level.id)}
+                  >
+                    {t('challenge.dismiss')}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-1">
               {Array.from({ length: 3 }, (_, i) => (
@@ -636,6 +673,20 @@ export function MapScreen({ worlds, records, onSelect, onBack }: MapScreenProps)
           <button className="op-button px-4 py-2 text-sm" onClick={onBack}>
             {t('map.back')}
           </button>
+          {/* Always offered, even on a stage with nothing to send yet: this is
+              also the only way *in* for a challenge that arrived as a pasted
+              code rather than as a tapped link, and a child who has been sent
+              one has to be able to find the box without having cleared the
+              stage first. The sheet explains which half applies. */}
+          {onChallenge && current && (
+            <button
+              className="op-button px-4 py-2 text-sm"
+              data-menu-outsider
+              onClick={() => onChallenge(current.level.id)}
+            >
+              {t('challenge.open')}
+            </button>
+          )}
           <button
             className="op-button op-button--primary px-4 py-2 text-sm"
             disabled={!current || isLocked(index)}

@@ -2,11 +2,16 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { DIFFICULTIES } from '../game/config'
 import type { Difficulty } from '../types'
+import { readName } from '../game/ghostCode'
 
 export type Lang = 'es' | 'en'
 
-/** See `SAVE_VERSION` in the progress store — same contract, same reasoning. */
-const SETTINGS_VERSION = 1
+/**
+ * See `SAVE_VERSION` in the progress store — same contract, same reasoning.
+ *
+ * Version 2 adds `playerName`, which the migration must run to supply.
+ */
+const SETTINGS_VERSION = 2
 
 const DEFAULTS = {
   master: 0.8,
@@ -18,6 +23,7 @@ const DEFAULTS = {
   crt: false,
   difficulty: 'normal' as Difficulty,
   ghost: false,
+  playerName: '',
 }
 
 /** A volume outside 0..1 is not a loud game, it is a broken `GainNode`. */
@@ -44,6 +50,7 @@ export function migrateSettings(persisted: unknown, _from: number): Partial<Sett
     crt: s.crt === true,
     difficulty: oneOf(s.difficulty, DIFFICULTIES, DEFAULTS.difficulty),
     ghost: s.ghost === true,
+    playerName: readName(s.playerName),
   }
 }
 
@@ -68,6 +75,14 @@ interface SettingsState {
    * something you switch on when you want to compete with yourself.
    */
   ghost: boolean
+  /**
+   * What to sign a challenge with. Empty until somebody types one.
+   *
+   * Kept here rather than asked for each time, because the alternative is a
+   * child typing their name into a box every single time they want to send a
+   * run to their brother, which is enough friction to stop them bothering.
+   */
+  playerName: string
   set: (patch: Partial<Omit<SettingsState, 'set'>>) => void
 }
 

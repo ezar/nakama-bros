@@ -30,6 +30,8 @@ interface Props {
    */
   onTick?: () => void
   onStamp?: () => void
+  /** Open the challenge sheet for this stage. Absent hides the button. */
+  onChallenge?: () => void
 }
 
 /**
@@ -39,6 +41,22 @@ interface Props {
  * and the rank is stamped on top of the wet ink. Everything else — time,
  * berries, fragments, falls — is the clerk's small print underneath.
  */
+
+/**
+ * How the race against a rival ended, in one sentence.
+ *
+ * A dead heat is its own case rather than a rounding artefact of the other
+ * two: times are recorded to a hundredth, and "you won by 0.00s" is a sentence
+ * that makes a child feel cheated.
+ */
+export function verdict(name: string, mine: number, theirs: number) {
+  const who = name || '?'
+  const gap = `${Math.abs(mine - theirs).toFixed(2)}s`
+  if (Math.abs(mine - theirs) < 0.01) return { key: 'challenge.tied' as const, vars: { name: who, gap } }
+  return mine < theirs
+    ? { key: 'challenge.beaten' as const, vars: { name: who, gap } }
+    : { key: 'challenge.lost' as const, vars: { name: who, gap } }
+}
 
 function RankStamp({ rank, visible, size = 92 }: { rank: string; visible: boolean; size?: number }) {
   const color = RANK_COLOR[rank as keyof typeof RANK_COLOR] ?? UI.wax
@@ -95,7 +113,7 @@ function Row({ label, value, icon, short }: { label: string; value: React.ReactN
   )
 }
 
-export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false, onTick, onStamp }: Props) {
+export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false, onTick, onStamp, onChallenge }: Props) {
   const t = useT()
   const motion = useUiMotion()
   const short = useShortViewport(560)
@@ -103,6 +121,8 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
   const crewId = useProgress((s) => s.crew) as CrewId
   const crew = CREW[crewId] ?? CREW.luffy
   const best = useProgress((s) => s.records[result.levelId]?.bestScore ?? 0)
+  const hasGhost = useProgress((s) => !!s.ghosts[result.levelId])
+  const rival = useProgress((s) => s.rivals[result.levelId])
   const rank = useMemo(() => rankFor(result), [result])
 
   const [portrait, setPortrait] = useState<string | null>(null)
@@ -149,10 +169,17 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
   }, [motion, onStamp])
 
   const actions = useMemo(
-    () => (hasNext
-      ? [{ label: finale ? t('clear.finish') : t('clear.next'), run: onNext }, { label: t('clear.retry'), run: onRetry }]
-      : [{ label: t('clear.retry'), run: onRetry }]),
-    [hasNext, finale, onNext, onRetry, t],
+    () => {
+      const list = hasNext
+        ? [{ label: finale ? t('clear.finish') : t('clear.next'), run: onNext }, { label: t('clear.retry'), run: onRetry }]
+        : [{ label: t('clear.retry'), run: onRetry }]
+      // Only once there is a run on file to send. Offering it after a clear
+      // that did not beat your own best would build a code from the *old*
+      // run, which is not what the button appears to promise.
+      if (onChallenge && hasGhost) list.push({ label: t('challenge.open'), run: onChallenge })
+      return list
+    },
+    [hasNext, finale, onNext, onRetry, onChallenge, hasGhost, t],
   )
   const [index, setIndex] = useState(0)
   const { itemRef } = useMenuNav({
@@ -279,6 +306,25 @@ export function ResultScreen({ result, onNext, onRetry, hasNext, finale = false,
               />
               <Row short={short} label={t('clear.deaths')} value={result.deaths} />
             </div>
+
+            {/* The point of having raced somebody: the sentence that says who
+                won. Compared on `runTime` rather than on the clock left over,
+                because the clock starts from a limit the difficulty stretches
+                and two players on different settings would not be comparable. */}
+            {rival && (
+              <div
+                className="mt-2 rounded-sm px-3 py-2 font-body text-[11px] font-bold leading-snug"
+                style={{
+                  background: 'rgba(42,29,20,0.08)',
+                  color: result.runTime < rival.time ? UI.ink : UI.wax,
+                }}
+              >
+                {(() => {
+                  const v = verdict(rival.name, result.runTime, rival.time)
+                  return t(v.key, v.vars)
+                })()}
+              </div>
+            )}
 
             <div className={`flex items-end justify-between ${short ? 'mt-1' : 'mt-2'}`}>
               <div className="font-body text-[9px] uppercase tracking-[0.16em]" style={{ color: UI.inkSoft, opacity: 0.75 }}>

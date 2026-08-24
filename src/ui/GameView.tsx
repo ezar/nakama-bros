@@ -7,6 +7,8 @@ import { EXPOSE_DEBUG } from '../debug'
 import { useProgress } from '../store/progressStore'
 import { useSettings } from '../store/settingsStore'
 import type { AudioApi } from '../types'
+import type { GhostRacer } from '../game/ghost'
+import { PAL } from '../art/palette'
 
 interface Props {
   level: LevelDef
@@ -39,7 +41,22 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
     // recording as it stood when the stage began; swapping it mid-run for one
     // the run itself just produced would be racing a moving target.
     const { difficulty, ghost: raceGhost } = useSettings.getState()
-    const track = raceGhost ? (useProgress.getState().ghosts[level.id] ?? null) : null
+    const progress = useProgress.getState()
+    const racers: GhostRacer[] = []
+    /*
+      The rival goes in first, so it draws under your own shadow when the two
+      are on top of each other. Yours is the one you steer by.
+
+      It is also not governed by the ghost setting, which reads "race the
+      shadow of your best lap" and means exactly that. A rival is opted into
+      one stage at a time, by accepting a challenge somebody sent — turning
+      your own shadow off is a statement about clutter, not a refusal of a
+      race you already agreed to. Dismissing the rival is how you decline it.
+    */
+    const rival = progress.rivals[level.id]
+    if (rival) racers.push({ track: rival, tint: PAL.bloodOrange })
+    const mine = raceGhost ? progress.ghosts[level.id] : undefined
+    if (mine) racers.push({ track: mine })
     const game = new Game(canvas, level, crew, audio, {
       onHud: setHud,
       onLevelEnd,
@@ -49,7 +66,7 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
     // Read once, here: the difficulty decides lives and the clock at
     // construction, so changing it mid-stage would be half-applied. The next
     // level picks up the new setting.
-    }, undefined, difficulty, track)
+    }, undefined, difficulty, racers)
     gameRef.current = game
     game.start()
     // A stable handle for automated screenshots and visual review runs.

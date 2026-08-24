@@ -1,7 +1,25 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { resolveViewWidth } from './types'
 import './index.css'
+
+/**
+ * Decide how wide the view is, before anything is built with it.
+ *
+ * This has to be the first thing that runs. The parallax layers are baked to
+ * this width when the art library loads and the post-processing buffers are
+ * allocated from it, so it cannot be settled after either of those exists.
+ *
+ * `visualViewport` where there is one: on iOS the window reports the size the
+ * page was laid out at rather than what is on screen once the browser chrome
+ * has collapsed, and being wrong here is a stage framed for the wrong shape of
+ * phone for the whole session.
+ */
+resolveViewWidth(
+  Math.round(window.visualViewport?.width ?? window.innerWidth),
+  Math.round(window.visualViewport?.height ?? window.innerHeight),
+)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

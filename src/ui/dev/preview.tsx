@@ -35,6 +35,7 @@ const RESULT: LevelResult = {
   levelId: 'east-blue-1',
   cleared: true,
   timeLeft: 118.4,
+  runTime: 96.2,
   berries: 47,
   score: 28_450,
   fragments: 2,

@@ -3,12 +3,13 @@ import { motion as m } from 'framer-motion'
 import type { LevelDef } from '../../types'
 import { WORLDS, worldOf } from '../../game/level'
 import { biomePalette } from '../../art/palette'
+import { useProgress } from '../../store/progressStore'
 import { useT } from '../../i18n/useT'
 import type { TranslationKey } from '../../i18n/translations'
 import { useUiMotion } from '../hooks/useUiMotion'
 import { useShortViewport } from '../hooks/useShortViewport'
 import { JollyRoger, Rope } from '../art/Icons'
-import { UI } from '../theme'
+import { UI, formatRunTime } from '../theme'
 
 /**
  * The card before the stage — "you are going to Alabasta".
@@ -43,6 +44,7 @@ export function LevelIntroScreen({ level, onDone }: { level: LevelDef; onDone: (
   const motion = useUiMotion()
   const short = useShortViewport(560)
   const world = useMemo(() => worldOf(level.id), [level.id])
+  const rival = useProgress((s) => s.rivals[level.id])
   const pal = biomePalette(level.biome)
 
   useEffect(() => {
@@ -135,6 +137,17 @@ export function LevelIntroScreen({ level, onDone }: { level: LevelDef; onDone: (
         >
           {world ? t(`world.${world.id}` as TranslationKey) : ''}
         </p>
+
+        {/* Who you are racing, said before the stage starts rather than left
+            for the player to work out from a coloured shape on the screen. */}
+        {rival && (
+          <div
+            className={`mt-1 rounded-sm px-3 py-1 font-body font-extrabold uppercase tracking-[0.16em] ${short ? 'text-[10px]' : 'text-xs'}`}
+            style={{ background: 'rgba(0,0,0,0.4)', color: UI.waxLit, textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}
+          >
+            {t('challenge.racing', { name: rival.name || '?' })} · {formatRunTime(rival.time)}
+          </div>
+        )}
       </m.div>
 
       <div

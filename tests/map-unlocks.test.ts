@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stageLocked, unlockedIndex, type Flat } from '../src/ui/screens/MapScreen'
+import { levelLocked, stageLocked, unlockedIndex, type Flat } from '../src/ui/screens/MapScreen'
 import type { LevelRecord } from '../src/store/progressStore'
 import { ALL_LEVELS, WORLDS } from '../src/game/level'
 
@@ -84,5 +84,43 @@ describe('chart unlocks', () => {
     // This is the alarm for that.
     const ids = new Set(ALL_LEVELS.map((l) => l.id))
     for (const id of CAMPAIGN_14) expect(ids.has(id), `${id} no longer exists`).toBe(true)
+  })
+})
+
+/**
+ * The same rule, asked the way a challenge link asks it.
+ *
+ * A link names a stage by id and can name any stage in the game — including
+ * one this save has never reached. It must get the same answer the chart gives,
+ * or a link becomes a way round the campaign.
+ */
+describe('a challenge naming a stage', () => {
+  it('agrees with the chart, stage for stage', () => {
+    const records = cleared('east-blue-1', 'east-blue-2')
+    const open = unlockedIndex(flat, records)
+    for (const [i, f] of flat.entries()) {
+      expect(levelLocked(f.level.id, records, WORLDS), f.level.id)
+        .toBe(stageLocked(i, open, flat, records))
+    }
+  })
+
+  it('opens the first stage on a save that has never played', () => {
+    expect(levelLocked(ALL_LEVELS[0].id, {}, WORLDS)).toBe(false)
+  })
+
+  it('refuses a stage further along than the save has reached', () => {
+    expect(levelLocked('wano-3', cleared('east-blue-1'), WORLDS)).toBe(true)
+  })
+
+  it('opens a stage that was already cleared, wherever it sits', () => {
+    // The rule the chart learned the hard way: a finished stage is never shut
+    // again, even when new stages have since been inserted in front of it.
+    expect(levelLocked('wano-3', cleared('east-blue-1', 'wano-3'), WORLDS)).toBe(false)
+  })
+
+  it('refuses a stage this build has never heard of', () => {
+    // A link from a later version of the game. Nothing to start, so nothing
+    // is started — the challenge is still kept, it just has nowhere to go.
+    expect(levelLocked('raftel-1', cleared(...ALL_LEVELS.map((l) => l.id)), WORLDS)).toBe(true)
   })
 })

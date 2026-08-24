@@ -69,7 +69,27 @@ Las trayectorias de salto son idénticas a 60 y a 144 Hz.
 
 ### Resolución
 
-Render interno de 480×270, escalado entero al viewport. `TILE = 16`.
+`TILE = 16`. El búfer se dibuja a `RENDER_SCALE = 3` veces las unidades de
+mundo y se escala a la ventana con suavizado — el arte es vectorial cel-shaded,
+no pixel art, así que no hay escalado entero que preservar.
+
+**La altura es el diseño y no se mueve: `GAME_H = 216`.** Decide cuánto salto
+cabe en pantalla y cuánto suelo ves debajo, y es igual en todos los aparatos
+para que una fase se encuadre igual en todos.
+
+**El ancho no.** `GAME_W` arranca en 384 (16:9) y se abre hasta 480 según la
+proporción de la pantalla. Un móvil en horizontal es 2,17:1, y un marco 16:9
+ahí desperdicia una quinta parte de la pantalla en barras negras; en vez de
+poner barras, la vista se ensancha y ves más a izquierda y derecha. Una
+pantalla 16:9 da exactamente 384, así que en portátil no cambia nada. Más
+ancho que 2,22:1 vuelven las barras a propósito: ver ocho tiles más allá que
+quien diseñó la fase deja de ser un ajuste y pasa a ser otro juego.
+
+`GAME_W` es un *live binding*, no una constante, y `resolveViewWidth()` se
+llama en `main.tsx` **antes de que se construya nada**: las capas de parallax
+se hornean con ese ancho y los búferes de post se reservan a partir de él, así
+que un valor que cambiara después dejaría el arte dimensionado para una vista
+que ya no existe. Por eso tampoco se recalcula al rotar el móvil.
 
 ## Convenciones
 
@@ -102,6 +122,36 @@ se guardan aparte y **nunca** pueden bloquear la instalación. Un despliegue
 nuevo se recoge en el siguiente arranque y limpia los bundles que ya nadie pide.
 Un worker nuevo espera en vez de tomar el mando: cambiar el bundle debajo de una
 partida en curso es peor que jugar un rato más con el de ayer.
+
+### Retos entre dos móviles
+
+Una vuelta terminada se puede mandar a otra persona, y quien la reciba corre
+contra tu sombra. No hay servidor, ni cuenta, ni nada que subir: **el enlace
+lleva la vuelta entera dentro**.
+
+- `src/game/ghost.ts` es el formato **guardado**: posiciones absolutas, cinco
+  caracteres por pose. Absoluto a propósito — se lee desde `localStorage`, que
+  puede quedarse a medio escribir, y un delta que se corta desplaza el resto de
+  la grabación sin avisar.
+- `src/game/ghostCode.ts` es el formato **que viaja**: los mismos datos con
+  deltas y una cabecera, en base64url. Un código se verifica entero antes de
+  leer una sola pose, así que aquí los deltas salen gratis y lo dejan en torno
+  al 40% — una vuelta de noventa segundos son unos 2 KB en vez de 5,4 KB.
+  La clase de pose más barata no lleva campo vertical: en un plataformas lo más
+  común es correr por suelo llano, y de ahí sale casi todo el ahorro.
+- El código lleva **checksum y longitud declarada**. Lo primero porque una
+  aplicación de mensajería puede cortar un enlace largo, y sin comprobarlo un
+  código truncado se convierte en un rival que desaparece a mitad de fase con
+  un tiempo que no cuadra. Lo segundo porque lo que se pega nunca es sólo el
+  código: es el mensaje entero, y hay que saber dónde acaba la carga útil.
+- Viaja en el **hash** (`#r=…`). Obligatorio: Pages no tiene enrutador, así que
+  cualquier ruta que no sea el fichero que existe devuelve un 404. De regalo,
+  el hash no se manda al servidor.
+- Un reto de una fase que aún no has desbloqueado **se guarda pero no la abre**
+  (`levelLocked`). Si un enlace pudiera arrancar cualquier fase, la campaña
+  pasaría a ser opcional.
+- Los rivales viven aparte de tus fantasmas en `progressStore` y **sobreviven a
+  `reset()`**: tu fantasma es tu progreso, el reto te lo regaló alguien.
 
 ### Partidas guardadas
 

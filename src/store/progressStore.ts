@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { CREW_IDS } from '../game/config'
 import { GHOST_MAX_POSES, type GhostTrack } from '../game/ghost'
+import { readName } from '../game/ghostCode'
 import type { CrewId, LevelResult } from '../types'
 
 /**
@@ -14,8 +15,14 @@ import type { CrewId, LevelResult } from '../types'
  * and an id nobody recognises is harmless: the chart only ever looks up the
  * ids it knows about, so an old record for a renamed stage is ignored rather
  * than believed.
+ *
+ * Version 2 adds `rivals`. A version-1 save has no such key, and zustand only
+ * runs `migrate` when the stored number differs from this one — so leaving it
+ * at 1 would load those saves without the field ever passing through the
+ * validator. It would still work, because the initial state supplies an empty
+ * object that a shallow merge leaves alone, but it would work by accident.
  */
-const SAVE_VERSION = 1
+const SAVE_VERSION = 2
 
 const num = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback
@@ -54,6 +61,7 @@ export function migrateProgress(persisted: unknown, _from: number): Partial<Prog
     totalBerries: Math.max(0, num(s.totalBerries, 0)),
     giftEarned: s.giftEarned === true,
     ghosts: readGhosts(s.ghosts),
+    rivals: readRivals(s.rivals),
   }
 }
 
@@ -83,6 +91,33 @@ function readGhosts(raw: unknown): Record<string, GhostTrack> {
   return out
 }
 
+/**
+ * Somebody else's run, kept per stage.
+ *
+ * Held apart from `ghosts` rather than in it, because they answer different
+ * questions and one must not overwrite the other: `ghosts` is the best *you*
+ * have done and is replaced only by beating it, a rival is a challenge that
+ * arrived and is replaced by whichever one arrived last. Racing your sister's
+ * time should not cost you your own shadow, and beating her should not delete
+ * her — you will want the rematch.
+ */
+export interface Rival extends GhostTrack {
+  /** Who sent it. Shown next to their time; may be empty. */
+  name: string
+}
+
+/**
+ * Rivals, checked the same way ghosts are, plus the name.
+ */
+function readRivals(raw: unknown): Record<string, Rival> {
+  const out: Record<string, Rival> = {}
+  for (const [id, track] of Object.entries(readGhosts(raw))) {
+    const g = (raw as Record<string, Record<string, unknown>>)[id]
+    out[id] = { ...track, name: readName(g?.name) }
+  }
+  return out
+}
+
 export interface LevelRecord {
   cleared: boolean
   bestScore: number
@@ -102,11 +137,17 @@ interface ProgressState {
   giftEarned: boolean
   /** Best recorded run per level, for the ghost. Absent until one is set. */
   ghosts: Record<string, GhostTrack>
+  /** A challenge somebody sent, per level. Absent until one is accepted. */
+  rivals: Record<string, Rival>
   setCrew: (c: CrewId) => void
   record: (r: LevelResult) => void
   earnGift: () => void
   /** Keep this run's recording if it beats the one on file. */
   saveGhost: (levelId: string, track: GhostTrack) => void
+  /** Take on a challenge. Replaces whatever was on that stage before. */
+  saveRival: (levelId: string, rival: Rival) => void
+  /** Send a rival away, once you are done being beaten by them. */
+  clearRival: (levelId: string) => void
   isCleared: (id: string) => boolean
   reset: () => void
 }
@@ -119,6 +160,7 @@ export const useProgress = create<ProgressState>()(
       totalBerries: 0,
       giftEarned: false,
       ghosts: {},
+      rivals: {},
       setCrew: (crew) => set({ crew }),
       record: (r) =>
         set((s) => {
@@ -148,12 +190,25 @@ export const useProgress = create<ProgressState>()(
           if (best && best.time <= track.time) return s
           return { ghosts: { ...s.ghosts, [levelId]: track } }
         }),
+      // Unconditional, unlike `saveGhost`: a challenge is not a personal best
+      // being defended, it is the last thing somebody sent you. If Leyre sends
+      // a slower time than Luca did last week, the one on the stage is hers.
+      saveRival: (levelId, rival) =>
+        set((s) => ({ rivals: { ...s.rivals, [levelId]: { ...rival, name: readName(rival.name) } } })),
+      clearRival: (levelId) =>
+        set((s) => {
+          const { [levelId]: gone, ...rest } = s.rivals
+          return gone ? { rivals: rest } : s
+        }),
       isCleared: (id) => get().records[id]?.cleared ?? false,
       // Records and takings only. `giftEarned` survives on purpose: wiping
       // your progress to play the campaign again should not take a present
       // away from you.
       // Ghosts go with the records they belong to: a shadow of a run you no
       // longer have a time for is a race against nothing.
+      // Rivals survive a reset, unlike ghosts. A ghost is a record of your own
+      // progress and goes with the rest of it; a challenge is a thing somebody
+      // gave you, and starting the campaign again is no reason to throw it out.
       reset: () => set({ records: {}, totalBerries: 0, ghosts: {} }),
     }),
     {
