@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TILE, type CrewId, type HudSnapshot, type LevelDef, type LevelResult } from '../types'
 import { Game } from '../game/Game'
 import { Hud } from './hud/Hud'
-import { TouchControls } from './controls/TouchControls'
+import { PauseButton, TouchControls } from './controls/TouchControls'
 import { EXPOSE_DEBUG } from '../debug'
 import { useProgress } from '../store/progressStore'
 import { useSettings } from '../store/settingsStore'
@@ -145,7 +145,14 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
   return (
     <div className="relative flex h-full w-full items-center justify-center bg-[#050a14]">
       <canvas ref={canvasRef} className="shadow-[0_0_80px_-10px_rgba(0,180,216,0.35)]" />
-      {hud && <Hud hud={hud} compass={compass} compact={showTouch} />}
+      {hud && (
+        <Hud
+          hud={hud}
+          compass={compass}
+          compact={showTouch}
+          pause={showTouch && gameRef.current ? <PauseButton input={gameRef.current.inputManager} /> : undefined}
+        />
+      )}
       {gameRef.current && (
         <TouchControls input={gameRef.current.inputManager} visible={showTouch} />
       )}

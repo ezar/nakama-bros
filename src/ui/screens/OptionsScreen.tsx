@@ -4,6 +4,8 @@ import { useSettings } from '../../store/settingsStore'
 import { DIFFICULTIES } from '../../game/config'
 import { useT } from '../../i18n/useT'
 import { useUiMotion } from '../hooks/useUiMotion'
+import { useTwoColumns } from '../hooks/useTwoColumns'
+import { useFitScale } from '../hooks/useFitScale'
 import { Paper } from '../art/Paper'
 import { Nail, Rope, ShipWheel } from '../art/Icons'
 import { UI } from '../theme'
@@ -102,6 +104,8 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
   const t = useT()
   const s = useSettings()
   const motion = useUiMotion()
+  const twoCol = useTwoColumns()
+  const fit = useFitScale()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -146,7 +150,15 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
         {/* `m-auto`, not `justify-center`: a centred flex child that overflows
             spills past the top of the scroll box and cannot be scrolled back to. */}
         <div className="flex min-h-full flex-col">
-          <div className="m-auto">
+          {/* Shrunk to fit before being scrolled. Two columns brought the sheet
+              down from twice the height of a sideways phone to just over it,
+              and the hundred pixels left over are the two buttons at the
+              bottom — which is exactly the part a player needs to reach. */}
+          <div className="m-auto" style={{ height: fit.height }}>
+          <div
+            ref={fit.ref as (el: HTMLDivElement | null) => void}
+            style={fit.scale < 1 ? { transform: `scale(${fit.scale})`, transformOrigin: 'top center' } : undefined}
+          >
       <m.div
         initial={{ y: motion ? 18 : 0, rotate: motion ? 0.8 : 0.4 }}
         animate={{ y: 0, rotate: 0.4 }}
@@ -154,7 +166,13 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
         className="relative z-10"
         style={{ filter: 'drop-shadow(0 18px 22px rgba(0,0,0,0.7))' }}
       >
-        <Paper seed={31} edges="all" bite={1.2} age={0.45} className="w-[min(470px,92vw)] px-7 pb-6 pt-7">
+        <Paper
+          seed={31}
+          edges="all"
+          bite={1.2}
+          age={0.45}
+          className={`px-7 pb-6 pt-7 ${twoCol ? 'w-[min(860px,94vw)]' : 'w-[min(470px,92vw)]'}`}
+        >
           <span className="absolute left-4 top-2">
             <Nail size={14} />
           </span>
@@ -170,6 +188,15 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
             <Rope length={240} thickness={7} />
           </div>
 
+          {/*
+            Two columns on a screen that is wide and short — a phone held
+            sideways. As one column this list is nearly twice the height of
+            such a screen, so the half holding the ghost switch sat below the
+            fold with nothing to say the sheet went on, while three hundred
+            pixels of width went unused on either side of it.
+          */}
+          <div className={twoCol ? 'grid grid-cols-2 gap-x-8' : undefined}>
+          <div>
           {/* First, and above the volumes: it is the only setting here that
               changes the game rather than the box it comes in. The note under
               it says what you get, because a child choosing "Fácil" should not
@@ -197,10 +224,12 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           <Slider label={t('options.music')} value={s.music} onChange={(v) => s.set({ music: v })} />
           <Slider label={t('options.sfx')} value={s.sfx} onChange={(v) => s.set({ sfx: v })} />
 
-          <div className="my-2 flex justify-center opacity-50">
+          <div className={`my-2 flex justify-center opacity-50 ${twoCol ? 'hidden' : ''}`}>
             <Rope length={200} thickness={6} />
           </div>
+          </div>
 
+          <div>
           <Toggle
             label={t('options.lang')}
             value={s.lang}
@@ -256,16 +285,22 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           >
             {t('options.ghostNote')}
           </p>
+          </div>
+          </div>
 
           {/* The credits are their own screen, and they carry the legal
               notice and the drawing with them: this sheet is for knobs. */}
-          <button className="op-button mt-5 w-full" onClick={onCredits}>
-            {t('options.credits')}
-          </button>
-
-          <button className="op-button op-button--primary mt-2 w-full" onClick={onBack}>
-            {t('options.back')}
-          </button>
+          {/* Written primary-first and reversed in both directions, so the
+              way out is the button nearest the thumb either way: bottom of
+              the stack in one column, right-hand side in two. */}
+          <div className={`mt-4 flex gap-2 ${twoCol ? 'flex-row-reverse' : 'flex-col-reverse'}`}>
+            <button className="op-button op-button--primary w-full" onClick={onBack}>
+              {t('options.back')}
+            </button>
+            <button className="op-button w-full" onClick={onCredits}>
+              {t('options.credits')}
+            </button>
+          </div>
 
           {/* The build. The title screen hides its copy on a narrow screen,
               and a phone running this as a cached PWA is exactly where
@@ -278,6 +313,7 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
           </div>
         </Paper>
       </m.div>
+          </div>
           </div>
         </div>
       </div>
