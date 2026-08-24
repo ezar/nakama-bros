@@ -153,6 +153,45 @@ lleva la vuelta entera dentro**.
 - Los rivales viven aparte de tus fantasmas en `progressStore` y **sobreviven a
   `reset()`**: tu fantasma es tu progreso, el reto te lo regaló alguien.
 
+### Carrera en directo entre dos aparatos
+
+Dos navegadores en la misma red corren la misma fase a la vez y cada uno ve al
+otro. Vale cualquier combinación —dos móviles, dos PCs, uno de cada—, y **dos
+PCs es el caso más fácil**: no hay permiso de red local de por medio.
+
+- **Cada lado simula su propia fase.** Sus enemigos, su física, su reloj. Por el
+  cable sólo va dónde está el otro cuerpo. No es un atajo: es lo que hace que
+  esto funcione entre un iPhone y un portátil. `Math.sin` no está obligado a dar
+  el mismo último bit en dos motores y el step tiene 54 llamadas
+  trigonométricas, así que cualquier cosa que dependiera de que los dos lados
+  coincidan se separaría en silencio. Aquí no hay nada en lo que coincidir.
+- **El otro jugador es un `Shadow`**, la misma clase que dibuja tu fantasma y el
+  rival de un reto; sólo cambia de dónde salen las poses. No colisiona, no se
+  pisa, no se pelea — el momento en que pudiera empujarte dejaría de ser una
+  carrera para ser un obstáculo con 60 ms de latencia.
+- **Dos canales**: el de poses va sin orden ni reenvío (una pose que llega tarde
+  es peor que una que no llega: mueve el cuerpo hacia atrás), y el de control va
+  fiable, porque perder un «ya» pierde la carrera.
+- **El emparejamiento son dos códigos**, ida y vuelta, con la misma máquinaria
+  que un reto (`engine/bytes.ts`). No hay forma de hacerlo con uno solo: WebRTC
+  necesita que cada lado vea la descripción del otro. El SDP de un canal de
+  datos son ~590 caracteres, más corto que un reto, porque no negocia códecs.
+- **No se espera a `complete` al recoger candidatos.** Medido: el navegador da
+  la dirección útil a los 8 ms y luego sigue recogiendo indefinidamente buscando
+  un relay que no existe. Se espera un poco tras el primer candidato — 3 s de
+  pantalla en blanco pasan a 400 ms.
+- **Sin servidores ICE.** Un STUN sólo sirve para salir a internet y un TURN lo
+  paga alguien. En una red local sobran las direcciones que ya se conocen.
+- **La carrera no toca el progreso**: ni berries, ni fase superada, ni fantasma.
+  Por eso el anfitrión puede elegir cualquier fase suya sin preguntar por dónde
+  va el otro — si no desbloquea nada, no hay nada que vigilar.
+- **La revancha no repite el emparejamiento** (`rematch()`). Pasar los códigos
+  cuesta la mitad de un minuto, y pedirlo tras cada carrera es la diferencia
+  entre que jueguen tres y que jueguen una.
+- **Lo que puede impedirlo**: un router con aislamiento de clientes, que muchas
+  redes de invitados traen puesto. Eso no se arregla desde aquí, así que la
+  pantalla lo dice en vez de quedarse esperando.
+
 ### Partidas guardadas
 
 Los dos stores persistidos llevan `version` y `migrate` (`src/store/`). El

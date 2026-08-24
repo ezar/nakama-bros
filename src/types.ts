@@ -68,9 +68,13 @@ export function viewWidthFor(screenW: number, screenH: number): number {
  *
  * Deliberately not re-run on rotation or resize: every parallax layer is baked
  * to this width at load, so changing it later would need the whole art library
- * rebuilt mid-game. A phone that rotates keeps the width it booted with, and
- * the frame letterboxes as it used to — which is the right trade for a case
- * that ends with the player rotating back.
+ * rebuilt mid-game.
+ *
+ * That is only safe because the caller passes the screen's longer edge as the
+ * width — see `main.tsx`. A phone is picked up in portrait and turned sideways
+ * to play, so measuring the viewport as it stands at boot gets the portrait
+ * shape and holds it for the whole session, which is precisely the black bars
+ * this was written to remove.
  */
 export function resolveViewWidth(screenW: number, screenH: number): number {
   GAME_W = viewWidthFor(screenW, screenH)

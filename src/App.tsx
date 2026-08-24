@@ -20,12 +20,15 @@ import { EndingScreen } from './ui/screens/EndingScreen'
 import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
 import { ChallengeScreen } from './ui/screens/ChallengeScreen'
 import { ChallengePanel } from './ui/ChallengePanel'
+import { VersusScreen } from './ui/screens/VersusScreen'
+import { RaceResultScreen } from './ui/screens/RaceResultScreen'
+import type { RaceSession } from './net/session'
 import { consumeChallengeFromLocation } from './game/challengeLink'
 import { decodeChallenge } from './game/ghostCode'
 
 type Screen =
   | 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'ending' | 'intro' | 'play'
-  | 'challenge'
+  | 'challenge' | 'versus'
 
 /**
  * Screen router and session owner.
@@ -75,6 +78,14 @@ export default function App() {
    * would be unmounted mid-action.
    */
   const [sharing, setSharing] = useState<string | null>(null)
+  /**
+   * The live race in progress, or null.
+   *
+   * Held here rather than in the screen that set it up, because it outlives
+   * that screen: the connection is made in the lobby and is still the same one
+   * carrying poses two minutes into the stage.
+   */
+  const [race, setRace] = useState<RaceSession | null>(null)
 
   const crew = useProgress((s) => s.crew)
   const rivals = useProgress((s) => s.rivals)
@@ -165,19 +176,25 @@ export default function App() {
 
   const onLevelEnd = useCallback(
     (r: LevelResult) => {
-      recordResult(r)
+      // A race is an exhibition: no berries banked, no stage marked cleared.
+      // The engine already withholds the ghost; this is the other half, and it
+      // is what lets the host pick any stage without asking what the guest has
+      // reached. See the note in `Game.finish`.
+      if (!race) recordResult(r)
       setResult(r)
     },
-    [recordResult],
+    [recordResult, race],
   )
 
   const quitToMenu = useCallback(() => {
     setPaused(false)
     setResult(null)
     setGameOver(false)
+    race?.close()
+    setRace(null)
     setScreen('title')
     audio.stopMusic(0.3)
-  }, [audio])
+  }, [audio, race])
 
   const renderScreen = () => {
     switch (screen) {
@@ -191,6 +208,7 @@ export default function App() {
             onCrew={() => setScreen('crew')}
             onMap={() => setScreen('map')}
             onOptions={() => setScreen('options')}
+            onVersus={() => setScreen('versus')}
             onLamp={(lit) => audio.playSfx(lit ? 'checkpoint' : 'menu-back')}
           />
         )
@@ -267,6 +285,26 @@ export default function App() {
           />
         )
       }
+      case 'versus':
+        return (
+          <VersusScreen
+            key="versus"
+            session={race}
+            onRace={(session, id) => {
+              setRace(session)
+              // Straight into the stage, with no island card in between: the
+              // countdown is already running on both devices and a screen that
+              // waited for a tap would spend it.
+              setLevelId(id)
+              setResult(null)
+              setGameOver(false)
+              setPaused(false)
+              setRunKey((k) => k + 1)
+              setScreen('play')
+            }}
+            onBack={() => setScreen('title')}
+          />
+        )
       case 'intro':
         return <LevelIntroScreen key={`intro:${levelId}:${runKey}`} level={level} onDone={() => setScreen('play')} />
       default:
@@ -309,6 +347,7 @@ export default function App() {
             level={level}
             crew={crew}
             audio={audio}
+            race={race}
             paused={paused || !!result || gameOver}
             onPause={() => setPaused(true)}
             onLevelEnd={onLevelEnd}
@@ -323,7 +362,22 @@ export default function App() {
                 onQuit={quitToMenu}
               />
             )}
-            {result && (
+            {result && race && (
+              <RaceResultScreen
+                key="raceresult"
+                race={race}
+                onAgain={() => {
+                  setResult(null)
+                  setPaused(false)
+                  // The connection stays up: a rematch goes back to the lobby,
+                  // not back through the handshake.
+                  race.rematch()
+                  setScreen('versus')
+                }}
+                onLeave={quitToMenu}
+              />
+            )}
+            {result && !race && (
               <ResultScreen
                 key="result"
                 result={result}

@@ -22,6 +22,8 @@ import './entities/enemies'
 import './entities/items'
 import './entities/bosses'
 import { Ghost } from './entities/Ghost'
+import { LiveRival } from './entities/LiveRival'
+import type { RaceSession } from '../net/session'
 import { GHOST_MIN_POSES, GhostRecorder, type GhostRacer, type GhostTrack } from './ghost'
 
 /** Seconds the HUD keeps showing a multiplier after the last link landed. */
@@ -106,6 +108,14 @@ export class Game implements World {
      * good run at all.
      */
     racers: GhostRacer[] = [],
+    /**
+     * A live race against another device, or null for an ordinary run.
+     *
+     * The game does not know this involves a network. It hands over where the
+     * body is, asks where the other one is, and says when it crossed the line
+     * — the session deals with everything else.
+     */
+    private readonly race: RaceSession | null = null,
   ) {
     this.level = levelDef
     this.rng = new Rng(seedFrom(levelDef.id))
@@ -131,6 +141,9 @@ export class Game implements World {
     this.camera.setBounds(this.levelObj.map.pixelW, this.levelObj.map.pixelH)
     this.reset()
     for (const racer of racers) this.spawn(new Ghost(racer.track, racer.tint ?? null))
+    if (race) {
+      this.spawn(new LiveRival(race, race.snapshot().opponent?.crew ?? 'luffy', PAL.bloodOrange))
+    }
 
     this.loop = new GameLoop({
       step: (dt) => this.step(dt),
@@ -179,7 +192,20 @@ export class Game implements World {
 
   /** Rebuild the level from its definition and place the player. */
   reset(fromCheckpoint = false): void {
+    /*
+      Shadows survive the rebuild.
+
+      They are not part of the stage — they are watching it — and rebuilding
+      the level from its definition would drop every one of them. That was a
+      real bug rather than a hypothetical: dying is precisely the moment a
+      player wants to see how far ahead the run they are chasing got to, and
+      instead the other body vanished for the rest of the lap with nothing to
+      say why. In a live race it was worse, because the opponent never came
+      back at all.
+    */
+    const shadows = this.entities.filter((e) => e.tags.has('ghost') && !e.dead)
     this.entities = this.levelObj.buildEntities()
+    this.entities.push(...shadows)
     this.particles.clear()
     const spawn: Vec2 =
       fromCheckpoint && this.run.checkpoint
@@ -281,6 +307,25 @@ export class Game implements World {
   // ── Step ───────────────────────────────────────────────────────────────────
 
   private step(dt: number): void {
+    /*
+      A race holds everybody at the start line until both countdowns run out.
+
+      The whole step is skipped rather than just the input: a stage that ticked
+      while waiting would have its enemies and its clock several seconds ahead
+      of the other player's by the time anyone could move, and the two would be
+      racing visibly different stages.
+
+      Nothing is drawn from here — the loop renders after stepping regardless,
+      so the stage keeps being painted, frozen, behind the countdown.
+    */
+    if (this.race && !this.race.started) {
+      // The stage is frozen, but the readout is not: without this the lives,
+      // the clock and the berries are simply absent for the three seconds of
+      // the countdown, and a HUD that appears at the gun looks like something
+      // that failed to load rather than something that was waiting.
+      this.callbacks.onHud?.(this.hud())
+      return
+    }
     this.time += dt
     // The chain readout outlives the chain by a beat, on purpose: landing is
     // what ends a chain, and a number that disappeared on the same frame would
@@ -291,9 +336,12 @@ export class Game implements World {
     // of the lap being raced.
     const racer = this.playerRef
     if (racer && !this.ended && !racer.dead && racer.state !== 'clear' && racer.state !== 'dead') {
-      this.recorder.sample(dt, {
-        x: racer.body.x, y: racer.body.y, facing: racer.facing, anim: racer.anim,
-      })
+      const pose = { x: racer.body.x, y: racer.body.y, facing: racer.facing, anim: racer.anim }
+      this.recorder.sample(dt, pose)
+      // The same pose the recorder gets, on the same clock: the other side
+      // orders what arrives by this number, and it must mean the same thing
+      // as the time this run will be judged on.
+      this.race?.publish(dt, pose, this.recorder.seconds * 1000)
     }
     const input = this.inputMgr.sample()
 
@@ -390,7 +438,17 @@ export class Game implements World {
 
   private finish(): void {
     this.endTimer = -1
-    if (this.recorder.poses >= GHOST_MIN_POSES) {
+    this.race?.finish(+this.recorder.seconds.toFixed(2))
+    /*
+      A race is an exhibition and leaves no mark on either save: no ghost, no
+      berries, no stage recorded as cleared.
+
+      Which is what lets the host pick any stage without having to ask what the
+      other player has reached. A link that could open a locked stage would make
+      the campaign optional; a race that records nothing cannot, so it does not
+      have to be policed.
+    */
+    if (!this.race && this.recorder.poses >= GHOST_MIN_POSES) {
       const track = this.recorder.finish(this.run.crew)
       if (track) this.callbacks.onGhostRecorded?.(this.level.id, track)
     }

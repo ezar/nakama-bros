@@ -15,11 +15,29 @@ import './index.css'
  * page was laid out at rather than what is on screen once the browser chrome
  * has collapsed, and being wrong here is a stage framed for the wrong shape of
  * phone for the whole session.
+ *
+ * ## Why the longer edge is always the width
+ *
+ * This is a landscape game, and a phone is picked up in portrait. So the boot
+ * almost always happens in the wrong orientation and the player rotates a
+ * moment later — which is not an edge case, it is the ordinary path.
+ *
+ * Measuring the viewport as it stands at that moment gets a portrait shape,
+ * which resolves to the narrowest allowed view, and because the layers are
+ * baked once it stays that way for the whole session: black bars down both
+ * sides of a landscape screen, exactly what the adaptive width was for. An
+ * earlier note called rotation "the right trade for a case that ends with the
+ * player rotating back". That was wrong about this game — nobody rotates back.
+ *
+ * Sorting the two numbers costs nothing and makes the boot orientation stop
+ * mattering at all, which is a better answer than recalculating later: the
+ * value still has to be settled before a single layer is baked.
  */
-resolveViewWidth(
-  Math.round(window.visualViewport?.width ?? window.innerWidth),
-  Math.round(window.visualViewport?.height ?? window.innerHeight),
-)
+{
+  const a = Math.round(window.visualViewport?.width ?? window.innerWidth)
+  const b = Math.round(window.visualViewport?.height ?? window.innerHeight)
+  resolveViewWidth(Math.max(a, b), Math.min(a, b))
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -217,23 +217,48 @@ export function TouchControls({ input, visible }: Props) {
         </button>
       </div>
 
-      {/* ── Pause, out of the way of both thumbs ── */}
-      <button
-        {...hold('pause')}
-        aria-label={t('touch.pause')}
-        className="pointer-events-auto absolute right-4 grid h-10 w-10 place-items-center rounded-[6px] transition-transform duration-75 data-[pressed=true]:translate-y-[3px]"
-        style={{
-          top: '4.5rem',
-          border: `2px solid ${UI.brassDark}`,
-          backgroundImage: 'linear-gradient(180deg, rgba(255,226,180,0.14), rgba(0,0,0,0.4))',
-          backgroundColor: 'rgba(16,9,4,0.6)',
-        }}
-      >
-        <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden="true">
-          <rect x={3} y={2} width={4} height={12} rx={1.2} fill={UI.brassLit} />
-          <rect x={9} y={2} width={4} height={12} rx={1.2} fill={UI.brassLit} />
-        </svg>
-      </button>
     </div>
+  )
+}
+
+/**
+ * Pause, rendered inside the HUD's own right-hand column.
+ *
+ * It used to live with the thumb controls, pinned four and a half rem from the
+ * top of the screen — a guess at where the readout above it ended. The readout
+ * is a stack that grows: the clock sits under the score, and a chain multiplier
+ * appears under that. The guess was wrong, and the button sat on the clock.
+ *
+ * Handing it to the HUD to lay out means the two cannot overlap however either
+ * of them changes, which a better guess would not have bought. It still writes
+ * to the input rather than calling a handler, so the pause goes through the
+ * game the same way the keyboard's does.
+ */
+export function PauseButton({ input }: { input: Input }) {
+  const t = useT()
+  const press = (down: boolean) => (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (down) e.preventDefault()
+    e.currentTarget.dataset.pressed = String(down)
+    input.setVirtual('pause', down)
+  }
+  return (
+    <button
+      onPointerDown={press(true)}
+      onPointerUp={press(false)}
+      onPointerLeave={press(false)}
+      onPointerCancel={press(false)}
+      aria-label={t('touch.pause')}
+      className="pointer-events-auto grid h-10 w-10 place-items-center rounded-[6px] transition-transform duration-75 data-[pressed=true]:translate-y-[3px]"
+      style={{
+        border: `2px solid ${UI.brassDark}`,
+        backgroundImage: 'linear-gradient(180deg, rgba(255,226,180,0.14), rgba(0,0,0,0.4))',
+        backgroundColor: 'rgba(16,9,4,0.6)',
+      }}
+    >
+      <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden="true">
+        <rect x={3} y={2} width={4} height={12} rx={1.2} fill={UI.brassLit} />
+        <rect x={9} y={2} width={4} height={12} rx={1.2} fill={UI.brassLit} />
+      </svg>
+    </button>
   )
 }

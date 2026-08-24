@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { HudSnapshot } from '../../types'
 import { CREW } from '../../game/config'
 import { useT } from '../../i18n/useT'
@@ -30,6 +30,15 @@ interface Props {
   compass?: () => CompassReading | null
   /** Touch controls are up: drop the corner instruments they would collide with. */
   compact?: boolean
+  /**
+   * The pause button, when there is one to place.
+   *
+   * Laid out here rather than positioned over the top by whoever owns it. The
+   * right-hand column grows — score, clock, and a chain multiplier when one is
+   * running — so anything pinned at a fixed distance from the top of the
+   * screen eventually lands on it. Given to the flex stack, it cannot.
+   */
+  pause?: ReactNode
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -231,7 +240,7 @@ function LogPose({ sample, motion, label }: { sample: () => CompassReading | nul
 
 /* ── HUD ─────────────────────────────────────────────────────────────────── */
 
-export const Hud = memo(function Hud({ hud, compass, compact = false }: Props) {
+export const Hud = memo(function Hud({ hud, compass, compact = false, pause }: Props) {
   const t = useT()
   const seconds = Math.max(0, Math.ceil(hud.time))
   const urgent = seconds <= 30
@@ -335,6 +344,7 @@ export const Hud = memo(function Hud({ hud, compass, compact = false }: Props) {
 
       {/* ── Top right: purse, score, clock ── */}
       <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
+        {pause}
         <Strip className="flex items-center gap-2">
           <span style={{ color: '#7C5A21' }}>
             <BerryIcon size={16} />
