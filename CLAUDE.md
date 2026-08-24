@@ -69,7 +69,27 @@ Las trayectorias de salto son idénticas a 60 y a 144 Hz.
 
 ### Resolución
 
-Render interno de 480×270, escalado entero al viewport. `TILE = 16`.
+`TILE = 16`. El búfer se dibuja a `RENDER_SCALE = 3` veces las unidades de
+mundo y se escala a la ventana con suavizado — el arte es vectorial cel-shaded,
+no pixel art, así que no hay escalado entero que preservar.
+
+**La altura es el diseño y no se mueve: `GAME_H = 216`.** Decide cuánto salto
+cabe en pantalla y cuánto suelo ves debajo, y es igual en todos los aparatos
+para que una fase se encuadre igual en todos.
+
+**El ancho no.** `GAME_W` arranca en 384 (16:9) y se abre hasta 480 según la
+proporción de la pantalla. Un móvil en horizontal es 2,17:1, y un marco 16:9
+ahí desperdicia una quinta parte de la pantalla en barras negras; en vez de
+poner barras, la vista se ensancha y ves más a izquierda y derecha. Una
+pantalla 16:9 da exactamente 384, así que en portátil no cambia nada. Más
+ancho que 2,22:1 vuelven las barras a propósito: ver ocho tiles más allá que
+quien diseñó la fase deja de ser un ajuste y pasa a ser otro juego.
+
+`GAME_W` es un *live binding*, no una constante, y `resolveViewWidth()` se
+llama en `main.tsx` **antes de que se construya nada**: las capas de parallax
+se hornean con ese ancho y los búferes de post se reservan a partir de él, así
+que un valor que cambiara después dejaría el arte dimensionado para una vista
+que ya no existe. Por eso tampoco se recalcula al rotar el móvil.
 
 ## Convenciones
 
