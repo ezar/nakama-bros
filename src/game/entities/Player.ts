@@ -1380,15 +1380,37 @@ export class Player extends Entity {
     const mods = this.mods
     const scale = mods.scale
 
-    // Aura behind the sprite for the powered tiers.
-    if (mods.aura) {
+    /*
+      Aura behind the sprite for the powered tiers.
+
+      Two things were wrong with the first version and both only showed at gear
+      3, where the body is half again as big. It was a flat fill with a hard
+      rim, so it was not a glow at all but a shape — a pale ellipse with a
+      visible edge. And its radii came straight off the body, so at gear 3 it
+      grew to sixty by seventy on a screen two hundred and seventy tall. Stand
+      still — or die, which is when you are stuck looking at it — and it read
+      as a translucent box someone had left on the screen.
+
+      Now it is a radial gradient that reaches zero alpha at the rim, so there
+      is no edge to see at any size, and the radius grows far slower than the
+      body: gear 3 widens it by a fifth rather than by a half.
+    */
+    if (mods.aura && this.state !== 'dead') {
       const pulse = 0.5 + Math.sin(this.auraPhase * 6) * 0.2
+      const cy = sy - this.body.h * 0.5
+      const rx = 10 + this.body.w * 0.5
+      const ry = 14 + this.body.h * 0.32
       ctx.save()
       ctx.globalCompositeOperation = 'lighter'
-      ctx.globalAlpha = 0.16 * pulse
-      ctx.fillStyle = mods.aura
+      ctx.translate(sx, cy)
+      ctx.scale(1, ry / rx)
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
+      glow.addColorStop(0, rgba(mods.aura, 0.26 * pulse))
+      glow.addColorStop(0.5, rgba(mods.aura, 0.09 * pulse))
+      glow.addColorStop(1, rgba(mods.aura, 0))
+      ctx.fillStyle = glow
       ctx.beginPath()
-      ctx.ellipse(sx, sy - this.body.h * 0.5, this.body.w * 1.5, this.body.h * 0.78, 0, 0, Math.PI * 2)
+      ctx.arc(0, 0, rx, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
     }
