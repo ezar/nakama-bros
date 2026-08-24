@@ -515,7 +515,40 @@ export class Player extends Entity {
       this.hurt(world, { amount: 1, dirX: -this.facing, dirY: -1, sourceId: 0, kind: 'hazard' })
     }
 
+    this.revealFakeWalls(world)
+
     this.updateAnimState(inWater, this.body.grounded, want)
+  }
+
+  /**
+   * Walk into a wall that is not there and it stops pretending.
+   *
+   * Every tile the body currently overlaps is checked, not just the one under
+   * the nose: entering a secret sideways, from below, or mid-roll all have to
+   * work, and at speed a body can cross two columns in a step.
+   *
+   * The swap is to a tile that draws the same art at a third of the alpha, so
+   * the room stays framed by the wall it was hidden behind and the way out is
+   * obvious. Once per tile — `Fake` becomes `FakeSeen` and never matches again,
+   * which is also what stops the puff firing sixty times a second.
+   */
+  private revealFakeWalls(world: World): void {
+    const r = this.rect()
+    const x0 = Math.floor(r.x / TILE)
+    const x1 = Math.floor((r.x + r.w - 1) / TILE)
+    const y0 = Math.floor(r.y / TILE)
+    const y1 = Math.floor((r.y + r.h - 1) / TILE)
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (world.map.get(tx, ty) !== Tile.Fake) continue
+        world.map.set(tx, ty, Tile.FakeSeen)
+        world.audio.playSfx('break', { volume: 0.34, rate: 1.5 })
+        world.particles.burst(9, tx * TILE + TILE / 2, ty * TILE + TILE / 2, {
+          speed: 46, speedVar: 26, life: 0.5, lifeVar: 0.2, size: 2.2, sizeEnd: 0.3,
+          color: PAL.cream, colorEnd: PAL.mist, shape: 'circle', drag: 0.12, spawnRadius: 6,
+        })
+      }
+    }
   }
 
   // ── Stance ─────────────────────────────────────────────────────────────────
@@ -1347,15 +1380,37 @@ export class Player extends Entity {
     const mods = this.mods
     const scale = mods.scale
 
-    // Aura behind the sprite for the powered tiers.
-    if (mods.aura) {
+    /*
+      Aura behind the sprite for the powered tiers.
+
+      Two things were wrong with the first version and both only showed at gear
+      3, where the body is half again as big. It was a flat fill with a hard
+      rim, so it was not a glow at all but a shape — a pale ellipse with a
+      visible edge. And its radii came straight off the body, so at gear 3 it
+      grew to sixty by seventy on a screen two hundred and seventy tall. Stand
+      still — or die, which is when you are stuck looking at it — and it read
+      as a translucent box someone had left on the screen.
+
+      Now it is a radial gradient that reaches zero alpha at the rim, so there
+      is no edge to see at any size, and the radius grows far slower than the
+      body: gear 3 widens it by a fifth rather than by a half.
+    */
+    if (mods.aura && this.state !== 'dead') {
       const pulse = 0.5 + Math.sin(this.auraPhase * 6) * 0.2
+      const cy = sy - this.body.h * 0.5
+      const rx = 10 + this.body.w * 0.5
+      const ry = 14 + this.body.h * 0.32
       ctx.save()
       ctx.globalCompositeOperation = 'lighter'
-      ctx.globalAlpha = 0.16 * pulse
-      ctx.fillStyle = mods.aura
+      ctx.translate(sx, cy)
+      ctx.scale(1, ry / rx)
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
+      glow.addColorStop(0, rgba(mods.aura, 0.26 * pulse))
+      glow.addColorStop(0.5, rgba(mods.aura, 0.09 * pulse))
+      glow.addColorStop(1, rgba(mods.aura, 0))
+      ctx.fillStyle = glow
       ctx.beginPath()
-      ctx.ellipse(sx, sy - this.body.h * 0.5, this.body.w * 1.5, this.body.h * 0.78, 0, 0, Math.PI * 2)
+      ctx.arc(0, 0, rx, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
     }

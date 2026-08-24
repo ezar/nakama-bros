@@ -30,6 +30,10 @@ export const TILE_FLAGS: Record<number, TileFlags> = {
   [Tile.Bouncy]: def({ solid: true, bounce: 330 }),
   [Tile.Crumble]: def({ solid: true, breakable: true }),
   [Tile.Climb]: def({ climbable: true }),
+  // Not solid, not anything. Every rule that makes a wall a wall lives in this
+  // table, so leaving it empty is the whole implementation of walking through.
+  [Tile.Fake]: def({}),
+  [Tile.FakeSeen]: def({}),
 }
 
 export const flagsFor = (id: number): TileFlags => TILE_FLAGS[id] ?? TILE_FLAGS[Tile.Empty]

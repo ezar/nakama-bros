@@ -368,6 +368,33 @@ export const Hud = memo(function Hud({ hud, compass, compact = false }: Props) {
             {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}
           </span>
         </Plaque>
+
+        {/*
+          The chain, while one is running.
+
+          Under the clock rather than beside the score, because it is the one
+          number here that is *about to stop being true* — it belongs with the
+          other thing that is counting down, not with the totals. It scales with
+          the multiplier so a long chain physically grows.
+        */}
+        {hud.chain > 1 && (
+          <Plaque
+            accent={UI.wax}
+            className={motion ? 'animate-flare' : undefined}
+            key={hud.chain}
+          >
+            <span
+              className="font-body font-extrabold tabnum leading-none"
+              style={{
+                color: '#FFD98A',
+                fontSize: `${0.85 + Math.min(0.5, Math.log2(hud.chain) * 0.12)}rem`,
+                textShadow: '0 0 12px rgba(255,154,60,0.9), 0 1px 0 rgba(0,0,0,0.7)',
+              }}
+            >
+              ×{hud.chain}
+            </span>
+          </Plaque>
+        )}
       </div>
 
       {/* ── Bottom right: the Log Pose ── */}

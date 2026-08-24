@@ -112,6 +112,23 @@ export const enum Tile {
   Crumble = 13,
   /** Ladder / rigging — climbable, non-solid. */
   Climb = 14,
+  /**
+   * A wall that is not there.
+   *
+   * Draws pixel for pixel as `Solid` — same tileset entry, same autotiling,
+   * same grass on top — and collides with nothing. Walk into it and you are
+   * through. It is the only tile in the game that lies, which is the point.
+   */
+  Fake = 15,
+  /**
+   * A fake wall somebody has already walked through.
+   *
+   * Same art at a fraction of the alpha and without its grass. This exists so
+   * a child who has found a secret room can see the way back out; a wall that
+   * stayed opaque behind them would make the reward feel like a trap. Never
+   * authored — the game swaps `Fake` for it on contact.
+   */
+  FakeSeen = 16,
 }
 
 export interface TileFlags {
@@ -360,6 +377,8 @@ export interface RunState {
   levelId: string
   /** Checkpoint reached in the current level, in tiles. */
   checkpoint: Vec2 | null
+  /** Highest stomp multiplier reached this run. Survives a death. */
+  bestChain: number
 }
 
 export interface LevelResult {
@@ -429,6 +448,12 @@ export interface RenderContext {
 }
 
 export interface HudSnapshot {
+  /**
+   * Live stomp multiplier, or 0 when no chain is running. The HUD shows it for
+   * a moment after the last link so the final number can be read — a counter
+   * that vanished the instant the player touched down would never be seen.
+   */
+  chain: number
   crew: CrewId
   tier: PowerTier
   lives: number

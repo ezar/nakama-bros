@@ -19,7 +19,9 @@ describe('reading a save', () => {
       totalBerries: 9100,
       giftEarned: true,
     }
-    expect(migrateProgress(old, 0)).toEqual(old)
+    // `ghosts` is added by the migration, empty: an old save has no
+    // recordings, and the game must not be handed an undefined map.
+    expect(migrateProgress(old, 0)).toEqual({ ...old, ghosts: {} })
   })
 
   it('keeps a record for a stage this build has never heard of', () => {
@@ -75,6 +77,8 @@ describe('reading a save', () => {
 
   it('keeps settings a player actually chose', () => {
     const chosen = { master: 0.2, music: 0, sfx: 1, lang: 'en', touchControls: 'on', effects: 'reduced', crt: true, difficulty: 'hard' }
-    expect(migrateSettings(chosen, 0)).toEqual(chosen)
+    // The ghost is off unless the save says otherwise — a new switch must not
+    // turn itself on for somebody who already had settings.
+    expect(migrateSettings(chosen, 0)).toEqual({ ...chosen, ghost: false })
   })
 })

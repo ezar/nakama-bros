@@ -633,11 +633,21 @@ export abstract class Enemy extends Entity {
     if (this.dyingFor >= 0 || this.dead) return
     const player = world.player() as Player | null
     const chain = player ? Math.min(player.chain, SCORE.chain.length - 1) : 0
-    const points = this.points * (how === 'stomp' ? SCORE.chain[chain] : 1)
+    const multiplier = how === 'stomp' ? SCORE.chain[chain] : 1
+    const points = this.points * multiplier
     if (points > 0) world.score(points, this.x, this.y - this.body.h)
+    // The multiplier has been quietly doubling the score since the chain was
+    // built; nothing ever said so. A chain you cannot see is a chain nobody
+    // goes for, so from the second link it announces itself above the points.
+    if (multiplier > 1) world.chainCalled(multiplier, this.x, this.y - this.body.h)
     world.events.emit('enemy:defeat', { x: this.x, y: this.y, type: this.sheetKey, points })
 
-    world.audio.playSfx(how === 'stomp' ? 'stomp' : how === 'explosion' ? 'explosion' : 'kick')
+    world.audio.playSfx(
+      how === 'stomp' ? 'stomp' : how === 'explosion' ? 'explosion' : 'kick',
+      // Each link rings a step higher. Five steps, then it holds — a chain that
+      // kept climbing would leave the last ones inaudible.
+      how === 'stomp' ? { rate: 1 + Math.min(chain, 5) * 0.11 } : {},
+    )
     world.hitstop(how === 'stomp' ? 5 : 8)
     world.shake(how === 'explosion' ? 0.3 : 0.14)
 

@@ -21,10 +21,21 @@ import { rectsOverlap } from '../engine/math'
 import './entities/enemies'
 import './entities/items'
 import './entities/bosses'
+import { Ghost } from './entities/Ghost'
+import { GHOST_MIN_POSES, GhostRecorder, type GhostTrack } from './ghost'
+
+/** Seconds the HUD keeps showing a multiplier after the last link landed. */
+const CHAIN_HOLD = 1.6
 
 export interface GameCallbacks {
   onHud?: (hud: HudSnapshot) => void
   onLevelEnd?: (result: LevelResult) => void
+  /**
+   * A run worth keeping finished. Handed over rather than written here: the
+   * game does not know about stores, and only the shell knows whether this
+   * beats what is already on file.
+   */
+  onGhostRecorded?: (levelId: string, track: GhostTrack) => void
   onGameOver?: () => void
   onPause?: () => void
 }
@@ -61,8 +72,21 @@ export class Game implements World {
   private respawnTimer = -1
   private endTimer = -1
   private ended = false
+  /** The multiplier the HUD is currently showing, and how long it has left. */
+  private chainShown = 0
+  private chainHold = 0
   private hudTick = 0
   private flash = 0
+  /**
+   * Recording is unconditional; *racing* is the thing behind the setting.
+   *
+   * Always recording costs a few kilobytes and one sample every twelfth of a
+   * second, and it means the first time somebody switches the ghost on they
+   * already have something to race. Recording only while the feature is on
+   * would make it useless until you had replayed a stage with it enabled,
+   * which is exactly when nobody would think to.
+   */
+  private recorder = new GhostRecorder()
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -72,6 +96,8 @@ export class Game implements World {
     private callbacks: GameCallbacks = {},
     startingRun?: Partial<RunState>,
     difficulty: Difficulty = 'normal',
+    /** The run to race against, or null. Absent means nothing to race. */
+    ghost: GhostTrack | null = null,
   ) {
     this.level = levelDef
     this.rng = new Rng(seedFrom(levelDef.id))
@@ -90,11 +116,13 @@ export class Game implements World {
       time: levelDef.timeLimit * this.difficulty.time,
       levelId: levelDef.id,
       checkpoint: null,
+      bestChain: 1,
       ...startingRun,
     }
 
     this.camera.setBounds(this.levelObj.map.pixelW, this.levelObj.map.pixelH)
     this.reset()
+    if (ghost) this.spawn(new Ghost(ghost))
 
     this.loop = new GameLoop({
       step: (dt) => this.step(dt),
@@ -203,6 +231,22 @@ export class Game implements World {
     this.spawn(new FloatingText(x, y - 6, `${points}`, PAL.gold))
   }
 
+  /**
+   * Call the multiplier out where the kill happened.
+   *
+   * Sits above the points rather than beside them, in a hotter colour and for
+   * longer, because it is the part worth chasing: the points are the
+   * consequence, the chain is the achievement. The hit-stop grows a little with
+   * each link so a long chain feels heavier as it goes, not just louder.
+   */
+  chainCalled(multiplier: number, x: number, y: number): void {
+    this.run.bestChain = Math.max(this.run.bestChain, multiplier)
+    this.chainShown = multiplier
+    this.chainHold = CHAIN_HOLD
+    this.spawn(new FloatingText(x, y - 20, `x${multiplier}`, PAL.ember, 1.15))
+    this.hitstop(Math.min(9, 3 + Math.log2(multiplier) * 2))
+  }
+
   berries(n: number, x: number, y: number): void {
     this.run.berries += n
     if (this.run.berries >= BERRIES_PER_LIFE) {
@@ -230,6 +274,19 @@ export class Game implements World {
 
   private step(dt: number): void {
     this.time += dt
+    // The chain readout outlives the chain by a beat, on purpose: landing is
+    // what ends a chain, and a number that disappeared on the same frame would
+    // never be read.
+    if (this.chainHold > 0) this.chainHold = Math.max(0, this.chainHold - dt)
+    // Sampled before anything can end the level, and only while the run is
+    // actually being played: the victory walk and the death fall are not part
+    // of the lap being raced.
+    const racer = this.playerRef
+    if (racer && !this.ended && !racer.dead && racer.state !== 'clear' && racer.state !== 'dead') {
+      this.recorder.sample(dt, {
+        x: racer.body.x, y: racer.body.y, facing: racer.facing, anim: racer.anim,
+      })
+    }
     const input = this.inputMgr.sample()
 
     if (input.pressed.pause && !this.ended) {
@@ -325,6 +382,10 @@ export class Game implements World {
 
   private finish(): void {
     this.endTimer = -1
+    if (this.recorder.poses >= GHOST_MIN_POSES) {
+      const track = this.recorder.finish(this.run.crew)
+      if (track) this.callbacks.onGhostRecorded?.(this.level.id, track)
+    }
     const timeBonus = Math.floor(this.run.time) * SCORE.timeBonus
     this.run.score += timeBonus + SCORE.clear
     this.callbacks.onLevelEnd?.({
@@ -351,6 +412,7 @@ export class Game implements World {
       bossHealth: boss ? boss.health / (boss as unknown as { maxHealth: number }).maxHealth : null,
       bossName: boss ? (boss as unknown as { displayName: string }).displayName : null,
       fragments: this.fragments,
+      chain: this.chainHold > 0 ? this.chainShown : 0,
     }
   }
 

@@ -17,6 +17,7 @@ const DEFAULTS = {
   effects: 'full' as SettingsState['effects'],
   crt: false,
   difficulty: 'normal' as Difficulty,
+  ghost: false,
 }
 
 /** A volume outside 0..1 is not a loud game, it is a broken `GainNode`. */
@@ -42,6 +43,7 @@ export function migrateSettings(persisted: unknown, _from: number): Partial<Sett
     effects: oneOf(s.effects, ['full', 'reduced'] as const, DEFAULTS.effects),
     crt: s.crt === true,
     difficulty: oneOf(s.difficulty, DIFFICULTIES, DEFAULTS.difficulty),
+    ghost: s.ghost === true,
   }
 }
 
@@ -57,6 +59,15 @@ interface SettingsState {
   crt: boolean
   /** How forgiving a run is. Read once, when a level starts. */
   difficulty: Difficulty
+  /**
+   * Race the shadow of your own best run.
+   *
+   * Off by default, and that is a decision rather than caution: a translucent
+   * copy of yourself appearing unannounced the first time a child replays a
+   * stage is confusing, and there is no way to ask what it is. It should be
+   * something you switch on when you want to compete with yourself.
+   */
+  ghost: boolean
   set: (patch: Partial<Omit<SettingsState, 'set'>>) => void
 }
 

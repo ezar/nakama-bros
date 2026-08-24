@@ -21,6 +21,10 @@ export const CHAR_TO_TILE: Record<string, number> = {
   O: Tile.Bouncy,
   C: Tile.Crumble,
   H: Tile.Climb,
+  '%': Tile.Fake,
+  // Never authored — the game writes it at runtime. It has a character anyway
+  // so a map that is encoded mid-run round-trips instead of losing the tile.
+  '&': Tile.FakeSeen,
 }
 
 export const TILE_TO_CHAR: Record<number, string> = Object.entries(CHAR_TO_TILE).reduce(

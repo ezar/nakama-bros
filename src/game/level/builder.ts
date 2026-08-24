@@ -34,6 +34,8 @@ export const C = {
   bouncy: 'O',
   crumble: 'C',
   climb: 'H',
+  /** Looks like `solid`, collides with nothing. Hides rooms. */
+  fake: '%',
 } as const
 
 export type Ch = (typeof C)[keyof typeof C]
@@ -221,6 +223,43 @@ export class LevelBuilder {
   }
 
   /** Bricks and question blocks, the bumpable furniture. */
+  /**
+   * A room hidden inside terrain, with a face of wall that is not wall.
+   *
+   * `(x0,y0)-(x1,y1)` is the hollow. `face` says which side you push through:
+   * the column or row on that edge becomes fake, and everything inside is
+   * cleared. The room is carved *out of solid*, so it only works where there
+   * was mass to begin with — a secret floating in open air would be a hole in
+   * the sky with a lid on it.
+   *
+   * The opening is deliberately at least two tiles tall on a side entrance: a
+   * one-tile slot needs a crouch the player has no reason to try against what
+   * looks like a cliff.
+   *
+   * The hollow is filled with `decor`, not air. Air would be a *hole* — this
+   * is a side-on game, so an empty pocket in a cliff is visible from across the
+   * screen and there is no secret left to find. Decor draws as rock and
+   * collides with nothing, so the face reads as unbroken stone while the room
+   * behind it is walk-in. Anything placed inside still shows, because entities
+   * draw in front of decor: what is hidden is the way in, not the prize. That
+   * is the better puzzle for a child anyway — you can see there is something
+   * there, and the game is working out how to reach it.
+   */
+  secret(
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    face: 'left' | 'right' | 'top' | 'bottom' = 'left',
+  ): this {
+    this.rect(x0, y0, x1, y1, C.decor)
+    if (face === 'left') this.vline(x0 - 1, y0, y1, C.fake)
+    else if (face === 'right') this.vline(x1 + 1, y0, y1, C.fake)
+    else if (face === 'top') this.hline(x0, x1, y0 - 1, C.fake)
+    else this.hline(x0, x1, y1 + 1, C.fake)
+    return this
+  }
+
   bricks(x0: number, x1: number, y: number): this {
     return this.hline(x0, x1, y, C.brick)
   }

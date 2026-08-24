@@ -223,12 +223,21 @@ export class Renderer {
         if (id === Tile.Empty || id === Tile.Water) continue
         const mask = neighbourMask(map, tx, ty)
         const h = hash2(tx, ty)
-        const src = ts.src(id, mask, h % ts.variants)
+        // A fake wall borrows the solid tile's art outright — not a lookalike,
+        // the same cell of the same atlas, same variant, same mirroring. There
+        // is nothing to spot because there is nothing different to spot.
+        const src = ts.src(family(id), mask, h % ts.variants)
         // Mirroring doubles the effective variant count for the price of one
         // transform, but only where the tile is left-right symmetric: flipping
         // a cliff edge would put its lit face on the wrong side.
         const symmetric = ((mask >> 1) & 1) === ((mask >> 3) & 1)
+        const ghosted = id === Tile.FakeSeen
+        if (ghosted) {
+          ctx.save()
+          ctx.globalAlpha = 0.34
+        }
         this.blitTile(ctx, ts, src.sx, src.sy, tx * TILE, ty * TILE, ((h >>> 9) & 1) === 1 && symmetric)
+        if (ghosted) ctx.restore()
       }
     }
 
@@ -237,7 +246,11 @@ export class Renderer {
     // moving the surface the player actually stands on.
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        if (map.get(tx, ty) !== Tile.Solid) continue
+        // Grass grows on a fake wall too, right up until somebody walks
+        // through it — losing the tuft is half of how a revealed wall reads as
+        // never having been one.
+        const here = map.get(tx, ty)
+        if (here !== Tile.Solid && here !== Tile.Fake) continue
         const above = map.get(tx, ty - 1)
         if (above !== Tile.Empty && above !== Tile.Decor) continue
         const mask = neighbourMask(map, tx, ty)
@@ -366,10 +379,13 @@ export class Renderer {
     for (let ty = y0; ty <= y1; ty++) {
       const y = ty * TILE
       for (let tx = x0; tx <= x1; tx++) {
-        const id = map.get(tx, ty)
+        // Through `family`, so a fake wall takes the same depth ramp as the
+        // stone around it. Left out, it would be the one flat patch on a shaded
+        // cliff — which is exactly the tell this tile exists to avoid.
+        const id = family(map.get(tx, ty))
         if (id !== Tile.Solid && id !== Tile.Ice && id !== Tile.Decor) continue
         let d = 0
-        while (d < 5 && map.get(tx, ty - 1 - d) === id) d++
+        while (d < 5 && family(map.get(tx, ty - 1 - d)) === id) d++
         // The surface row is shaded too, from nothing at its top to whatever
         // the row below starts at. Skipping it as an optimisation left a step
         // of the first ramp's whole depth exactly one tile under every skyline
@@ -903,10 +919,22 @@ export class Renderer {
   }
 }
 
+/**
+ * What a tile counts as when its neighbours are asked.
+ *
+ * A fake wall has to autotile as though it were the wall it is pretending to
+ * be — and so do the real tiles beside it. Treated as its own kind, the seam
+ * would tile itself an edge, and a wall with a suspicious vertical line down
+ * it is not a secret, it is a sign saying "here".
+ */
+function family(id: number): number {
+  return id === Tile.Fake || id === Tile.FakeSeen ? Tile.Solid : id
+}
+
 /** 8-bit neighbour mask: N=1 E=2 S=4 W=8 NE=16 SE=32 SW=64 NW=128. */
 export function neighbourMask(map: TileMap, tx: number, ty: number): number {
-  const id = map.get(tx, ty)
-  const same = (dx: number, dy: number) => map.get(tx + dx, ty + dy) === id
+  const id = family(map.get(tx, ty))
+  const same = (dx: number, dy: number) => family(map.get(tx + dx, ty + dy)) === id
   return (
     (same(0, -1) ? 1 : 0) |
     (same(1, 0) ? 2 : 0) |
