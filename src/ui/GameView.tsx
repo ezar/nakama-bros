@@ -4,6 +4,7 @@ import { Game } from '../game/Game'
 import { Hud } from './hud/Hud'
 import { TouchControls } from './controls/TouchControls'
 import { EXPOSE_DEBUG } from '../debug'
+import { useProgress } from '../store/progressStore'
 import { useSettings } from '../store/settingsStore'
 import type { AudioApi } from '../types'
 
@@ -34,15 +35,21 @@ export function GameView({ level, crew, audio, onLevelEnd, onGameOver, onPause, 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    // Read once, here — same reason as the difficulty below. A ghost is the
+    // recording as it stood when the stage began; swapping it mid-run for one
+    // the run itself just produced would be racing a moving target.
+    const { difficulty, ghost: raceGhost } = useSettings.getState()
+    const track = raceGhost ? (useProgress.getState().ghosts[level.id] ?? null) : null
     const game = new Game(canvas, level, crew, audio, {
       onHud: setHud,
       onLevelEnd,
       onGameOver,
       onPause,
+      onGhostRecorded: (levelId, t) => useProgress.getState().saveGhost(levelId, t),
     // Read once, here: the difficulty decides lives and the clock at
     // construction, so changing it mid-stage would be half-applied. The next
     // level picks up the new setting.
-    }, undefined, useSettings.getState().difficulty)
+    }, undefined, difficulty, track)
     gameRef.current = game
     game.start()
     // A stable handle for automated screenshots and visual review runs.

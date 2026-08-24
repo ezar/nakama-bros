@@ -121,6 +121,8 @@ export const TRANSLATIONS = {
     'options.touch': 'Controles táctiles',
     'options.effects': 'Efectos visuales',
     'options.crt': 'Filtro CRT',
+    'options.ghost': 'Fantasma',
+    'options.ghostNote': 'Corre contra la sombra de tu mejor vuelta. Se graba siempre; esto sólo la enseña.',
     // ── Ending ──
     'ending.eyebrow': 'Fin del viaje',
     'ending.title': 'Se acaba el Grand Line',
@@ -281,6 +283,8 @@ export const TRANSLATIONS = {
     'options.touch': 'Touch controls',
     'options.effects': 'Visual effects',
     'options.crt': 'CRT filter',
+    'options.ghost': 'Ghost',
+    'options.ghostNote': 'Race the shadow of your best run. Always recorded; this only shows it.',
     'ending.eyebrow': 'Journey\u2019s end',
     'ending.title': 'The Grand Line runs out',
     'ending.blurb': '{crew} and the crew have crossed it end to end. The Log Pose points nowhere now: ahead there is only open sea.',

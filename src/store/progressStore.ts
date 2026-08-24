@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { CREW_IDS } from '../game/config'
+import { GHOST_MAX_POSES, type GhostTrack } from '../game/ghost'
 import type { CrewId, LevelResult } from '../types'
 
 /**
@@ -52,7 +53,34 @@ export function migrateProgress(persisted: unknown, _from: number): Partial<Prog
     records,
     totalBerries: Math.max(0, num(s.totalBerries, 0)),
     giftEarned: s.giftEarned === true,
+    ghosts: readGhosts(s.ghosts),
   }
+}
+
+/**
+ * Ghost tracks, checked before they reach the game.
+ *
+ * A track is a packed string, so nothing about a corrupt one looks wrong until
+ * it is decoded mid-level. The decoder is deliberately tolerant, but a track
+ * with a nonsense crew would ask the art library for a sheet that does not
+ * exist, and one of absurd length would spend real time being unpacked during
+ * a load. Both are cheaper to refuse here: a dropped ghost costs a race, and
+ * every other kind of failure costs the level.
+ */
+function readGhosts(raw: unknown): Record<string, GhostTrack> {
+  const out: Record<string, GhostTrack> = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object') continue
+    const g = value as Record<string, unknown>
+    if (typeof g.data !== 'string' || g.data.length === 0) continue
+    if (g.data.length > GHOST_MAX_POSES * 5) continue
+    if (!CREW_IDS.includes(g.crew as CrewId)) continue
+    const time = num(g.time, 0)
+    if (time <= 0) continue
+    out[id] = { crew: g.crew as CrewId, time, data: g.data }
+  }
+  return out
 }
 
 export interface LevelRecord {
@@ -72,9 +100,13 @@ interface ProgressState {
    * it is a thing you win once, and then keep.
    */
   giftEarned: boolean
+  /** Best recorded run per level, for the ghost. Absent until one is set. */
+  ghosts: Record<string, GhostTrack>
   setCrew: (c: CrewId) => void
   record: (r: LevelResult) => void
   earnGift: () => void
+  /** Keep this run's recording if it beats the one on file. */
+  saveGhost: (levelId: string, track: GhostTrack) => void
   isCleared: (id: string) => boolean
   reset: () => void
 }
@@ -86,6 +118,7 @@ export const useProgress = create<ProgressState>()(
       records: {},
       totalBerries: 0,
       giftEarned: false,
+      ghosts: {},
       setCrew: (crew) => set({ crew }),
       record: (r) =>
         set((s) => {
@@ -107,11 +140,21 @@ export const useProgress = create<ProgressState>()(
       // is pushed in rather than derived here — the store stays free of both
       // the scoring rules and the screens that draw them.
       earnGift: () => { if (!get().giftEarned) set({ giftEarned: true }) },
+      // Only a faster run replaces the one on file: the point of a ghost is
+      // that it is the best you have done, not the last thing you did.
+      saveGhost: (levelId, track) =>
+        set((s) => {
+          const best = s.ghosts[levelId]
+          if (best && best.time <= track.time) return s
+          return { ghosts: { ...s.ghosts, [levelId]: track } }
+        }),
       isCleared: (id) => get().records[id]?.cleared ?? false,
       // Records and takings only. `giftEarned` survives on purpose: wiping
       // your progress to play the campaign again should not take a present
       // away from you.
-      reset: () => set({ records: {}, totalBerries: 0 }),
+      // Ghosts go with the records they belong to: a shadow of a run you no
+      // longer have a time for is a race against nothing.
+      reset: () => set({ records: {}, totalBerries: 0, ghosts: {} }),
     }),
     {
       name: 'nakama-bros:progress',

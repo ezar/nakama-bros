@@ -238,6 +238,24 @@ export function OptionsScreen({ onBack, onCredits }: { onBack: () => void; onCre
             ]}
             onChange={(v) => s.set({ crt: v === 'on' })}
           />
+          {/* Off by default. A translucent copy of yourself turning up
+              unannounced the first time a child replays a stage is confusing,
+              and there is nobody to ask what it is. */}
+          <Toggle
+            label={t('options.ghost')}
+            value={s.ghost ? 'on' : 'off'}
+            options={[
+              { value: 'off' as const, label: 'Off' },
+              { value: 'on' as const, label: 'On' },
+            ]}
+            onChange={(v) => s.set({ ghost: v === 'on' })}
+          />
+          <p
+            className="-mt-1 text-right font-body text-[10px] leading-tight"
+            style={{ color: UI.inkSoft }}
+          >
+            {t('options.ghostNote')}
+          </p>
 
           {/* The credits are their own screen, and they carry the legal
               notice and the drawing with them: this sheet is for knobs. */}
