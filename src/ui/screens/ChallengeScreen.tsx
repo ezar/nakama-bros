@@ -9,6 +9,8 @@ import { Paper } from '../art/Paper'
 import { JollyRoger } from '../art/Icons'
 import { UI, formatRunTime } from '../theme'
 import { CREW } from '../../game/config'
+import { encodeChallenge } from '../../game/ghostCode'
+import { useBrowserOnPhone } from '../hooks/useStandalone'
 import type { Rival } from '../../store/progressStore'
 
 /**
@@ -25,6 +27,7 @@ import type { Rival } from '../../store/progressStore'
  */
 export function ChallengeScreen({
   rival,
+  levelId,
   levelName,
   locked,
   onAccept,
@@ -32,6 +35,8 @@ export function ChallengeScreen({
   onLater,
 }: {
   rival: Rival
+  /** Needed to rebuild the code, for carrying the challenge somewhere else. */
+  levelId: string
   levelName: string
   /**
    * The stage is further along the campaign than this save has reached.
@@ -73,6 +78,23 @@ export function ChallengeScreen({
   })
 
   const crew = CREW[rival.crew]
+  const inBrowser = useBrowserOnPhone()
+  const [copied, setCopied] = useState(false)
+
+  const copyCode = async () => {
+    // Rebuilt rather than kept from the link: by this point the address bar
+    // has been cleared, which is what stops a reload re-offering the same
+    // challenge. The rival holds everything the code is made of.
+    const code = encodeChallenge({ levelId, name: rival.name, track: rival })
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 3000)
+    } catch {
+      /* Refused clipboard access. Nothing useful left to try. */
+    }
+  }
 
   return (
     <m.div
@@ -155,6 +177,31 @@ export function ChallengeScreen({
                     <p className="mt-3 font-body text-[11px] leading-snug" style={{ color: UI.wax }}>
                       {t('challenge.locked')}
                     </p>
+                  )}
+
+                  {/*
+                    Only on a phone that is not running the installed copy.
+
+                    A link never opens in a home-screen app on iOS, and that
+                    app does not share storage with the browser — so this
+                    challenge has landed in a copy of the game with none of
+                    the player's progress in it, and the copy they play cannot
+                    see it. Nothing here can move it across; handing over the
+                    code is the one thing that can.
+                  */}
+                  {inBrowser && (
+                    <div className="mt-3 w-full">
+                      <p className="font-body text-[10px] leading-snug" style={{ color: UI.inkSoft }}>
+                        {t('challenge.inBrowser')}
+                      </p>
+                      <button
+                        className="op-button mt-2 w-full px-4 py-1.5 text-xs"
+                        data-menu-outsider
+                        onClick={() => void copyCode()}
+                      >
+                        {copied ? t('challenge.codeCopied') : t('challenge.copyCode')}
+                      </button>
+                    </div>
                   )}
                 </div>
               </Paper>
