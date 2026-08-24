@@ -13,13 +13,19 @@ import { CrewScreen } from './ui/screens/CrewScreen'
 import { PauseScreen } from './ui/screens/PauseScreen'
 import { ResultScreen } from './ui/screens/ResultScreen'
 import { GameOverScreen } from './ui/screens/GameOverScreen'
-import { MapScreen } from './ui/screens/MapScreen'
+import { MapScreen, levelLocked } from './ui/screens/MapScreen'
 import { OptionsScreen } from './ui/screens/OptionsScreen'
 import { CreditsScreen } from './ui/screens/CreditsScreen'
 import { EndingScreen } from './ui/screens/EndingScreen'
 import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
+import { ChallengeScreen } from './ui/screens/ChallengeScreen'
+import { ChallengePanel } from './ui/ChallengePanel'
+import { consumeChallengeFromLocation } from './game/challengeLink'
+import { decodeChallenge } from './game/ghostCode'
 
-type Screen = 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'ending' | 'intro' | 'play'
+type Screen =
+  | 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'ending' | 'intro' | 'play'
+  | 'challenge'
 
 /**
  * Screen router and session owner.
@@ -46,8 +52,33 @@ export default function App() {
    * out but the pause key.
    */
   const [creditsBack, setCreditsBack] = useState<'options' | 'title'>('options')
+  /**
+   * A challenge that arrived in the address bar, waiting to be offered.
+   *
+   * Taken out of the URL once, at the first render, rather than in an effect:
+   * an effect runs after React has already committed, and in development it
+   * runs twice — the second pass would find the hash gone and conclude there
+   * was never a challenge. `useState` with an initialiser runs once, before
+   * anything is drawn, which is exactly the shape of this job.
+   */
+  const [invite] = useState(() => {
+    const code = consumeChallengeFromLocation()
+    return code ? decodeChallenge(code) : null
+  })
+  const [inviteLevel, setInviteLevel] = useState<string | null>(null)
+  /**
+   * The stage whose challenge sheet is open, or null.
+   *
+   * Held here rather than inside each screen that can open it, because the
+   * sheet outlives the screen underneath in one case that matters: accepting a
+   * challenge from the chart starts a level, and a sheet owned by the chart
+   * would be unmounted mid-action.
+   */
+  const [sharing, setSharing] = useState<string | null>(null)
 
   const crew = useProgress((s) => s.crew)
+  const rivals = useProgress((s) => s.rivals)
+  const saveRival = useProgress((s) => s.saveRival)
   const setCrew = useProgress((s) => s.setCrew)
   const recordResult = useProgress((s) => s.record)
   const records = useProgress((s) => s.records)
@@ -58,7 +89,28 @@ export default function App() {
     loadArt((t, label) => {
       setProgress(t)
       setLoadLabel(label)
-    }).then(() => setScreen('title'))
+    }).then(() => {
+      /*
+        A link that carries a challenge opens on the challenge, not on the
+        title. Somebody tapped a message from their brother; making them find
+        the stage themselves would be asking them to do the work the link
+        already did.
+
+        It is saved here rather than on acceptance, so that "not now" leaves it
+        on the chart instead of throwing it away — and so that closing the tab
+        on this screen does not lose it either.
+      */
+      if (invite && levelById(invite.levelId)) {
+        saveRival(invite.levelId, { ...invite.track, name: invite.name })
+        setInviteLevel(invite.levelId)
+        setScreen('challenge')
+        return
+      }
+      setScreen('title')
+    })
+    // Runs once, at boot: `invite` is settled before the first render and
+    // never changes, and re-running this would reload the whole art library.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Browsers only allow audio to start inside a user gesture — and on iOS a
@@ -165,6 +217,7 @@ export default function App() {
             worlds={WORLDS}
             records={records}
             onSelect={startLevel}
+            onChallenge={setSharing}
             onBack={() => setScreen('title')}
           />
         )
@@ -196,6 +249,24 @@ export default function App() {
             onPort={quitToMenu}
           />
         )
+      // Arrived by link. The stage is whichever one the challenge names, not
+      // whatever the session happened to be pointing at.
+      case 'challenge': {
+        const target = inviteLevel ? levelById(inviteLevel) : null
+        const rival = inviteLevel ? rivals[inviteLevel] : undefined
+        if (!target || !rival) return null
+        return (
+          <ChallengeScreen
+            key="challenge"
+            rival={rival}
+            levelName={target.name}
+            locked={levelLocked(target.id, records, WORLDS)}
+            onAccept={() => startLevel(target.id)}
+            onMap={() => setScreen('map')}
+            onLater={() => setScreen('title')}
+          />
+        )
+      }
       case 'intro':
         return <LevelIntroScreen key={`intro:${levelId}:${runKey}`} level={level} onDone={() => setScreen('play')} />
       default:
@@ -215,6 +286,21 @@ export default function App() {
         thing given up, and it buys a shell that cannot dead-end.
       */}
       {renderScreen()}
+
+      <AnimatePresence>
+        {sharing && (
+          <ChallengePanel
+            key="share"
+            levelId={sharing}
+            onClose={() => setSharing(null)}
+            // Loading a challenge from the sheet does not start the stage: you
+            // may well be sitting on the chart looking at a different island,
+            // and being thrown into a level by a paste is a surprise. The
+            // panel says where it landed and the chart shows it waiting.
+            onLoaded={() => undefined}
+          />
+        )}
+      </AnimatePresence>
 
       {screen === 'play' && (
         <div className="relative h-full w-full">
@@ -244,6 +330,7 @@ export default function App() {
                 hasNext
                 finale={!nextLevelId(levelId)}
                 onRetry={() => startLevel(levelId)}
+                onChallenge={() => setSharing(levelId)}
                 onNext={() => {
                   const next = nextLevelId(levelId)
                   if (next) return startLevel(next)

@@ -71,6 +71,13 @@ export interface GhostTrack {
   data: string
 }
 
+/** One shadow on the stage: a run, and how to tell it apart from the others. */
+export interface GhostRacer {
+  track: GhostTrack
+  /** Colour to wash the silhouette in, or null/absent for your own run. */
+  tint?: string | null
+}
+
 export interface GhostPose {
   x: number
   y: number
@@ -133,6 +140,11 @@ export class GhostRecorder {
 
   get poses(): number {
     return this.parts.length
+  }
+
+  /** Seconds recorded so far, on the same clock a finished track reports. */
+  get seconds(): number {
+    return this.elapsed
   }
 
   sample(dt: number, pose: GhostPose): void {

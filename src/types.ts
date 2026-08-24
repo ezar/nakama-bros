@@ -443,6 +443,15 @@ export interface LevelResult {
   levelId: string
   cleared: boolean
   timeLeft: number
+  /**
+   * Seconds the run took, wall to wall.
+   *
+   * Not derivable from `timeLeft`: that counts down from a limit the
+   * difficulty stretches, so the same run reports a different number on easy.
+   * This is the clock a ghost is recorded against, which makes it the only one
+   * two players can be compared on.
+   */
+  runTime: number
   berries: number
   score: number
   /** Of 3 collectible Poneglyph fragments. */

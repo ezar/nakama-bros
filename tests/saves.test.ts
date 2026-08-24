@@ -19,9 +19,10 @@ describe('reading a save', () => {
       totalBerries: 9100,
       giftEarned: true,
     }
-    // `ghosts` is added by the migration, empty: an old save has no
-    // recordings, and the game must not be handed an undefined map.
-    expect(migrateProgress(old, 0)).toEqual({ ...old, ghosts: {} })
+    // `ghosts` and `rivals` are added by the migration, both empty: an old
+    // save has neither, and the game must not be handed an undefined map for
+    // either — every screen that reads them indexes straight into them.
+    expect(migrateProgress(old, 0)).toEqual({ ...old, ghosts: {}, rivals: {} })
   })
 
   it('keeps a record for a stage this build has never heard of', () => {
@@ -60,6 +61,36 @@ describe('reading a save', () => {
     expect(migrateProgress({ giftEarned: true }, 0).giftEarned).toBe(true)
   })
 
+  it('validates a rival exactly as strictly as a ghost', () => {
+    // A rival arrives from another phone by way of a string a person pasted,
+    // so it is the least trustworthy thing in the save. Everything the ghost
+    // validator refuses, this must refuse too.
+    const good = { crew: 'nami', time: 41.2, data: 'AAAAA'.repeat(20), name: 'Luca' }
+    const got = migrateProgress({ rivals: {
+      'east-blue-1': good,
+      'east-blue-2': { ...good, crew: 'shanks' },
+      'east-blue-3': { ...good, time: -3 },
+      'east-blue-4': { ...good, data: '' },
+      'wano-1': { ...good, data: 'x'.repeat(500000) },
+      'wano-2': 'not an object',
+    } }, 0)
+    expect(Object.keys(got.rivals ?? {})).toEqual(['east-blue-1'])
+    expect(got.rivals?.['east-blue-1'].name).toBe('Luca')
+  })
+
+  it('flattens a name that would break the screen it lands on', () => {
+    // The one field in the save written by somebody else, and it goes on
+    // screen next to their time. A newline in it is not an attack, it is a
+    // child pasting from a chat app — but it would still wreck the layout.
+    const track = { crew: 'nami', time: 41.2, data: 'AAAAA'.repeat(20) }
+    const rivals = (name: unknown) =>
+      migrateProgress({ rivals: { 'east-blue-1': { ...track, name } } }, 0).rivals?.['east-blue-1']
+    expect(rivals('  Le\nyre  ')?.name).toBe('Le yre')
+    expect(rivals('A'.repeat(200))?.name.length).toBeLessThanOrEqual(24)
+    expect(rivals(undefined)?.name).toBe('')
+    expect(rivals(42)?.name).toBe('')
+  })
+
   it('clamps volumes into a range a GainNode can use', () => {
     const out = migrateSettings({ master: 40, music: -3, sfx: NaN }, 0)
     expect(out.master).toBe(1)
@@ -79,6 +110,6 @@ describe('reading a save', () => {
     const chosen = { master: 0.2, music: 0, sfx: 1, lang: 'en', touchControls: 'on', effects: 'reduced', crt: true, difficulty: 'hard' }
     // The ghost is off unless the save says otherwise — a new switch must not
     // turn itself on for somebody who already had settings.
-    expect(migrateSettings(chosen, 0)).toEqual({ ...chosen, ghost: false })
+    expect(migrateSettings(chosen, 0)).toEqual({ ...chosen, ghost: false, playerName: '' })
   })
 })

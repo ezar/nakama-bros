@@ -22,7 +22,7 @@ import './entities/enemies'
 import './entities/items'
 import './entities/bosses'
 import { Ghost } from './entities/Ghost'
-import { GHOST_MIN_POSES, GhostRecorder, type GhostTrack } from './ghost'
+import { GHOST_MIN_POSES, GhostRecorder, type GhostRacer, type GhostTrack } from './ghost'
 
 /** Seconds the HUD keeps showing a multiplier after the last link landed. */
 const CHAIN_HOLD = 1.6
@@ -96,8 +96,16 @@ export class Game implements World {
     private callbacks: GameCallbacks = {},
     startingRun?: Partial<RunState>,
     difficulty: Difficulty = 'normal',
-    /** The run to race against, or null. Absent means nothing to race. */
-    ghost: GhostTrack | null = null,
+    /**
+     * The runs to race against. Empty means nothing to race.
+     *
+     * A list rather than one, because your own best and a challenge somebody
+     * sent are both on the stage at the same time and neither replaces the
+     * other: the point of a rival is to see where you lose ground to them,
+     * and the point of your own shadow is to see whether you are having a
+     * good run at all.
+     */
+    racers: GhostRacer[] = [],
   ) {
     this.level = levelDef
     this.rng = new Rng(seedFrom(levelDef.id))
@@ -122,7 +130,7 @@ export class Game implements World {
 
     this.camera.setBounds(this.levelObj.map.pixelW, this.levelObj.map.pixelH)
     this.reset()
-    if (ghost) this.spawn(new Ghost(ghost))
+    for (const racer of racers) this.spawn(new Ghost(racer.track, racer.tint ?? null))
 
     this.loop = new GameLoop({
       step: (dt) => this.step(dt),
@@ -389,6 +397,7 @@ export class Game implements World {
     const timeBonus = Math.floor(this.run.time) * SCORE.timeBonus
     this.run.score += timeBonus + SCORE.clear
     this.callbacks.onLevelEnd?.({
+      runTime: +this.recorder.seconds.toFixed(2),
       levelId: this.level.id,
       cleared: true,
       timeLeft: this.run.time,

@@ -59,6 +59,19 @@ export const BOUNTY: Record<CrewId, number> = {
 /** Berries with the thousands separator the poster printer would have used. */
 export const formatBerry = (n: number): string => n.toLocaleString('es-ES')
 
+/**
+ * A run's duration, as a time you would say out loud: 1:04.28, or 42.31s.
+ *
+ * Hundredths always, even under a minute: challenge times are compared against
+ * each other and a tenth is often the whole margin.
+ */
+export function formatRunTime(seconds: number): string {
+  const s = Math.max(0, seconds)
+  const mins = Math.floor(s / 60)
+  const rest = s - mins * 60
+  return mins === 0 ? `${rest.toFixed(2)}s` : `${mins}:${rest.toFixed(2).padStart(5, '0')}`
+}
+
 export type Rank = 'S' | 'A' | 'B' | 'C'
 
 /**
