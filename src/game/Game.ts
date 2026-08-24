@@ -22,6 +22,9 @@ import './entities/enemies'
 import './entities/items'
 import './entities/bosses'
 
+/** Seconds the HUD keeps showing a multiplier after the last link landed. */
+const CHAIN_HOLD = 1.6
+
 export interface GameCallbacks {
   onHud?: (hud: HudSnapshot) => void
   onLevelEnd?: (result: LevelResult) => void
@@ -61,6 +64,9 @@ export class Game implements World {
   private respawnTimer = -1
   private endTimer = -1
   private ended = false
+  /** The multiplier the HUD is currently showing, and how long it has left. */
+  private chainShown = 0
+  private chainHold = 0
   private hudTick = 0
   private flash = 0
 
@@ -90,6 +96,7 @@ export class Game implements World {
       time: levelDef.timeLimit * this.difficulty.time,
       levelId: levelDef.id,
       checkpoint: null,
+      bestChain: 1,
       ...startingRun,
     }
 
@@ -203,6 +210,22 @@ export class Game implements World {
     this.spawn(new FloatingText(x, y - 6, `${points}`, PAL.gold))
   }
 
+  /**
+   * Call the multiplier out where the kill happened.
+   *
+   * Sits above the points rather than beside them, in a hotter colour and for
+   * longer, because it is the part worth chasing: the points are the
+   * consequence, the chain is the achievement. The hit-stop grows a little with
+   * each link so a long chain feels heavier as it goes, not just louder.
+   */
+  chainCalled(multiplier: number, x: number, y: number): void {
+    this.run.bestChain = Math.max(this.run.bestChain, multiplier)
+    this.chainShown = multiplier
+    this.chainHold = CHAIN_HOLD
+    this.spawn(new FloatingText(x, y - 20, `x${multiplier}`, PAL.ember, 1.15))
+    this.hitstop(Math.min(9, 3 + Math.log2(multiplier) * 2))
+  }
+
   berries(n: number, x: number, y: number): void {
     this.run.berries += n
     if (this.run.berries >= BERRIES_PER_LIFE) {
@@ -230,6 +253,10 @@ export class Game implements World {
 
   private step(dt: number): void {
     this.time += dt
+    // The chain readout outlives the chain by a beat, on purpose: landing is
+    // what ends a chain, and a number that disappeared on the same frame would
+    // never be read.
+    if (this.chainHold > 0) this.chainHold = Math.max(0, this.chainHold - dt)
     const input = this.inputMgr.sample()
 
     if (input.pressed.pause && !this.ended) {
@@ -351,6 +378,7 @@ export class Game implements World {
       bossHealth: boss ? boss.health / (boss as unknown as { maxHealth: number }).maxHealth : null,
       bossName: boss ? (boss as unknown as { displayName: string }).displayName : null,
       fragments: this.fragments,
+      chain: this.chainHold > 0 ? this.chainShown : 0,
     }
   }
 

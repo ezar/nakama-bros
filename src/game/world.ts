@@ -43,6 +43,12 @@ export interface World {
   shake(amount: number): void
   /** Award points with a floating number at the world position. */
   score(points: number, x: number, y: number): void
+
+  /**
+   * A chained stomp landed and was worth `multiplier` times the usual. The
+   * world decides how to say so; the enemy only knows that it happened.
+   */
+  chainCalled(multiplier: number, x: number, y: number): void
   /** Collect berries (this game's coins). */
   berries(n: number, x: number, y: number): void
   /** Move the respawn point. */

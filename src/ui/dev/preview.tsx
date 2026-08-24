@@ -50,7 +50,8 @@ const HUD: HudSnapshot = {
   time: 27.4,
   bossHealth: 0.62,
   bossName: 'Arlong',
-  fragments: [true, false, true],
+  chain: 8,
+      fragments: [true, false, true],
 }
 
 const RECORDS: Record<string, LevelRecord> = {

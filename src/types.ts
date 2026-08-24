@@ -360,6 +360,8 @@ export interface RunState {
   levelId: string
   /** Checkpoint reached in the current level, in tiles. */
   checkpoint: Vec2 | null
+  /** Highest stomp multiplier reached this run. Survives a death. */
+  bestChain: number
 }
 
 export interface LevelResult {
@@ -429,6 +431,12 @@ export interface RenderContext {
 }
 
 export interface HudSnapshot {
+  /**
+   * Live stomp multiplier, or 0 when no chain is running. The HUD shows it for
+   * a moment after the last link so the final number can be read — a counter
+   * that vanished the instant the player touched down would never be seen.
+   */
+  chain: number
   crew: CrewId
   tier: PowerTier
   lives: number

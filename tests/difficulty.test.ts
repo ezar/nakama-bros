@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DIFFICULTIES, DIFFICULTY, PHYS, TIER_ORDER } from '../src/game/config'
+import { DIFFICULTIES, DIFFICULTY, PHYS, SCORE, TIER_ORDER } from '../src/game/config'
 import { TRANSLATIONS } from '../src/i18n/translations'
 
 /**
@@ -83,5 +83,27 @@ describe('difficulty', () => {
       }
       expect(TRANSLATIONS[lang]['options.difficulty']?.length ?? 0).toBeGreaterThan(2)
     }
+  })
+})
+
+/**
+ * The stomp chain.
+ *
+ * The multiplier table has been quietly doubling scores since it was written;
+ * what it never had was a guard. These are the properties the HUD readout and
+ * the rising stomp pitch both assume.
+ */
+describe('stomp chain', () => {
+  it('starts at no bonus and only ever climbs', () => {
+    expect(SCORE.chain[0]).toBe(1)
+    for (let i = 1; i < SCORE.chain.length; i++) {
+      expect(SCORE.chain[i], `link ${i}`).toBeGreaterThan(SCORE.chain[i - 1])
+    }
+  })
+
+  it('has a last link, so a long chain cannot run off the end of the table', () => {
+    // `defeat` clamps with `SCORE.chain.length - 1`; a table of one would make
+    // that clamp silently disable the whole feature.
+    expect(SCORE.chain.length).toBeGreaterThan(2)
   })
 })
