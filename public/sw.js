@@ -96,6 +96,19 @@ self.addEventListener('install', (event) => {
   )
 })
 
+/**
+ * Take charge now, because somebody asked.
+ *
+ * Nothing here calls `skipWaiting()` on its own, and that is the whole policy:
+ * a build that swaps itself in under a stage in progress costs a run, and a run
+ * is the only thing in this game a player can lose. So the new worker waits,
+ * and the page offers the swap when it is not in the middle of anything. This
+ * is the player saying yes.
+ */
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'nakama:update-now') void self.skipWaiting()
+})
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {

@@ -123,6 +123,26 @@ nuevo se recoge en el siguiente arranque y limpia los bundles que ya nadie pide.
 Un worker nuevo espera en vez de tomar el mando: cambiar el bundle debajo de una
 partida en curso es peor que jugar un rato más con el de ayer.
 
+Eso deja un agujero que el propio worker no puede tapar: un móvil que guarda el
+juego en la pantalla de inicio no arranca en frío nunca, así que «el siguiente
+arranque» puede ser dentro de dos semanas y el jugador no tiene forma de saber
+que va una versión por detrás. Lo tapa la portada. `useAppUpdate` pregunta al
+volver de segundo plano y cada media hora, y cuando hay una build esperando sale
+una tarjeta en la esquina (`UpdateNotice`) que la deja entrar. **Sólo en la
+portada**, y eso está medido, no elegido: la carta de navegación y la sala de
+carrera acaban en una fila de botones que llega al borde inferior, y una tarjeta
+en la esquina se les monta encima; arriba se monta al farol de la portada.
+Ninguna posición sobrevive a cinco pantallas, y una tarjeta que se moviera de
+sitio según la pantalla sería una tarjeta que aparece en un sitio nuevo cada
+vez. Por la portada se pasa siempre al salir de una fase.
+
+El aviso **nunca** llega durante una partida: el relevo recarga la página, y
+recargar a mitad de fase es la vuelta tirada. La distinción entre una instalación
+nueva y una actualización es `navigator.serviceWorker.controller`, no el estado
+del worker — un worker que se instala por primera vez pasa por `installed` igual
+que uno que actualiza, así que mirar sólo el estado le anuncia a quien abre el
+juego por primera vez que hay una versión nueva de la que acaba de descargar.
+
 ### Retos entre dos móviles
 
 Una vuelta terminada se puede mandar a otra persona, y quien la reciba corre

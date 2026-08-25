@@ -252,6 +252,12 @@ export const TRANSLATIONS = {
     'touch.jump': 'Saltar',
     'touch.attack': 'Atacar',
     'touch.pause': 'Pausa',
+
+    // ── New build waiting ──
+    'update.title': 'Hay una versión nueva',
+    'update.body': 'Ya está descargada; entra cuando tú digas.',
+    'update.apply': 'Actualizar',
+    'update.later': 'Ahora no',
   },
   en: {
     'title.play': 'Set sail',
@@ -484,6 +490,12 @@ export const TRANSLATIONS = {
     'touch.jump': 'Jump',
     'touch.attack': 'Attack',
     'touch.pause': 'Pause',
+
+    // ── New build waiting ──
+    'update.title': 'A new version is here',
+    'update.body': 'Already downloaded; it comes in when you say so.',
+    'update.apply': 'Update',
+    'update.later': 'Not now',
   },
 } as const
 
