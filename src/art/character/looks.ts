@@ -702,7 +702,11 @@ const LOOKS_BASE = {
     face: {
       nose: 1, noseLong: 1, eye: 1.05, brow: 1.1, blush: 0.9, freckles: true, iris: '#8E4E22',
     },
-    portrait: { expression: 'surprised', turn: 0.3, tilt: 0.08 },
+    // Turned further than the rest of the crew, and for his reason: the nose is
+    // a profile feature. Square to the camera it is mostly pointing at the
+    // viewer, so what reaches the picture is a stub beside the mouth — the one
+    // angle at which the thing that makes him recognisable does not read.
+    portrait: { expression: 'surprised', turn: 0.52, tilt: 0.08 },
     banner: PAL.usoppBrown,
     pal: P({
       skin: '#D89A6C', hair: '#2A1C14', shirt: '#E0BC62', trousers: '#4E8244',
