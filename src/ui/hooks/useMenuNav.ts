@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { isTyping } from '../../engine/typing'
+
+// Re-exported because every caller that has this hook also needs the rule.
+export { isTyping }
 
 /**
  * Keyboard and gamepad navigation for a menu.
@@ -44,26 +48,6 @@ interface Options {
 const REPEAT_DELAY = 400
 const REPEAT_RATE = 130
 const DEADZONE = 0.55
-
-/**
- * Is this key going into a text field?
- *
- * If it is, the menu must not see it at all — not just not confirm on it.
- * `a`, `d`, `w` and `s` are movement keys here, and `Backspace` is "go back",
- * and all of them are swallowed with `preventDefault`. Typing a name into the
- * challenge sheet therefore lost letters and could not delete: the field is
- * drawn over the chart, and the chart's menu was eating the keystrokes on
- * their way past `window`.
- *
- * A `select` counts. Its own keyboard handling is how a stage gets picked in
- * the race lobby, and arrow keys there belong to it, not to the screen behind.
- */
-export function isTyping(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null
-  if (!el || typeof el.tagName !== 'string') return false
-  const tag = el.tagName
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
-}
 
 /**
  * Is a dialog covering this menu?

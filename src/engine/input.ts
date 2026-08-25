@@ -1,3 +1,4 @@
+import { isTyping } from './typing'
 import type { ButtonName, InputState } from '../types'
 import { clamp } from './math'
 
@@ -76,6 +77,12 @@ export class Input {
   attach(target: Window | HTMLElement = window): void {
     const onKeyDown = (e: Event) => {
       const ke = e as KeyboardEvent
+      // Not a keystroke meant for us. The engine listens on the window, so a
+      // text field anywhere in the shell sits under a handler that swallows
+      // half the alphabet — and the sheet where you type your name is opened
+      // from the card at the end of a lap, with the game still mounted and
+      // still listening underneath it.
+      if (isTyping(ke.target)) return
       const b = KEYMAP[ke.code]
       if (!b) return
       // Arrow keys and space scroll the page otherwise.
@@ -86,9 +93,12 @@ export class Input {
     }
     const onKeyUp = (e: Event) => {
       const ke = e as KeyboardEvent
+      // Deliberately *not* guarded on `isTyping`: a key can go down on the
+      // canvas and come up after focus has moved into a field, and a release
+      // that never arrives leaves the character running by itself.
       const b = KEYMAP[ke.code]
       if (!b) return
-      ke.preventDefault()
+      if (!isTyping(ke.target)) ke.preventDefault()
       this.keys[b] = false
     }
     const onBlur = () => {
@@ -99,12 +109,16 @@ export class Input {
 
     target.addEventListener('keydown', onKeyDown as EventListener)
     target.addEventListener('keyup', onKeyUp as EventListener)
-    window.addEventListener('blur', onBlur)
+    // Losing the window with a key held is the classic stuck-run bug, so this
+    // one is on the window rather than the target — but the target may be all
+    // there is, off a browser.
+    const win = typeof window === 'undefined' ? null : window
+    win?.addEventListener('blur', onBlur)
 
     this.detached.push(() => {
       target.removeEventListener('keydown', onKeyDown as EventListener)
       target.removeEventListener('keyup', onKeyUp as EventListener)
-      window.removeEventListener('blur-sm', onBlur)
+      win?.removeEventListener('blur', onBlur)
     })
   }
 
