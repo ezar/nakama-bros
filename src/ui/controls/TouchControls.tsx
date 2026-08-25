@@ -18,9 +18,29 @@ interface Props {
  * being pushed by writing straight to the DOM — a d-pad that re-rendered React
  * on every thumb movement would cost the game frames.
  *
- * Everything is inset from the safe area, and the two action buttons are placed
- * for a right thumb at rest: jump lowest and largest, attack above and inboard.
+ * The two action buttons are placed for a right thumb at rest: jump lowest and
+ * largest, attack above and inboard.
+ *
+ * ## Where the edge is
+ *
+ * The gap and the notch inset are combined with `max`, never added. Added, they
+ * stack: on a phone in landscape iOS already holds back a band for the notch
+ * and another for the home indicator, and a further rem of our own on top put
+ * the pad a thumb's width inside the glass — which is exactly where a thumb
+ * curled around the back of the phone cannot comfortably reach. `max` gives the
+ * platform's inset where there is one and our own gap where there is not, so
+ * the controls sit on the edge of the usable screen on every device instead of
+ * on the edge of the usable screen plus a guess.
+ *
+ * Deliberately no tighter than the inset. That rectangle is the platform's own
+ * account of the notch and the rounded corners; a control placed outside it
+ * looks fine on the device it was tuned on and gets clipped on the next one.
  */
+
+/** Gap from the edge where the platform asks for none of its own. */
+const EDGE = '0.65rem'
+const edgeX = (side: 'l' | 'r') => `max(${EDGE}, var(--safe-${side}))`
+const EDGE_B = `max(${EDGE}, var(--safe-b))`
 export function TouchControls({ input, visible }: Props) {
   const t = useT()
   const padRef = useRef<HTMLDivElement>(null)
@@ -136,25 +156,16 @@ export function TouchControls({ input, visible }: Props) {
   })
 
   return (
-    <div
-      // Inset, not padded: the pad and the buttons are absolutely positioned,
-      // and those measure from the padding box, which padding does not move.
-      // The jump button was sitting half under the rounded corner.
-      className="pointer-events-none absolute z-20 touch-none select-none"
-      style={{
-        top: 'var(--safe-t)',
-        right: 'var(--safe-r)',
-        bottom: 'var(--safe-b)',
-        left: 'var(--safe-l)',
-      }}
-    >
+    <div className="pointer-events-none absolute inset-0 z-20 touch-none select-none">
       {/* ── Steering ── */}
       <div
         ref={padRef}
         role="group"
         aria-label={t('touch.move')}
-        className="pointer-events-auto absolute bottom-6 left-5 grid h-36 w-36 place-items-center rounded-full"
+        className="pointer-events-auto absolute grid h-36 w-36 place-items-center rounded-full"
         style={{
+          bottom: EDGE_B,
+          left: edgeX('l'),
           backgroundImage:
             'radial-gradient(circle at 36% 30%, rgba(255,226,180,0.18) 0%, rgba(20,12,6,0.55) 62%, rgba(8,4,2,0.7) 100%)',
           border: `3px solid ${UI.brassDark}`,
@@ -198,7 +209,10 @@ export function TouchControls({ input, visible }: Props) {
       </div>
 
       {/* ── Actions ── */}
-      <div className="pointer-events-auto absolute bottom-7 right-6 flex items-end gap-4">
+      <div
+        className="pointer-events-auto absolute flex items-end gap-4"
+        style={{ bottom: EDGE_B, right: edgeX('r') }}
+      >
         <button
           {...hold('attack')}
           aria-label={t('touch.attack')}

@@ -36,6 +36,35 @@ export function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
  * A short, dense, decaying impulse response. Two early reflections plus an
  * exponential noise tail reads as a room rather than as a metallic ring.
  */
+/**
+ * Route a voice to the mix, panned only if it is actually panned.
+ *
+ * A `StereoPanner` set to dead centre is an identity: it costs a node, a
+ * connection and a slot in the render graph to multiply by one. Most notes in
+ * this soundtrack are centred — the panning that matters is on a handful of
+ * layers and on positional effects — and the graph makes around three hundred
+ * and fifty nodes a second while a level is running, measured. Skipping the
+ * ones that do nothing is free in every sense: the output is sample-identical,
+ * because a centre pan is what a mono source connected straight through
+ * already sounds like.
+ */
+export function panTo(
+  ctx: BaseAudioContext,
+  from: AudioNode,
+  out: AudioNode,
+  pan: number,
+): AudioNode {
+  if (Math.abs(pan) < 0.001) {
+    from.connect(out)
+    return from
+  }
+  const p = ctx.createStereoPanner()
+  p.pan.value = Math.max(-1, Math.min(1, pan))
+  from.connect(p)
+  p.connect(out)
+  return p
+}
+
 export function reverbImpulse(ctx: BaseAudioContext, seconds = 1.9, decay = 3.2): AudioBuffer {
   const rate = ctx.sampleRate
   const len = Math.max(1, Math.floor(rate * seconds))
@@ -192,10 +221,7 @@ export function playPatch(
     node = ws
   }
 
-  const pan = ctx.createStereoPanner()
-  pan.pan.value = Math.max(-1, Math.min(1, o.pan ?? 0))
-  node.connect(pan)
-  pan.connect(out)
+  const pan = panTo(ctx, node, out, o.pan ?? 0)
   if (send && patch.send > 0) {
     const s = ctx.createGain()
     s.gain.value = patch.send
@@ -360,6 +386,9 @@ export function playDrum(
   const t = Math.max(when, ctx.currentTime)
   const level = spec.gain * gain * (0.15 + 0.85 * vel)
 
+  // Not routed through `panTo`: a drum's layers have no node to meet at except
+  // the panner itself, so skipping it would only mean creating a gain in its
+  // place. The saving there is zero and the wiring is worse.
   const panner = ctx.createStereoPanner()
   panner.pan.value = Math.max(-1, Math.min(1, pan))
   panner.connect(out)

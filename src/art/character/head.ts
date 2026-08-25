@@ -238,14 +238,24 @@ function noseWedge(
  */
 function longNose(cx: number, cy: number, r: number, turn: number, len: number): Path2D | null {
   if (len < 0.02) return null
-  // Foreshortening. Never all the way to nothing: even square to the camera a
-  // nose this size still breaks the contour, and a face that loses it for a
+  // Foreshortening, on the law a real one obeys: a rod of length L pointing at
+  // an angle projects as L·sin of it, and `turn` is that angle over a quarter
+  // circle. Straight-line ramps are the tempting shortcut and they are wrong in
+  // the place it shows — near square-on, where a nose should be nearly all
+  // pointing at the viewer and hardly any of it across the face. The portrait
+  // is drawn at a third of a turn, and a linear ramp left it three quarters
+  // extended there: a stub of a nose came out beside the mouth reading as an
+  // ear. Never all the way to nothing, though — even dead square to the camera
+  // a nose this size still breaks the contour, and a face that loses it for a
   // frame is a different face.
-  const ext = (0.42 + 0.58 * Math.max(0, Math.min(1, turn))) * len
-  const tipX = cx + r * (0.6 + 1.52 * ext)
-  // And it droops. A straight cone off a face is a beak; the fall from bridge
-  // to tip is what makes it read as flesh hanging off a skull.
-  const tipY = cy + r * (0.34 + 0.08 * turn)
+  const t = Math.max(0, Math.min(1, turn))
+  const ext = (0.18 + 0.82 * Math.sin(t * Math.PI * 0.5)) * len
+  const tipX = cx + r * (0.6 + 1.38 * ext)
+  // And it droops — more, not less, as it shortens. A nose swinging toward the
+  // camera shows its underside, so the tip falls away from the bridge in the
+  // picture plane even as the length across it collapses. A straight cone off a
+  // face is a beak; this fall is what makes it read as flesh on a skull.
+  const tipY = cy + r * (0.46 - 0.05 * t)
   return blob([
     // Root on the bridge, between the eyes and well inside the skull.
     //
@@ -258,13 +268,15 @@ function longNose(cx: number, cy: number, r: number, turn: number, len: number):
     [cx + r * 0.3, cy - r * 0.1],
     [cx + r * 0.78, cy - r * 0.02],
     [tipX - r * ext * 0.55, tipY - r * 0.24],
-    // The tip, and the notch under it. Slack tension everywhere else, because
-    // these two are the only corners a nose has.
+    // The tip, and the notch under it — the only two corners a nose has, which
+    // is why the tension is slack rather than absent. Slacker still and the
+    // foreshortened tip, where these three points crowd together, comes to a
+    // flat diagonal cut and the nose reads as a sawn-off peg.
     [tipX, tipY],
     [tipX - r * ext * 0.4, tipY + r * 0.16],
     [cx + r * 0.7, cy + r * 0.34],
     [cx + r * 0.26, cy + r * 0.26],
-  ] as Pt[], 0.42)
+  ] as Pt[], 0.66)
 }
 
 export function drawHead(
@@ -636,7 +648,19 @@ function drawFace(
       break
     }
     case 'o': {
-      const p = ellipsePath(mx, my + 0.2, mw * (0.8 + e.gape * 0.2), mw * (1 + e.gape))
+      // A gasp drops the jaw; it does not inflate about the lip line. Grown
+      // from its centre — which is what a plain radius does — a wide gape on
+      // this head reached from the chin to *above the eyeline*, and since the
+      // mouth is painted after the eyes it simply covered the near one. Every
+      // character has worn that on the frame they leave the ground, where the
+      // sprite is too small to see it; on a portrait at nine times the size it
+      // is the first thing you see. So the top lip is fixed and the opening
+      // grows downward into the room there actually is, between the eyes and
+      // the jaw this particular face has.
+      const top = my - mw * 0.72
+      const chin = cy + r * (0.62 + o.turn * 0.08) * st.jaw
+      const bot = top + Math.max(mw * 0.5, chin - top) * (0.5 + e.gape * 0.46)
+      const p = ellipsePath(mx, (top + bot) / 2, mw * (0.8 + e.gape * 0.2), (bot - top) / 2)
       ctx.fillStyle = gum
       ctx.fill(p)
       ctx.stroke(p)
