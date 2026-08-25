@@ -20,11 +20,13 @@ import { EndingScreen } from './ui/screens/EndingScreen'
 import { LevelIntroScreen } from './ui/screens/LevelIntroScreen'
 import { ChallengeScreen } from './ui/screens/ChallengeScreen'
 import { ChallengePanel } from './ui/ChallengePanel'
+import { UpdateNotice } from './ui/UpdateNotice'
 import { VersusScreen } from './ui/screens/VersusScreen'
 import { RaceResultScreen } from './ui/screens/RaceResultScreen'
 import type { RaceSession } from './net/session'
 import { consumeChallengeFromLocation, watchForChallenges } from './game/challengeLink'
 import { decodeChallenge } from './game/ghostCode'
+import { useAppUpdate } from './ui/hooks/useAppUpdate'
 
 type Screen =
   | 'loading' | 'title' | 'crew' | 'map' | 'options' | 'credits' | 'ending' | 'intro' | 'play'
@@ -78,6 +80,18 @@ export default function App() {
    * would be unmounted mid-action.
    */
   const [sharing, setSharing] = useState<string | null>(null)
+
+  /*
+    A newer build, if one is waiting. Offered on the title and nowhere else.
+
+    Taking it reloads the page, so it must never come up during a stage — that
+    is a run thrown away. But the reason it is the title alone rather than
+    everywhere-but-play is a layout one, and it was measured: the chart and the
+    race lobby end in a row of actions that runs to the bottom edge, and a card
+    in the corner sits on top of it. See `UpdateNotice`. The build keeps waiting
+    regardless, and every way out of a level leads here.
+  */
+  const update = useAppUpdate(screen !== 'title')
   /**
    * The live race in progress, or null.
    *
@@ -359,6 +373,12 @@ export default function App() {
         thing given up, and it buys a shell that cannot dead-end.
       */}
       {renderScreen()}
+
+      <AnimatePresence>
+        {update.ready && (
+          <UpdateNotice key="update" onApply={update.apply} onDismiss={update.dismiss} />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {sharing && (
