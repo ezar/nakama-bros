@@ -160,6 +160,19 @@ export class AudioEngine implements AudioApi {
       graph.musicIn.gain.value = this.musicVolume
       graph.sfxIn.gain.value = this.sfxVolume
 
+      // iOS takes the audio session away for a phone call, for Siri, for
+      // another app that wants it — and hands back a context in `interrupted`
+      // or `suspended` with no visibility change and no gesture to hang a
+      // recovery off. Nothing was listening, so the sound simply stopped: every
+      // effect returned early on the state check and the sequencer went on
+      // scheduling into a context that was not running. `statechange` is the
+      // one notification there is for it, so it is worth a try at resuming.
+      // The gesture listeners in the shell stay as the fallback for when this
+      // is refused outside one.
+      ctx.onstatechange = () => {
+        if (ctx.state !== 'running') void ctx.resume().catch(() => undefined)
+      }
+
       this.ctx = ctx
       this.graph = graph
       this.music = new MusicPlayer(ctx, graph.musicIn, graph.reverbIn)

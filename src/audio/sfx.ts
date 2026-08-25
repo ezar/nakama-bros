@@ -13,7 +13,7 @@
  * does not machine-gun.
  */
 import type { SfxName } from '../types'
-import { driveCurve, noiseBuffer } from './synth'
+import { driveCurve, noiseBuffer, panTo } from './synth'
 
 export interface SfxLayer {
   /** Documentation only — it keeps the recipes honest. */
@@ -330,10 +330,7 @@ export function renderSfx(
       node = ws
     }
 
-    const panner = ctx.createStereoPanner()
-    panner.pan.value = Math.max(-1, Math.min(1, basePan + (layer.pan ?? 0)))
-    node.connect(panner)
-    panner.connect(out)
+    const panner = panTo(ctx, node, out, basePan + (layer.pan ?? 0))
     if (send && (recipe.send ?? 0) > 0) {
       const s = ctx.createGain()
       s.gain.value = recipe.send ?? 0
