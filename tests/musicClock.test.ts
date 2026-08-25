@@ -12,7 +12,7 @@ import { TRACKS } from '../src/audio/tracks'
  * sounds like from the sofa.
  */
 describe('the music clock', () => {
-  it('drops the notes a late bar has already missed, and keeps the rest', () => {
+  it('drops the notes a late bar has properly missed, and keeps the rest', () => {
     const bar = [{ t: 0 }, { t: 0.25 }, { t: 0.5 }, { t: 0.75 }]
     // The bar was meant to start at 10.0 and the clock is already at 10.4.
     expect(notesDue(bar, 10, 10.4)).toEqual([{ t: 0.5 }, { t: 0.75 }])
@@ -25,6 +25,22 @@ describe('the music clock', () => {
 
   it('keeps a note landing exactly on the clock', () => {
     expect(notesDue([{ t: 0 }], 10, 10)).toHaveLength(1)
+  })
+
+  /*
+    The first cut refused anything at all behind the clock. Counting what it
+    actually refused said that was too strict where it bites: at every throttle
+    a real phone would see it refuses nothing, but at twentyfold — a device that
+    cannot keep up — it threw away 28% of the music, some of it barely late. A
+    note that loose is a flam; a note that is gone is a hole. So a little slop
+    plays and a lot does not.
+  */
+  it('lets a note a hair behind the clock through rather than losing it', () => {
+    expect(notesDue([{ t: 0 }], 10, 10.02)).toHaveLength(1)
+  })
+
+  it('still refuses one far enough behind to land somewhere else entirely', () => {
+    expect(notesDue([{ t: 0 }], 10, 10.2)).toHaveLength(0)
   })
 
   /*

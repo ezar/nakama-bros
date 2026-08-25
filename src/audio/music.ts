@@ -42,14 +42,36 @@ export const LOOKAHEAD = 0.45
 const TICK_MS = 25
 
 /**
- * The notes of a bar that have not already happened.
+ * How far behind the clock a note may be and still be worth playing.
  *
- * A start time in the past is clamped to now by the audio clock, so a bar that
- * goes out late does not play late — it plays *all at once*. Dropping the head
- * of one bar costs a few notes; letting it through costs a chord nobody wrote.
+ * Not zero, and the measurement is why. Counting what the rule actually
+ * refuses, over a minute of play at a range of CPU throttles: at ×1, ×3 and ×6
+ * it refuses *nothing at all* — no bar ever goes out behind the clock, which is
+ * what the look-ahead above is for. Only at ×20, a device that genuinely cannot
+ * keep up, does the scheduler fall behind, and there it fell as much as a
+ * second back and the rule threw away 28% of the music.
+ *
+ * A fifth of the notes is a lot to lose, and some of them were barely late. So
+ * the line sits where a late note stops being loose and starts being in the
+ * wrong place: below this it plays, a hair early against its neighbours, which
+ * is a flam and reads as feel; beyond it, it belongs to a bar the scheduler
+ * genuinely lost and playing it would clamp it into a chord nobody wrote. On
+ * the same ×20 run that took the loss from 28% to 20%, and it changes nothing
+ * at any throttle a real phone would see.
  */
-export function notesDue<T extends { t: number }>(notes: T[], when: number, floor: number): T[] {
-  return notes.filter((n) => when + n.t >= floor)
+const SLOP = 0.05
+
+/**
+ * The notes of a bar still worth handing to the clock.
+ *
+ * A start time in the past is clamped to now, so a bar that goes out far behind
+ * does not play late — it plays *all at once*. Dropping the head of such a bar
+ * costs a few notes; letting it through costs a chord nobody wrote.
+ */
+export function notesDue<T extends { t: number }>(
+  notes: T[], when: number, floor: number, slop = SLOP,
+): T[] {
+  return notes.filter((n) => when + n.t >= floor - slop)
 }
 
 /** Render one bar of a track into any context — used by the player and by tests. */
