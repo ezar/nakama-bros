@@ -698,7 +698,10 @@ const LOOKS_BASE = {
   usopp: {
     name: 'Usopp',
     build: { shoulder: 4.25, chest: 3.9, waist: 2.85, hip: 3.7 },
-    face: { nose: 0, eye: 1.05, brow: 1.1, blush: 0.9, freckles: true, iris: '#8E4E22' },
+    // The nose is built with the head, not over it: see `longNose` in `head.ts`.
+    face: {
+      nose: 1, noseLong: 1, eye: 1.05, brow: 1.1, blush: 0.9, freckles: true, iris: '#8E4E22',
+    },
     portrait: { expression: 'surprised', turn: 0.3, tilt: 0.08 },
     banner: PAL.usoppBrown,
     pal: P({
@@ -757,18 +760,6 @@ const LOOKS_BASE = {
     ],
     headgear: (ctx, cx, cy, r, _s) => {
       goggles(ctx, cx, cy, r)
-      // The nose. It is the character, so it is drawn as a real tapering form
-      // with its own terminator rather than a triangle stuck on the face.
-      const skin = skinCel('#D89A6C')
-      celPaint(ctx, blob([
-        [cx + r * 0.5, cy + r * 0.06],
-        [cx + r * 1.7, cy + r * 0.24],
-        [cx + r * 2.5, cy + r * 0.46],
-        [cx + r * 1.6, cy + r * 0.64],
-        [cx + r * 0.56, cy + r * 0.7],
-      ] as Pt[], 0.6), skin, {
-        shadow: 0.46, radius: r, pivot: [cx + r, cy + r * 0.2], rim: 0.5, line: 0.5, occlusion: 0.2,
-      })
     },
     props: (ctx, s, phase) => {
       if (phase !== 'behind') return

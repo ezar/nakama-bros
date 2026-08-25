@@ -45,6 +45,12 @@ export interface FaceStyle {
   gills: boolean
   /** Widens the jaw without widening the cranium: a heavy, blunt head. */
   jaw: number
+  /**
+   * How far the nose projects past the face, in the long form: 0 is the
+   * ordinary wedge, 1 is the sniper's. Above zero it also takes over from the
+   * face's nose tick, which is a shading mark for a nose you cannot see.
+   */
+  noseLong: number
 }
 
 export const FACE: FaceStyle = {
@@ -63,6 +69,7 @@ export const FACE: FaceStyle = {
   tusk: 0,
   gills: false,
   jaw: 1,
+  noseLong: 0,
 }
 
 export interface FaceOptions {
@@ -192,7 +199,10 @@ export function drawNeck(ctx: CanvasRenderingContext2D, s: Skeleton, skin: Cel, 
  * It fades in from half a turn: below that the nose is genuinely inside the
  * silhouette and a bump there would read as a lump on the cheek.
  */
-function noseWedge(cx: number, cy: number, r: number, turn: number, nose: number): Path2D | null {
+function noseWedge(
+  cx: number, cy: number, r: number, turn: number, nose: number, long = 0,
+): Path2D | null {
+  if (long > 0.01) return longNose(cx, cy, r, turn, nose * long)
   const t = Math.max(0, Math.min(1, (turn - 0.5) / 0.42)) * nose
   if (t < 0.02) return null
   // Five points and a slack tension, because a nose is the one place on this
@@ -207,6 +217,54 @@ function noseWedge(cx: number, cy: number, r: number, turn: number, nose: number
     [cx + r * (0.78 + out * 0.3), cy + r * 0.37],
     [cx + r * 0.48, cy + r * 0.4],
   ] as Pt[], 0.35)
+}
+
+/**
+ * The long nose, for the character whose nose is the character.
+ *
+ * It is the same wedge as everyone else's, only carried far enough past the
+ * face to become a silhouette of its own — and that is the whole point of
+ * building it here rather than as a shape laid over the face. Painted on top it
+ * is a cone with its own ink outline, and the outline crosses the cheek: the
+ * line that should be the *edge* of a form running down the front of a head
+ * instead reads as the border of a sticker. Built here it goes down before the
+ * skull, so the skull's own fill buries the base, the only line left is the one
+ * around the part that genuinely projects, and the head's terminator and rim
+ * run across both because they are one call with one pivot.
+ *
+ * It also has to shorten. A nose pointing at the camera is a stub; a nose in
+ * profile is its full length. Holding one length at every angle is the single
+ * loudest tell that a feature was pasted on, and it costs one term to fix.
+ */
+function longNose(cx: number, cy: number, r: number, turn: number, len: number): Path2D | null {
+  if (len < 0.02) return null
+  // Foreshortening. Never all the way to nothing: even square to the camera a
+  // nose this size still breaks the contour, and a face that loses it for a
+  // frame is a different face.
+  const ext = (0.42 + 0.58 * Math.max(0, Math.min(1, turn))) * len
+  const tipX = cx + r * (0.6 + 1.52 * ext)
+  // And it droops. A straight cone off a face is a beak; the fall from bridge
+  // to tip is what makes it read as flesh hanging off a skull.
+  const tipY = cy + r * (0.34 + 0.08 * turn)
+  return blob([
+    // Root on the bridge, between the eyes and well inside the skull.
+    //
+    // What decides whether this reads as a nose or as a fin growing out of the
+    // cheek is not the length — it is how thick the form is where it crosses
+    // the silhouette. Wide enough and the eye stops reading a nose in
+    // perspective and starts reading a wedge stuck to the side of the head, at
+    // which point every other detail is wasted. It wants about a third of a
+    // head radius there, no more.
+    [cx + r * 0.3, cy - r * 0.1],
+    [cx + r * 0.78, cy - r * 0.02],
+    [tipX - r * ext * 0.55, tipY - r * 0.24],
+    // The tip, and the notch under it. Slack tension everywhere else, because
+    // these two are the only corners a nose has.
+    [tipX, tipY],
+    [tipX - r * ext * 0.4, tipY + r * 0.16],
+    [cx + r * 0.7, cy + r * 0.34],
+    [cx + r * 0.26, cy + r * 0.26],
+  ] as Pt[], 0.42)
 }
 
 export function drawHead(
@@ -232,22 +290,43 @@ export function drawHead(
   // whitening it.
   const skinL = rgbToHsl(hexToRgb(o.skin.core)).l
   const rimFade = 1 - Math.max(0, (skinL - 0.6) / 0.4) * 0.82
-  const paint = (target: Path2D): void => celPaint(ctx, target, o.skin, {
+  const paint = (target: Path2D, line = 0.5): void => celPaint(ctx, target, o.skin, {
     shadow: 0.27,
     radius: r * 1.2,
     pivot: [cx + r * 0.1, cy - r * 0.1],
     rim: 0.42 * rimFade,
     rimColor: mix(o.skin.light, skinL > 0.72 ? '#FFE6BE' : '#FFFFFF', 0.25),
-    line: 0.5,
+    line,
   })
 
   // A snout is already a profile, and a skull has a cavity where a nose would
   // be — neither wants one bolted on.
-  if (!st0.muzzle && !st0.skull) {
-    const wedge = noseWedge(cx, cy, r, o.turn, st0.nose)
-    if (wedge) paint(wedge)
+  const wedge = !st0.muzzle && !st0.skull
+    ? noseWedge(cx, cy, r, o.turn, st0.nose, st0.noseLong)
+    : null
+  if (wedge) paint(wedge)
+
+  if (wedge && st0.noseLong > 0.01) {
+    // Laying the nose down first buries its base under the skull's fill, but it
+    // does not bury the skull's *own* contour, which then runs straight across
+    // the nose — the same seam as a pasted-on shape, moved an inch. On a nose
+    // this size that line is the whole read, so the skull is filled first and
+    // its contour stroked afterwards through a hole cut where the nose is: the
+    // skull's line stops at the nose, the nose's line is buried inside the
+    // skull, and the two meet as the single unbroken profile a face has.
+    paint(path, 0)
+    ctx.save()
+    const outside = new Path2D()
+    outside.rect(cx - r * 6, cy - r * 6, r * 12, r * 12)
+    outside.addPath(wedge)
+    ctx.clip(outside, 'evenodd')
+    ctx.strokeStyle = o.skin.line
+    ctx.lineWidth = 0.5
+    ctx.stroke(path)
+    ctx.restore()
+  } else {
+    paint(path)
   }
-  paint(path)
 
   drawFace(ctx, cx, cy, r, o, path)
   return { center: [cx, cy], r, path }
@@ -430,8 +509,9 @@ function drawFace(
     ctx.restore()
   }
 
-  // Nose: a single short tick. More than that fights the eyes.
-  if (!st.muzzle && st.nose > 0.01) {
+  // Nose: a single short tick. More than that fights the eyes — and a nose you
+  // can actually see needs no mark standing in for it.
+  if (!st.muzzle && st.nose > 0.01 && st.noseLong < 0.01) {
     ctx.save()
     ctx.strokeStyle = mix(o.skin.shade, ink, 0.45)
     ctx.lineWidth = 0.46
